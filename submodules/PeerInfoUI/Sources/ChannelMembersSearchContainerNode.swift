@@ -1203,7 +1203,7 @@ public final class ChannelMembersSearchContainerNode: SearchDisplayControllerCon
                 strongSelf.enqueueEmptyQueryTransition(transition, firstTime: firstTime)
                 
                 if entries == nil {
-                    strongSelf.emptyQueryListNode.backgroundColor = .clear
+                    strongSelf.emptyQueryListNode.backgroundColor = UIColor(white: 0.0, alpha: 0.5)
                 } else {
                     strongSelf.emptyQueryListNode.backgroundColor = presentationData.theme.chatList.backgroundColor
                 }

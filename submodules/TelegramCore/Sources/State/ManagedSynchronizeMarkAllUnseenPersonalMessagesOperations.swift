@@ -126,16 +126,13 @@ private func synchronizeMarkAllUnseen(transaction: Transaction, postbox: Postbox
         return network.request(Api.functions.messages.getUnreadMentions(flags: 0, peer: inputPeer, topMsgId: nil, offsetId: maxId, addOffset: maxId == 0 ? 0 : -1, limit: limit, maxId: maxId == 0 ? 0 : (maxId + 1), minId: 1))
         |> mapToSignal { result -> Signal<[MessageId], MTRpcError> in
             switch result {
-                case let .messages(messagesData):
-                    let messages = messagesData.messages
+                case let .messages(messages, _, _):
                     return .single(messages.compactMap({ $0.id() }))
-                case let .channelMessages(channelMessagesData):
-                    let messages = channelMessagesData.messages
+                case let .channelMessages(_, _, _, _, messages, _, _, _):
                     return .single(messages.compactMap({ $0.id() }))
                 case .messagesNotModified:
                     return .single([])
-                case let .messagesSlice(messagesSliceData):
-                    let messages = messagesSliceData.messages
+                case let .messagesSlice(_, _, _, _, messages, _, _):
                     return .single(messages.compactMap({ $0.id() }))
             }
         }
@@ -160,8 +157,7 @@ private func synchronizeMarkAllUnseen(transaction: Transaction, postbox: Postbox
                 return network.request(Api.functions.messages.readMessageContents(id: filteredIds.map { $0.id }))
                 |> map { result -> Int32? in
                     switch result {
-                        case let .affectedMessages(affectedMessagesData):
-                            let (pts, ptsCount) = (affectedMessagesData.pts, affectedMessagesData.ptsCount)
+                        case let .affectedMessages(pts, ptsCount):
                             stateManager.addUpdateGroups([.updatePts(pts: pts, ptsCount: ptsCount)])
                     }
                     if ids.count < limit {
@@ -227,7 +223,7 @@ func markUnseenPersonalMessage(transaction: Transaction, id: MessageId, addSynch
                         break loop
                     }
                 }
-                return .update(StoreMessage(id: currentMessage.id, customStableId: nil, globallyUniqueId: currentMessage.globallyUniqueId, groupingKey: currentMessage.groupingKey, threadId: currentMessage.threadId, timestamp: currentMessage.timestamp, flags: StoreMessageFlags(currentMessage.flags), tags: currentMessage.tags, globalTags: currentMessage.globalTags, localTags: currentMessage.localTags, forwardInfo: currentMessage.forwardInfo.flatMap(StoreMessageForwardInfo.init), authorId: currentMessage.author?.id, text: currentMessage.text, attributes: attributes, media: currentMessage.media))
+                return .update(StoreMessage(id: currentMessage.id, globallyUniqueId: currentMessage.globallyUniqueId, groupingKey: currentMessage.groupingKey, threadId: currentMessage.threadId, timestamp: currentMessage.timestamp, flags: StoreMessageFlags(currentMessage.flags), tags: currentMessage.tags, globalTags: currentMessage.globalTags, localTags: currentMessage.localTags, forwardInfo: currentMessage.forwardInfo.flatMap(StoreMessageForwardInfo.init), authorId: currentMessage.author?.id, text: currentMessage.text, attributes: attributes, media: currentMessage.media))
             })
             
             if addSynchronizeAction {
@@ -284,29 +280,11 @@ func managedSynchronizeMarkAllUnseenReactionsOperations(postbox: Postbox, networ
 }
 
 private func synchronizeMarkAllUnseenReactions(transaction: Transaction, postbox: Postbox, network: Network, stateManager: AccountStateManager, peerId: PeerId, operation: SynchronizeMarkAllUnseenReactionsOperation) -> Signal<Void, NoError> {
-    guard let peer = transaction.getPeer(peerId) else {
-        return .complete()
-    }
-    guard let inputPeer = apiInputPeer(peer) else {
+    guard let inputPeer = transaction.getPeer(peerId).flatMap(apiInputPeer) else {
         return .complete()
     }
     
-    var flags: Int32 = 0
-    var topMsgId: Int32?
-    var savedPeerId: Api.InputPeer?
-    if let threadId = operation.threadId {
-        if peer.isMonoForum {
-            if let subPeerId = transaction.getPeer(PeerId(threadId)).flatMap(apiInputPeer) {
-                flags |= 1 << 1
-                savedPeerId = subPeerId
-            }
-        } else {
-            flags |= 1 << 0
-            topMsgId = Int32(clamping: threadId)
-        }
-    }
-    
-    let signal = network.request(Api.functions.messages.readReactions(flags: flags, peer: inputPeer, topMsgId: topMsgId, savedPeerId: savedPeerId))
+    let signal = network.request(Api.functions.messages.readReactions(flags: 0, peer: inputPeer, topMsgId: nil))
     |> map(Optional.init)
     |> `catch` { _ -> Signal<Api.messages.AffectedHistory?, Bool> in
         return .fail(true)
@@ -314,8 +292,7 @@ private func synchronizeMarkAllUnseenReactions(transaction: Transaction, postbox
     |> mapToSignal { result -> Signal<Void, Bool> in
         if let result = result {
             switch result {
-            case let .affectedHistory(affectedHistoryData):
-                let (pts, ptsCount, offset) = (affectedHistoryData.pts, affectedHistoryData.ptsCount, affectedHistoryData.offset)
+            case let .affectedHistory(pts, ptsCount, offset):
                 stateManager.addUpdateGroups([.updatePts(pts: pts, ptsCount: ptsCount)])
                 if offset == 0 {
                     return .fail(true)
@@ -353,7 +330,7 @@ func markUnseenReactionMessage(transaction: Transaction, id: MessageId, addSynch
                 }
                 var tags = currentMessage.tags
                 tags.remove(.unseenReaction)
-                return .update(StoreMessage(id: currentMessage.id, customStableId: nil, globallyUniqueId: currentMessage.globallyUniqueId, groupingKey: currentMessage.groupingKey, threadId: currentMessage.threadId, timestamp: currentMessage.timestamp, flags: StoreMessageFlags(currentMessage.flags), tags: tags, globalTags: currentMessage.globalTags, localTags: currentMessage.localTags, forwardInfo: currentMessage.forwardInfo.flatMap(StoreMessageForwardInfo.init), authorId: currentMessage.author?.id, text: currentMessage.text, attributes: attributes, media: currentMessage.media))
+                return .update(StoreMessage(id: currentMessage.id, globallyUniqueId: currentMessage.globallyUniqueId, groupingKey: currentMessage.groupingKey, threadId: currentMessage.threadId, timestamp: currentMessage.timestamp, flags: StoreMessageFlags(currentMessage.flags), tags: tags, globalTags: currentMessage.globalTags, localTags: currentMessage.localTags, forwardInfo: currentMessage.forwardInfo.flatMap(StoreMessageForwardInfo.init), authorId: currentMessage.author?.id, text: currentMessage.text, attributes: attributes, media: currentMessage.media))
             })
             
             if addSynchronizeAction {

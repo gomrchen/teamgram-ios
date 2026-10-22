@@ -1,18 +1,18 @@
-#import <LegacyComponents/TGMediaEditingContext.h>
+#import "TGMediaEditingContext.h"
 
 #import "LegacyComponentsInternal.h"
-#import <LegacyComponents/TGStringUtils.h>
+#import "TGStringUtils.h"
 
 #import <LegacyComponents/UIImage+TG.h>
-#import <LegacyComponents/TGPhotoEditorUtils.h>
-#import <LegacyComponents/PGPhotoEditorValues.h>
-#import <LegacyComponents/TGVideoEditAdjustments.h>
+#import "TGPhotoEditorUtils.h"
+#import "PGPhotoEditorValues.h"
+#import "TGVideoEditAdjustments.h"
 
-#import <LegacyComponents/TGModernCache.h>
-#import <LegacyComponents/TGMemoryImageCache.h>
-#import <LegacyComponents/TGMediaAsset.h>
+#import "TGModernCache.h"
+#import "TGMemoryImageCache.h"
+#import "TGMediaAsset.h"
 
-#import <LegacyComponents/TGPaintingData.h>
+#import "TGPaintingData.h"
 
 @interface TGMediaImageUpdate : NSObject
 
@@ -74,16 +74,6 @@
 
 @end
 
-@interface TGMediaLivePhotoModeUpdate : NSObject
-
-@property (nonatomic, readonly, strong) id<TGMediaEditableItem> item;
-@property (nonatomic, readonly) TGMediaLivePhotoMode mode;
-
-+ (instancetype)livePhotoModeUpdateWithItem:(id<TGMediaEditableItem>)item mode:(TGMediaLivePhotoMode)mode;
-+ (instancetype)livePhotoModeUpdate:(TGMediaLivePhotoMode)mode;
-
-@end
-
 
 @interface TGModernCache (Private)
 
@@ -102,7 +92,6 @@
     
     NSMutableDictionary *_spoilers;
     NSMutableDictionary *_prices;
-    NSMutableDictionary *_livePhotoModes;
     
     SQueue *_queue;
     
@@ -142,14 +131,10 @@
     SPipe *_fullSizePipe;
     SPipe *_cropPipe;
     SPipe *_captionAbovePipe;
-    SPipe *_highQualityPhotoPipe;
-    SPipe *_livePhotoModePipe;
     
     NSAttributedString *_forcedCaption;
     
     bool _captionAbove;
-    
-    bool _highQualityPhoto;
 }
 @end
 
@@ -168,7 +153,6 @@
         _timers = [[NSMutableDictionary alloc] init];
         _spoilers = [[NSMutableDictionary alloc] init];
         _prices = [[NSMutableDictionary alloc] init];
-        _livePhotoModes = [[NSMutableDictionary alloc] init];
         
         _imageCache = [[TGMemoryImageCache alloc] initWithSoftMemoryLimit:[[self class] imageSoftMemoryLimit]
                                                           hardMemoryLimit:[[self class] imageHardMemoryLimit]];
@@ -225,8 +209,6 @@
         _fullSizePipe = [[SPipe alloc] init];
         _cropPipe = [[SPipe alloc] init];
         _captionAbovePipe = [[SPipe alloc] init];
-        _highQualityPhotoPipe = [[SPipe alloc] init];
-        _livePhotoModePipe = [[SPipe alloc] init];
     }
     return self;
 }
@@ -788,67 +770,6 @@
     }];
 }
 
-#pragma mark -
-
-- (TGMediaLivePhotoMode)livePhotoModeForItem:(NSObject<TGMediaEditableItem> *)item {
-    NSString *itemId = [self _contextualIdForItemId:item.uniqueIdentifier];
-    if (itemId == nil)
-        return TGMediaLivePhotoModeOff;
-    
-    return [self _livePhotoModeForItemId:itemId];
-}
-
-- (TGMediaLivePhotoMode)_livePhotoModeForItemId:(NSString *)itemId
-{
-    if (itemId == nil)
-        return TGMediaLivePhotoModeOff;
-    
-    return (TGMediaLivePhotoMode)[_livePhotoModes[itemId] unsignedIntValue];
-}
-
-- (SSignal *)livePhotoModeSignalForItem:(NSObject<TGMediaEditableItem> *)item {
-    SSignal *updateSignal = [[_livePhotoModePipe.signalProducer() filter:^bool(TGMediaLivePhotoModeUpdate *update)
-    {
-        return [update.item.uniqueIdentifier isEqualToString:item.uniqueIdentifier];
-    }] map:^NSNumber *(TGMediaLivePhotoModeUpdate *update)
-    {
-        return @(update.mode);
-    }];
-    
-    return [[SSignal single:@([self livePhotoModeForItem:item])] then:updateSignal];
-}
-
-- (SSignal *)livePhotoModeForIdentifier:(NSString *)identifier {
-    SSignal *updateSignal = [[_livePhotoModePipe.signalProducer() filter:^bool(TGMediaLivePhotoModeUpdate *update)
-    {
-        return [update.item.uniqueIdentifier isEqualToString:identifier];
-    }] map:^NSNumber *(TGMediaLivePhotoModeUpdate *update)
-    {
-        return @(update.mode);
-    }];
-    
-    return [[SSignal single:@([self _livePhotoModeForItemId:identifier])] then:updateSignal];
-}
-
-- (void)setLivePhotoMode:(TGMediaLivePhotoMode)mode forItem:(NSObject<TGMediaEditableItem> *)item {
-    NSString *itemId = [self _contextualIdForItemId:item.uniqueIdentifier];
-    if (itemId == nil)
-        return;
-    
-    if (mode != TGMediaLivePhotoModeOff)
-        _livePhotoModes[itemId] = @(mode);
-    else
-        [_livePhotoModes removeObjectForKey:itemId];
-
-    _livePhotoModePipe.sink([TGMediaLivePhotoModeUpdate livePhotoModeUpdateWithItem:item mode:mode]);
-}
-
-- (SSignal *)livePhotoModesUpdatedSignal {
-    return [_livePhotoModePipe.signalProducer() map:^id(__unused id value)
-    {
-        return @true;
-    }];
-}
 
 #pragma mark -
 
@@ -966,29 +887,6 @@
     _captionAbove = captionAbove;
     _captionAbovePipe.sink(@(captionAbove));
 }
-
-- (bool)isHighQualityPhoto {
-    return _highQualityPhoto;
-}
-
-- (SSignal *)highQualityPhoto
-{
-    __weak TGMediaEditingContext *weakSelf = self;
-    SSignal *updateSignal = [_highQualityPhotoPipe.signalProducer() map:^NSNumber *(NSNumber *update)
-    {
-        __strong TGMediaEditingContext *strongSelf = weakSelf;
-        return @(strongSelf->_highQualityPhoto);
-    }];
-    
-    return [[SSignal single:@(_highQualityPhoto)] then:updateSignal];
-}
-
-- (void)setHighQualityPhoto:(bool)highQualityPhoto
-{
-    _highQualityPhoto = highQualityPhoto;
-    _highQualityPhotoPipe.sink(@(highQualityPhoto));
-}
-
 
 - (SSignal *)facesForItem:(NSObject<TGMediaEditableItem> *)item
 {
@@ -1481,25 +1379,6 @@
 {
     TGMediaPriceUpdate *update = [[TGMediaPriceUpdate alloc] init];
     update->_price = price;
-    return update;
-}
-
-@end
-
-@implementation TGMediaLivePhotoModeUpdate
-
-+ (instancetype)livePhotoModeUpdateWithItem:(id<TGMediaEditableItem>)item mode:(TGMediaLivePhotoMode)mode
-{
-    TGMediaLivePhotoModeUpdate *update = [[TGMediaLivePhotoModeUpdate alloc] init];
-    update->_item = item;
-    update->_mode = mode;
-    return update;
-}
-
-+ (instancetype)livePhotoModeUpdate:(TGMediaLivePhotoMode)mode
-{
-    TGMediaLivePhotoModeUpdate *update = [[TGMediaLivePhotoModeUpdate alloc] init];
-    update->_mode = mode;
     return update;
 }
 

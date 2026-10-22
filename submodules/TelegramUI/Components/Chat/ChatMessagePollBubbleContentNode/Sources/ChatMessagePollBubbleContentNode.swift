@@ -449,12 +449,10 @@ private final class ChatMessagePollOptionNode: ASDisplayNode {
         self.buttonNode.highligthedChanged = { [weak self] highlighted in
             if let strongSelf = self {
                 if highlighted {
-                    if let theme = strongSelf.theme, theme.overallDarkAppearance, let contentNode = strongSelf.supernode as? ChatMessagePollBubbleContentNode, let backdropNode = contentNode.bubbleBackgroundNode?.backdropNode {
+                    if "".isEmpty, let contentNode = strongSelf.supernode as? ChatMessagePollBubbleContentNode, let backdropNode = contentNode.bubbleBackgroundNode?.backdropNode {
                         strongSelf.highlightedBackgroundNode.layer.compositingFilter = "overlayBlendMode"
                         strongSelf.highlightedBackgroundNode.frame = strongSelf.view.convert(strongSelf.highlightedBackgroundNode.frame, to: backdropNode.view)
                         backdropNode.addSubnode(strongSelf.highlightedBackgroundNode)
-                    } else {
-                        strongSelf.insertSubnode(strongSelf.highlightedBackgroundNode, at: 0)
                     }
                     
                     strongSelf.highlightedBackgroundNode.layer.removeAnimation(forKey: "opacity")
@@ -1056,7 +1054,6 @@ public class ChatMessagePollBubbleContentNode: ChatMessageBubbleContentNode {
                 }
                 var viewCount: Int?
                 var dateReplies = 0
-                var starsCount: Int64?
                 var dateReactionsAndPeers = mergedMessageReactionsAndPeers(accountPeerId: item.context.account.peerId, accountPeer: item.associatedData.accountPeer, message: item.message)
                 if item.message.isRestricted(platform: "ios", contentSettings: item.context.currentContentSettings.with { $0 }) {
                     dateReactionsAndPeers = ([], [])
@@ -1070,8 +1067,6 @@ public class ChatMessagePollBubbleContentNode: ChatMessageBubbleContentNode {
                         if let channel = item.message.peers[item.message.id.peerId] as? TelegramChannel, case .group = channel.info {
                             dateReplies = Int(attribute.count)
                         }
-                    } else if let attribute = attribute as? PaidStarsMessageAttribute, item.message.id.peerId.namespace == Namespaces.Peer.CloudChannel {
-                        starsCount = attribute.stars.value
                     }
                 }
                 
@@ -1128,10 +1123,8 @@ public class ChatMessagePollBubbleContentNode: ChatMessageBubbleContentNode {
                         reactionPeers: dateReactionsAndPeers.peers,
                         displayAllReactionPeers: item.message.id.peerId.namespace == Namespaces.Peer.CloudUser,
                         areReactionsTags: item.topMessage.areReactionsTags(accountPeerId: item.context.account.peerId),
-                        areStarReactionsEnabled: item.associatedData.areStarReactionsEnabled,
                         messageEffect: item.topMessage.messageEffect(availableMessageEffects: item.associatedData.availableMessageEffects),
                         replyCount: dateReplies,
-                        starsCount: starsCount,
                         isPinned: item.message.tags.contains(.pinned) && !item.associatedData.isInPinnedListMode && !isReplyThread,
                         hasAutoremove: item.message.isSelfExpiring,
                         canViewReactionList: canViewMessageReactionList(message: item.topMessage),
@@ -1678,15 +1671,8 @@ public class ChatMessagePollBubbleContentNode: ChatMessageBubbleContentNode {
         
         if isTranslating, !rects.isEmpty {
             if self.shimmeringNodes.isEmpty {
-                let color: UIColor
-                let isIncoming = item.message.effectivelyIncoming(item.context.account.peerId)
-                if item.presentationData.theme.theme.overallDarkAppearance {
-                    color = isIncoming ? item.presentationData.theme.theme.chat.message.incoming.primaryTextColor.withAlphaComponent(0.1) : item.presentationData.theme.theme.chat.message.outgoing.primaryTextColor.withAlphaComponent(0.1)
-                } else {
-                    color = isIncoming ? item.presentationData.theme.theme.chat.message.incoming.accentTextColor.withAlphaComponent(0.1) : item.presentationData.theme.theme.chat.message.outgoing.secondaryTextColor.withAlphaComponent(0.1)
-                }
                 for rects in rects {
-                    let shimmeringNode = ShimmeringLinkNode(color: color)
+                    let shimmeringNode = ShimmeringLinkNode(color: item.message.effectivelyIncoming(item.context.account.peerId) ? item.presentationData.theme.theme.chat.message.incoming.secondaryTextColor.withAlphaComponent(0.1) : item.presentationData.theme.theme.chat.message.outgoing.secondaryTextColor.withAlphaComponent(0.1))
                     shimmeringNode.updateRects(rects)
                     shimmeringNode.frame = self.bounds
                     shimmeringNode.updateLayout(self.bounds.size)

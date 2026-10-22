@@ -17,7 +17,6 @@ final class StarsBalanceComponent: Component {
     let strings: PresentationStrings
     let dateTimeFormat: PresentationDateTimeFormat
     let count: StarsAmount
-    let currency: CurrencyAmount.Currency
     let rate: Double?
     let actionTitle: String
     let actionAvailable: Bool
@@ -36,7 +35,6 @@ final class StarsBalanceComponent: Component {
         strings: PresentationStrings,
         dateTimeFormat: PresentationDateTimeFormat,
         count: StarsAmount,
-        currency: CurrencyAmount.Currency,
         rate: Double?,
         actionTitle: String,
         actionAvailable: Bool,
@@ -54,7 +52,6 @@ final class StarsBalanceComponent: Component {
         self.strings = strings
         self.dateTimeFormat = dateTimeFormat
         self.count = count
-        self.currency = currency
         self.rate = rate
         self.actionTitle = actionTitle
         self.actionAvailable = actionAvailable
@@ -100,9 +97,6 @@ final class StarsBalanceComponent: Component {
         if lhs.count != rhs.count {
             return false
         }
-        if lhs.currency != rhs.currency {
-            return false
-        }
         if lhs.rate != rhs.rate {
             return false
         }
@@ -126,6 +120,8 @@ final class StarsBalanceComponent: Component {
         override init(frame: CGRect) {
             super.init(frame: frame)
             
+            self.icon.image = UIImage(bundleImageName: "Premium/Stars/BalanceStar")
+            
             self.addSubview(self.icon)
         }
         
@@ -134,15 +130,6 @@ final class StarsBalanceComponent: Component {
         }
         
         func update(component: StarsBalanceComponent, availableSize: CGSize, state: EmptyComponentState, environment: Environment<Empty>, transition: ComponentTransition) -> CGSize {
-            if self.component == nil {
-                switch component.currency {
-                case .ton:
-                    self.icon.image = generateTintedImage(image: UIImage(bundleImageName: "Ads/TonBig"), color: component.theme.list.itemAccentColor)
-                case .stars:
-                    self.icon.image = UIImage(bundleImageName: "Premium/Stars/BalanceStar")
-                }
-            }
-            
             self.component = component
             self.state = state
             
@@ -177,13 +164,7 @@ final class StarsBalanceComponent: Component {
             let sideInset: CGFloat = 16.0
             var contentHeight: CGFloat = sideInset
             
-            let formattedLabel: String
-            switch component.currency {
-            case .ton:
-                formattedLabel = formatTonAmountText(component.count.value, dateTimeFormat: component.dateTimeFormat, maxDecimalPositions: 3)
-            case .stars:
-                formattedLabel = formatStarsAmountText(component.count, dateTimeFormat: component.dateTimeFormat)
-            }
+            let formattedLabel = formatStarsAmountText(component.count, dateTimeFormat: component.dateTimeFormat)
             let labelFont: UIFont
             if formattedLabel.contains(component.dateTimeFormat.decimalSeparator) {
                 labelFont = Font.with(size: 48.0, design: .round, weight: .semibold)
@@ -207,20 +188,20 @@ final class StarsBalanceComponent: Component {
                     self.addSubview(titleView)
                 }
                 if let icon = self.icon.image {
-                    let spacing: CGFloat = 4.0
+                    let spacing: CGFloat = 3.0
                     let totalWidth = titleSize.width + icon.size.width + spacing
                     let origin = floorToScreenPixels((availableSize.width - totalWidth) / 2.0)
                     let titleFrame = CGRect(origin: CGPoint(x: origin + icon.size.width + spacing, y: contentHeight - 3.0), size: titleSize)
                     titleView.frame = titleFrame
-                                        
-                    self.icon.frame = CGRect(origin: CGPoint(x: origin, y: floorToScreenPixels(titleFrame.midY - icon.size.height / 2.0)), size: icon.size)
+                    
+                    self.icon.frame = CGRect(origin: CGPoint(x: origin, y: contentHeight), size: icon.size)
                 }
             }
             contentHeight += titleSize.height
         
             let subtitleText: String
             if let rate = component.rate {
-                subtitleText = "~\(formatTonUsdValue(component.count.value, divide: false, rate: rate, dateTimeFormat: component.dateTimeFormat))"
+                subtitleText = "≈\(formatTonUsdValue(component.count.value, divide: false, rate: rate, dateTimeFormat: component.dateTimeFormat))"
             } else {
                 subtitleText = component.strings.Stars_Intro_YourBalance
             }
@@ -282,7 +263,6 @@ final class StarsBalanceComponent: Component {
                     transition: transition,
                     component: AnyComponent(ButtonComponent(
                         background: ButtonComponent.Background(
-                            style: .glass,
                             color: component.theme.list.itemCheckColors.fillColor,
                             foreground: component.theme.list.itemCheckColors.foregroundColor,
                             pressedColor: component.theme.list.itemCheckColors.fillColor.withMultipliedAlpha(0.8)
@@ -299,7 +279,7 @@ final class StarsBalanceComponent: Component {
                         }
                     )),
                     environment: {},
-                    containerSize: CGSize(width: withdrawWidth, height: 52.0)
+                    containerSize: CGSize(width: withdrawWidth, height: 50.0)
                 )
                 if let buttonView = self.button.view {
                     if buttonView.superview == nil {
@@ -339,7 +319,6 @@ final class StarsBalanceComponent: Component {
                         transition: transition,
                         component: AnyComponent(ButtonComponent(
                             background: ButtonComponent.Background(
-                                style: .glass,
                                 color: component.theme.list.itemCheckColors.fillColor,
                                 foreground: component.theme.list.itemCheckColors.foregroundColor,
                                 pressedColor: component.theme.list.itemCheckColors.fillColor.withMultipliedAlpha(0.8)
@@ -356,7 +335,7 @@ final class StarsBalanceComponent: Component {
                             }
                         )),
                         environment: {},
-                        containerSize: CGSize(width: withdrawWidth, height: 52.0)
+                        containerSize: CGSize(width: withdrawWidth, height: 50.0)
                     )
                     if let buttonView = self.secondaryButton.view {
                         if buttonView.superview == nil {

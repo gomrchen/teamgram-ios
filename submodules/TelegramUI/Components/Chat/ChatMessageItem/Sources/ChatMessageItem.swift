@@ -104,23 +104,8 @@ public enum ChatMessageMerge: Int32 {
     }
 }
 
-public struct ChatMessageHeaderSpec: Equatable {
-    public var hasDate: Bool
-    public var hasTopic: Bool
-    
-    public init(hasDate: Bool, hasTopic: Bool) {
-        self.hasDate = hasDate
-        self.hasTopic = hasTopic
-    }
-}
-
-public protocol ChatMessageDateHeaderNode: ListViewItemHeaderNode {
-    func updateItem(hasDate: Bool, hasPeer: Bool)
-}
-
 public protocol ChatMessageAvatarHeaderNode: ListViewItemHeaderNode {
     func updateSelectionState(animated: Bool)
-    func updateAvatarIsHidden(isHidden: Bool, transition: ContainedViewLayoutTransition)
 }
 
 public protocol ChatMessageItem: ListViewItem {
@@ -142,7 +127,7 @@ public protocol ChatMessageItem: ListViewItem {
     var sending: Bool { get }
     var failed: Bool { get }
     
-    func mergedWithItems(top: ListViewItem?, bottom: ListViewItem?, isRotated: Bool) -> (top: ChatMessageMerge, bottom: ChatMessageMerge, dateAtBottom: ChatMessageHeaderSpec)
+    func mergedWithItems(top: ListViewItem?, bottom: ListViewItem?, isRotated: Bool) -> (top: ChatMessageMerge, bottom: ChatMessageMerge, dateAtBottom: Bool)
 }
 
 public func hasCommentButton(item: ChatMessageItem) -> Bool {

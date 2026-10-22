@@ -138,7 +138,7 @@ public final class HorizontalPeerItemNode: ListViewItemNode {
         
         self.onlineNode = PeerOnlineMarkerNode()
         
-        super.init(layerBacked: false)
+        super.init(layerBacked: false, dynamicBounce: false)
         
         self.addSubnode(self.peerNode)
         self.addSubnode(self.badgeBackgroundNode)

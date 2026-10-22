@@ -25,16 +25,12 @@ final class VideoChatParticipantsComponent: Component {
             }
         }
         
-        var leftInset: CGFloat
-        var rightInset: CGFloat
         var videoColumn: Column?
         var mainColumn: Column
         var columnSpacing: CGFloat
         var isMainColumnHidden: Bool
         
-        init(leftInset: CGFloat, rightInset: CGFloat, videoColumn: Column?, mainColumn: Column, columnSpacing: CGFloat, isMainColumnHidden: Bool) {
-            self.leftInset = leftInset
-            self.rightInset = rightInset
+        init(videoColumn: Column?, mainColumn: Column, columnSpacing: CGFloat, isMainColumnHidden: Bool) {
             self.videoColumn = videoColumn
             self.mainColumn = mainColumn
             self.columnSpacing = columnSpacing
@@ -43,33 +39,23 @@ final class VideoChatParticipantsComponent: Component {
     }
     
     final class Participants: Equatable {
-        enum InviteType: Equatable {
-            case invite(isMultipleUsers: Bool)
+        enum InviteType {
+            case invite
             case shareLink
-        }
-        
-        struct InviteOption: Equatable {
-            let id: Int
-            let type: InviteType
-            
-            init(id: Int, type: InviteType) {
-                self.id = id
-                self.type = type
-            }
         }
         
         let myPeerId: EnginePeer.Id
         let participants: [GroupCallParticipantsContext.Participant]
         let totalCount: Int
         let loadMoreToken: String?
-        let inviteOptions: [InviteOption]
+        let inviteType: InviteType?
         
-        init(myPeerId: EnginePeer.Id, participants: [GroupCallParticipantsContext.Participant], totalCount: Int, loadMoreToken: String?, inviteOptions: [InviteOption]) {
+        init(myPeerId: EnginePeer.Id, participants: [GroupCallParticipantsContext.Participant], totalCount: Int, loadMoreToken: String?, inviteType: InviteType?) {
             self.myPeerId = myPeerId
             self.participants = participants
             self.totalCount = totalCount
             self.loadMoreToken = loadMoreToken
-            self.inviteOptions = inviteOptions
+            self.inviteType = inviteType
         }
         
         static func ==(lhs: Participants, rhs: Participants) -> Bool {
@@ -88,7 +74,7 @@ final class VideoChatParticipantsComponent: Component {
             if lhs.loadMoreToken != rhs.loadMoreToken {
                 return false
             }
-            if lhs.inviteOptions != rhs.inviteOptions {
+            if lhs.inviteType != rhs.inviteType {
                 return false
             }
             return true
@@ -96,10 +82,10 @@ final class VideoChatParticipantsComponent: Component {
     }
     
     struct VideoParticipantKey: Hashable {
-        var id: GroupCallParticipantsContext.Participant.Id
+        var id: EnginePeer.Id
         var isPresentation: Bool
         
-        init(id: GroupCallParticipantsContext.Participant.Id, isPresentation: Bool) {
+        init(id: EnginePeer.Id, isPresentation: Bool) {
             self.id = id
             self.isPresentation = isPresentation
         }
@@ -152,13 +138,11 @@ final class VideoChatParticipantsComponent: Component {
     let expandedInsets: UIEdgeInsets
     let safeInsets: UIEdgeInsets
     let interfaceOrientation: UIInterfaceOrientation
-    let enableVideoSharpening: Bool
     let openParticipantContextMenu: (EnginePeer.Id, ContextExtractedContentContainingView, ContextGesture?) -> Void
-    let openInvitedParticipantContextMenu: (EnginePeer.Id, ContextExtractedContentContainingView, ContextGesture?) -> Void
     let updateMainParticipant: (VideoParticipantKey?, Bool?) -> Void
     let updateIsMainParticipantPinned: (Bool) -> Void
     let updateIsExpandedUIHidden: (Bool) -> Void
-    let openInviteMembers: (Participants.InviteType) -> Void
+    let openInviteMembers: () -> Void
     let visibleParticipantsUpdated: (Set<EnginePeer.Id>) -> Void
 
     init(
@@ -174,13 +158,11 @@ final class VideoChatParticipantsComponent: Component {
         expandedInsets: UIEdgeInsets,
         safeInsets: UIEdgeInsets,
         interfaceOrientation: UIInterfaceOrientation,
-        enableVideoSharpening: Bool,
         openParticipantContextMenu: @escaping (EnginePeer.Id, ContextExtractedContentContainingView, ContextGesture?) -> Void,
-        openInvitedParticipantContextMenu: @escaping (EnginePeer.Id, ContextExtractedContentContainingView, ContextGesture?) -> Void,
         updateMainParticipant: @escaping (VideoParticipantKey?, Bool?) -> Void,
         updateIsMainParticipantPinned: @escaping (Bool) -> Void,
         updateIsExpandedUIHidden: @escaping (Bool) -> Void,
-        openInviteMembers: @escaping (Participants.InviteType) -> Void,
+        openInviteMembers: @escaping () -> Void,
         visibleParticipantsUpdated: @escaping (Set<EnginePeer.Id>) -> Void
     ) {
         self.call = call
@@ -195,9 +177,7 @@ final class VideoChatParticipantsComponent: Component {
         self.expandedInsets = expandedInsets
         self.safeInsets = safeInsets
         self.interfaceOrientation = interfaceOrientation
-        self.enableVideoSharpening = enableVideoSharpening
         self.openParticipantContextMenu = openParticipantContextMenu
-        self.openInvitedParticipantContextMenu = openInvitedParticipantContextMenu
         self.updateMainParticipant = updateMainParticipant
         self.updateIsMainParticipantPinned = updateIsMainParticipantPinned
         self.updateIsExpandedUIHidden = updateIsExpandedUIHidden
@@ -240,9 +220,6 @@ final class VideoChatParticipantsComponent: Component {
             return false
         }
         if lhs.interfaceOrientation != rhs.interfaceOrientation {
-            return false
-        }
-        if lhs.enableVideoSharpening != rhs.enableVideoSharpening {
             return false
         }
         return true
@@ -402,14 +379,14 @@ final class VideoChatParticipantsComponent: Component {
             let sideInset: CGFloat
             let itemCount: Int
             let itemHeight: CGFloat
-            let trailingItemHeights: [CGFloat]
+            let trailingItemHeight: CGFloat
             
-            init(containerSize: CGSize, sideInset: CGFloat, itemCount: Int, itemHeight: CGFloat, trailingItemHeights: [CGFloat]) {
+            init(containerSize: CGSize, sideInset: CGFloat, itemCount: Int, itemHeight: CGFloat, trailingItemHeight: CGFloat) {
                 self.containerSize = containerSize
                 self.sideInset = sideInset
                 self.itemCount = itemCount
                 self.itemHeight = itemHeight
-                self.trailingItemHeights = trailingItemHeights
+                self.trailingItemHeight = trailingItemHeight
             }
             
             func frame(at index: Int) -> CGRect {
@@ -417,15 +394,8 @@ final class VideoChatParticipantsComponent: Component {
                 return frame
             }
             
-            func trailingItemFrame(index: Int) -> CGRect {
-                if index < 0 || index >= self.trailingItemHeights.count {
-                    return CGRect()
-                }
-                var prefixHeight: CGFloat = 0.0
-                for i in 0 ..< index {
-                    prefixHeight += self.trailingItemHeights[i]
-                }
-                return CGRect(origin: CGPoint(x: self.sideInset, y: CGFloat(self.itemCount) * self.itemHeight + prefixHeight), size: CGSize(width: self.containerSize.width - self.sideInset * 2.0, height: self.trailingItemHeights[index]))
+            func trailingItemFrame() -> CGRect {
+                return CGRect(origin: CGPoint(x: self.sideInset, y: CGFloat(self.itemCount) * self.itemHeight), size: CGSize(width: self.containerSize.width - self.sideInset * 2.0, height: self.trailingItemHeight))
             }
 
             func contentHeight() -> CGFloat {
@@ -433,9 +403,7 @@ final class VideoChatParticipantsComponent: Component {
                 if self.itemCount != 0 {
                     result = self.frame(at: self.itemCount - 1).maxY
                 }
-                for height in self.trailingItemHeights {
-                    result += height
-                }
+                result += self.trailingItemHeight
                 return result
             }
             
@@ -471,7 +439,7 @@ final class VideoChatParticipantsComponent: Component {
         let scrollClippingFrame: CGRect
         let separateVideoScrollClippingFrame: CGRect
 
-        init(containerSize: CGSize, layout: Layout, isUIHidden: Bool, expandedInsets: UIEdgeInsets, safeInsets: UIEdgeInsets, gridItemCount: Int, listItemCount: Int, listItemHeight: CGFloat, listTrailingItemHeights: [CGFloat]) {
+        init(containerSize: CGSize, layout: Layout, isUIHidden: Bool, expandedInsets: UIEdgeInsets, safeInsets: UIEdgeInsets, gridItemCount: Int, listItemCount: Int, listItemHeight: CGFloat, listTrailingItemHeight: CGFloat) {
             self.containerSize = containerSize
             self.layout = layout
             self.isUIHidden = isUIHidden
@@ -497,7 +465,7 @@ final class VideoChatParticipantsComponent: Component {
             }
             
             self.grid = Grid(containerSize: CGSize(width: gridWidth, height: gridContainerHeight), sideInset: gridSideInset, itemCount: gridItemCount, isDedicatedColumn: layout.videoColumn != nil)
-            self.list = List(containerSize: CGSize(width: listWidth, height: containerSize.height), sideInset: layout.mainColumn.insets.left, itemCount: listItemCount, itemHeight: listItemHeight, trailingItemHeights: listTrailingItemHeights)
+            self.list = List(containerSize: CGSize(width: listWidth, height: containerSize.height), sideInset: layout.mainColumn.insets.left, itemCount: listItemCount, itemHeight: listItemHeight, trailingItemHeight: listTrailingItemHeight)
             self.spacing = 4.0
             
             if let videoColumn = layout.videoColumn, !isUIHidden && !layout.isMainColumnHidden {
@@ -519,13 +487,13 @@ final class VideoChatParticipantsComponent: Component {
             
             if let videoColumn = layout.videoColumn {
                 let columnsWidth: CGFloat = videoColumn.width + layout.columnSpacing + layout.mainColumn.width
-                let columnsLeftInset: CGFloat = layout.leftInset
+                let columnsSideInset: CGFloat = floorToScreenPixels((containerSize.width - columnsWidth) * 0.5)
                 
-                var separateVideoGridFrame = CGRect(origin: CGPoint(x: columnsLeftInset, y: 0.0), size: CGSize(width: gridWidth, height: containerSize.height))
+                var separateVideoGridFrame = CGRect(origin: CGPoint(x: floor((containerSize.width - columnsWidth) * 0.5), y: 0.0), size: CGSize(width: gridWidth, height: containerSize.height))
                 
                 var listFrame = CGRect(origin: CGPoint(x: separateVideoGridFrame.maxX + layout.columnSpacing, y: 0.0), size: CGSize(width: listWidth, height: containerSize.height))
                 if isUIHidden || layout.isMainColumnHidden {
-                    listFrame.origin.x = containerSize.width + columnsLeftInset
+                    listFrame.origin.x = containerSize.width + columnsSideInset
                     separateVideoGridFrame = CGRect(origin: CGPoint(x: floor((containerSize.width - columnsWidth) * 0.5), y: 0.0), size: CGSize(width: columnsWidth, height: containerSize.height))
                 }
                 
@@ -600,8 +568,8 @@ final class VideoChatParticipantsComponent: Component {
             }
         }
         
-        func listTrailingItemFrame(index: Int) -> CGRect {
-            return self.list.trailingItemFrame(index: index)
+        func listTrailingItemFrame() -> CGRect {
+            return self.list.trailingItemFrame()
         }
     }
     
@@ -618,7 +586,7 @@ final class VideoChatParticipantsComponent: Component {
         let isPresentation: Bool
         
         var key: VideoParticipantKey {
-            return VideoParticipantKey(id: self.participant.id, isPresentation: self.isPresentation)
+            return VideoParticipantKey(id: self.participant.peer.id, isPresentation: self.isPresentation)
         }
         
         init(participant: GroupCallParticipantsContext.Participant, isPresentation: Bool) {
@@ -673,7 +641,7 @@ final class VideoChatParticipantsComponent: Component {
         private var listParticipants: [GroupCallParticipantsContext.Participant] = []
         
         private let measureListItemView = ComponentView<Empty>()
-        private var inviteListItemViews: [Int: ComponentView<Empty>] = [:]
+        private let inviteListItemView = ComponentView<Empty>()
         
         private var gridItemViews: [VideoParticipantKey: GridItem] = [:]
         private let gridItemViewContainer: UIView
@@ -683,7 +651,7 @@ final class VideoChatParticipantsComponent: Component {
         private var expandedThumbnailsView: ComponentView<Empty>?
         private var expandedSpeakingToast: ComponentView<Empty>?
         
-        private var listItemViews: [GroupCallParticipantsContext.Participant.Id: ListItem] = [:]
+        private var listItemViews: [EnginePeer.Id: ListItem] = [:]
         private let listItemViewContainer: UIView
         private let listItemViewSeparatorContainer: SimpleLayer
         private let listItemsBackground = ComponentView<Empty>()
@@ -969,7 +937,7 @@ final class VideoChatParticipantsComponent: Component {
                 }
             }
             
-            var visibleParticipants: [GroupCallParticipantsContext.Participant.Id] = []
+            var visibleParticipants: [EnginePeer.Id] = []
              
             for index in validGridItemIndices {
                 let videoParticipant = self.gridParticipants[index]
@@ -998,7 +966,7 @@ final class VideoChatParticipantsComponent: Component {
                 }
                 
                 if isItemExpanded || (index >= clippedVisibleGridItemRange.minIndex && index <= clippedVisibleGridItemRange.maxIndex) {
-                    visibleParticipants.append(videoParticipant.participant.id)
+                    visibleParticipants.append(videoParticipant.key.id)
                 }
                 
                 var suppressItemExpansionCollapseAnimation = false
@@ -1058,11 +1026,6 @@ final class VideoChatParticipantsComponent: Component {
                 } else {
                     itemAlpha = 1.0
                 }
-
-                var isSpeaking = false
-                if let participantPeer = videoParticipant.participant.peer {
-                    isSpeaking = component.speakingParticipants.contains(participantPeer.id)
-                }
                 
                 let _ = itemView.view.update(
                     transition: itemTransition,
@@ -1071,16 +1034,15 @@ final class VideoChatParticipantsComponent: Component {
                         strings: component.strings,
                         call: component.call,
                         participant: videoParticipant.participant,
-                        isMyPeer: videoParticipant.participant.peer?.id == component.participants?.myPeerId,
+                        isMyPeer: videoParticipant.participant.peer.id == component.participants?.myPeerId,
                         isPresentation: videoParticipant.isPresentation,
-                        isSpeaking: isSpeaking,
+                        isSpeaking: component.speakingParticipants.contains(videoParticipant.participant.peer.id),
                         maxVideoQuality: component.maxVideoQuality,
                         isExpanded: isItemExpanded,
                         isUIHidden: isItemUIHidden || self.isPinchToZoomActive,
                         contentInsets: itemContentInsets,
                         controlInsets: itemControlInsets,
                         interfaceOrientation: component.interfaceOrientation,
-                        enableVideoSharpening: component.enableVideoSharpening,
                         action: { [weak self] in
                             guard let self, let component = self.component else {
                                 return
@@ -1112,7 +1074,7 @@ final class VideoChatParticipantsComponent: Component {
                             }
                             self.isPinchToZoomActive = true
                             self.state?.updated(transition: .immediate, isLocal: true)
-                            let pinchController = makePinchController(sourceNode: sourceNode, getContentAreaInScreenSpace: {
+                            let pinchController = PinchController(sourceNode: sourceNode, getContentAreaInScreenSpace: {
                                 return UIScreen.main.bounds
                             })
                             component.call.accountContext.sharedContext.mainWindow?.presentInGlobalOverlay(pinchController)
@@ -1221,23 +1183,23 @@ final class VideoChatParticipantsComponent: Component {
                 self.gridItemViews.removeValue(forKey: itemId)
             }
             
-            var validListItemIds: [GroupCallParticipantsContext.Participant.Id] = []
+            var validListItemIds: [EnginePeer.Id] = []
             let visibleListItemRange = itemLayout.visibleListItemRange(for: self.scrollView.bounds)
             let clippedVisibleListItemRange = itemLayout.visibleListItemRange(for: clippedScrollViewBounds)
             if visibleListItemRange.maxIndex >= visibleListItemRange.minIndex {
                 for i in visibleListItemRange.minIndex ... visibleListItemRange.maxIndex {
                     let itemFrame = itemLayout.listItemFrame(at: i)
                     
-                    let participantItemId: GroupCallParticipantsContext.Participant.Id
+                    let participantPeerId: EnginePeer.Id
                     let peerItemComponent: PeerListItemComponent
                     if i < self.listParticipants.count {
                         let participant = self.listParticipants[i]
-                        participantItemId = participant.id
+                        participantPeerId = participant.peer.id
                         
                         let subtitle: PeerListItemComponent.Subtitle
-                        if participant.id == .peer(component.call.accountContext.account.peerId) {
+                        if participant.peer.id == component.call.accountContext.account.peerId {
                             subtitle = PeerListItemComponent.Subtitle(text: component.strings.VoiceChat_You, color: .accent)
-                        } else if let participantPeer = participant.peer, component.speakingParticipants.contains(participantPeer.id) {
+                        } else if component.speakingParticipants.contains(participant.peer.id) {
                             if let volume = participant.volume, volume / 100 != 100 {
                                 subtitle = PeerListItemComponent.Subtitle(text: component.strings.VoiceChat_StatusSpeakingVolume("\(volume / 100)%").string, color: .constructive)
                             } else {
@@ -1249,14 +1211,10 @@ final class VideoChatParticipantsComponent: Component {
                             subtitle = PeerListItemComponent.Subtitle(text: component.strings.VoiceChat_StatusListening, color: .neutral)
                         }
                         
-                        var isSpeaking = false
-                        if let participantPeer = participant.peer {
-                            isSpeaking = component.speakingParticipants.contains(participantPeer.id)
-                        }
                         let rightAccessoryComponent: AnyComponent<Empty> = AnyComponent(VideoChatParticipantStatusComponent(
                             muteState: participant.muteState,
                             hasRaiseHand: participant.hasRaiseHand,
-                            isSpeaking: isSpeaking,
+                            isSpeaking: component.speakingParticipants.contains(participant.peer.id),
                             theme: component.theme
                         ))
                         
@@ -1266,19 +1224,19 @@ final class VideoChatParticipantsComponent: Component {
                             strings: component.strings,
                             style: .generic,
                             sideInset: 0.0,
-                            title: participant.peer?.displayTitle(strings: component.strings, displayOrder: .firstLast) ?? "User \(participant.id)",
+                            title: EnginePeer(participant.peer).displayTitle(strings: component.strings, displayOrder: .firstLast),
                             avatarComponent: AnyComponent(VideoChatParticipantAvatarComponent(
                                 call: component.call,
-                                peer: participant.peer,
+                                peer: EnginePeer(participant.peer),
                                 myPeerId: component.participants?.myPeerId ?? component.call.accountContext.account.peerId,
-                                isSpeaking: isSpeaking,
+                                isSpeaking: component.speakingParticipants.contains(participant.peer.id),
                                 theme: component.theme
                             )),
-                            peer: participant.peer,
+                            peer: EnginePeer(participant.peer),
                             subtitle: subtitle,
                             subtitleAccessory: .none,
                             presence: nil,
-                            rightAccessoryComponent: AnyComponentWithIdentity(id: 0, component: rightAccessoryComponent),
+                            rightAccessoryComponent: rightAccessoryComponent,
                             selectionState: .none,
                             hasNext: false,
                             extractedTheme: PeerListItemComponent.ExtractedTheme(
@@ -1300,13 +1258,20 @@ final class VideoChatParticipantsComponent: Component {
                         )
                     } else {
                         let invitedPeer = component.invitedPeers[i - self.listParticipants.count]
-                        participantItemId = .peer(invitedPeer.peer.id)
+                        participantPeerId = invitedPeer.peer.id
                         
-                        let subtitle: PeerListItemComponent.Subtitle = PeerListItemComponent.Subtitle(text: component.strings.VoiceChat_StatusInvited, color: .neutral)
-                        
-                        let rightAccessoryComponent: AnyComponent<Empty> = AnyComponent(VideoChatParticipantInvitedStatusComponent(
-                            theme: component.theme
-                        ))
+                        let subtitle: PeerListItemComponent.Subtitle
+                        //TODO:localize
+                        switch invitedPeer.state {
+                        case .none:
+                            subtitle = PeerListItemComponent.Subtitle(text: component.strings.VoiceChat_StatusInvited, color: .neutral)
+                        case .connecting:
+                            subtitle = PeerListItemComponent.Subtitle(text: "connecting...", color: .neutral)
+                        case .requesting:
+                            subtitle = PeerListItemComponent.Subtitle(text: "requesting...", color: .neutral)
+                        case .ringing:
+                            subtitle = PeerListItemComponent.Subtitle(text: "ringing...", color: .neutral)
+                        }
                         
                         peerItemComponent = PeerListItemComponent(
                             context: component.call.accountContext,
@@ -1326,42 +1291,32 @@ final class VideoChatParticipantsComponent: Component {
                             subtitle: subtitle,
                             subtitleAccessory: .none,
                             presence: nil,
-                            rightAccessoryComponent: AnyComponentWithIdentity(id: 1, component: rightAccessoryComponent),
+                            rightAccessoryComponent: nil,
                             selectionState: .none,
                             hasNext: false,
                             extractedTheme: PeerListItemComponent.ExtractedTheme(
                                 inset: 2.0,
                                 background: UIColor(white: 0.1, alpha: 1.0)
                             ),
-                            action: { [weak self] peer, _, itemView in
-                                guard let self, let component = self.component else {
-                                    return
-                                }
-                                component.openInvitedParticipantContextMenu(peer.id, itemView.extractedContainerView, nil)
-                            },
-                            contextAction: { [weak self] peer, sourceView, gesture in
-                                guard let self, let component = self.component else {
-                                    return
-                                }
-                                component.openInvitedParticipantContextMenu(peer.id, sourceView, gesture)
-                            }
+                            action: nil,
+                            contextAction: nil
                         )
                     }
                     
-                    validListItemIds.append(participantItemId)
+                    validListItemIds.append(participantPeerId)
                     
                     if i >= clippedVisibleListItemRange.minIndex && i <= clippedVisibleListItemRange.maxIndex {
-                        visibleParticipants.append(participantItemId)
+                        visibleParticipants.append(participantPeerId)
                     }
                     
                     var itemTransition = transition
                     let itemView: ListItem
-                    if let current = self.listItemViews[participantItemId] {
+                    if let current = self.listItemViews[participantPeerId] {
                         itemView = current
                     } else {
                         itemTransition = itemTransition.withAnimation(.none)
                         itemView = ListItem()
-                        self.listItemViews[participantItemId] = itemView
+                        self.listItemViews[participantPeerId] = itemView
                     }
                     
                     let _ = itemView.view.update(
@@ -1395,7 +1350,7 @@ final class VideoChatParticipantsComponent: Component {
                 }
             }
             
-            var removedListItemIds: [GroupCallParticipantsContext.Participant.Id] = []
+            var removedListItemIds: [EnginePeer.Id] = []
             for (itemId, itemView) in self.listItemViews {
                 if !validListItemIds.contains(itemId) {
                     removedListItemIds.append(itemId)
@@ -1426,15 +1381,11 @@ final class VideoChatParticipantsComponent: Component {
                 self.listItemViews.removeValue(forKey: itemId)
             }
             
-            var trailingItemIndex = 0
-            for inviteOption in component.participants?.inviteOptions ?? [] {
-                guard let itemView = self.inviteListItemViews[inviteOption.id] else {
-                    continue
-                }
+            do {
                 var itemTransition = transition
+                let itemView = self.inviteListItemView
                 
-                let itemFrame = itemLayout.listTrailingItemFrame(index: trailingItemIndex)
-                trailingItemIndex += 1
+                let itemFrame = itemLayout.listTrailingItemFrame()
                 
                 if let itemComponentView = itemView.view {
                     if itemComponentView.superview == nil {
@@ -1444,17 +1395,6 @@ final class VideoChatParticipantsComponent: Component {
                     itemTransition.setFrame(view: itemComponentView, frame: itemFrame)
                 }
             }
-            var removeInviteListItemIds: [Int] = []
-            for (id, itemView) in self.inviteListItemViews {
-                if let participants = component.participants, participants.inviteOptions.contains(where: { $0.id == id }) {
-                } else {
-                    removeInviteListItemIds.append(id)
-                    itemView.view?.removeFromSuperview()
-                }
-            }
-            for id in removeInviteListItemIds {
-                self.inviteListItemViews.removeValue(forKey: id)
-            }
             
             transition.setScale(view: self.gridItemViewContainer, scale: gridIsEmpty ? 0.001 : 1.0)
             transition.setPosition(view: self.gridItemViewContainer, position: CGPoint(x: itemLayout.gridItemContainerFrame().midX, y: itemLayout.gridItemContainerFrame().minY))
@@ -1463,7 +1403,7 @@ final class VideoChatParticipantsComponent: Component {
             transition.setFrame(layer: self.listItemViewSeparatorContainer, frame: CGRect(origin: CGPoint(), size: itemLayout.listItemContainerFrame().size))
             
             if self.expandedGridItemContainer.frame != expandedGridItemContainerFrame {
-                self.expandedGridItemContainer.layer.cornerRadius = 16.0
+                self.expandedGridItemContainer.layer.cornerRadius = 10.0
                 
                 transition.setFrame(view: self.expandedGridItemContainer, frame: expandedGridItemContainerFrame, completion: { [weak self] completed in
                     guard let self, completed else {
@@ -1532,7 +1472,7 @@ final class VideoChatParticipantsComponent: Component {
                         expandedThumbnailsComponentView.alpha = expandedThumbnailsAlpha
                         
                         let fromReferenceFrame: CGRect
-                        if let index = self.gridParticipants.firstIndex(where: { $0.participant.id == expandedVideoState.mainParticipant.id && $0.isPresentation == expandedVideoState.mainParticipant.isPresentation }) {
+                        if let index = self.gridParticipants.firstIndex(where: { $0.participant.peer.id ==  expandedVideoState.mainParticipant.id && $0.isPresentation == expandedVideoState.mainParticipant.isPresentation }) {
                             fromReferenceFrame = self.gridItemViewContainer.convert(itemLayout.gridItemFrame(at: index), to: self.expandedGridItemContainer)
                         } else {
                             fromReferenceFrame = previousExpandedGridItemContainerFrame
@@ -1591,7 +1531,7 @@ final class VideoChatParticipantsComponent: Component {
                         expandedControlsComponentView.alpha = expandedControlsAlpha
                         
                         let fromReferenceFrame: CGRect
-                        if let index = self.gridParticipants.firstIndex(where: { $0.participant.id == expandedVideoState.mainParticipant.id && $0.isPresentation == expandedVideoState.mainParticipant.isPresentation }) {
+                        if let index = self.gridParticipants.firstIndex(where: { $0.participant.peer.id ==  expandedVideoState.mainParticipant.id && $0.isPresentation == expandedVideoState.mainParticipant.isPresentation }) {
                             fromReferenceFrame = self.gridItemViewContainer.convert(itemLayout.gridItemFrame(at: index), to: self.expandedGridItemContainer)
                         } else {
                             fromReferenceFrame = previousExpandedGridItemContainerFrame
@@ -1611,7 +1551,7 @@ final class VideoChatParticipantsComponent: Component {
                     self.expandedThumbnailsView = nil
                     
                     if transition.containedViewLayoutTransition.isAnimated, let expandedThumbnailsComponentView = expandedThumbnailsView.view {
-                        if let collapsingItemView = self.gridItemViews.values.first(where: { $0.isCollapsing }), let index = self.gridParticipants.firstIndex(where: { $0.participant.id ==  collapsingItemView.key.id && $0.isPresentation == collapsingItemView.key.isPresentation }) {
+                        if let collapsingItemView = self.gridItemViews.values.first(where: { $0.isCollapsing }), let index = self.gridParticipants.firstIndex(where: { $0.participant.peer.id ==  collapsingItemView.key.id && $0.isPresentation == collapsingItemView.key.isPresentation }) {
                             let targetLocalItemFrame = itemLayout.gridItemFrame(at: index)
                             var targetItemFrame = self.gridItemViewContainer.convert(targetLocalItemFrame, to: self)
                             targetItemFrame.origin.y -= expandedGridItemContainerFrame.minY
@@ -1632,7 +1572,7 @@ final class VideoChatParticipantsComponent: Component {
                     self.expandedControlsView = nil
                     
                     if transition.containedViewLayoutTransition.isAnimated, let expandedControlsComponentView = expandedControlsView.view {
-                        if let collapsingItemView = self.gridItemViews.values.first(where: { $0.isCollapsing }), let index = self.gridParticipants.firstIndex(where: { $0.participant.id == collapsingItemView.key.id && $0.isPresentation == collapsingItemView.key.isPresentation }) {
+                        if let collapsingItemView = self.gridItemViews.values.first(where: { $0.isCollapsing }), let index = self.gridParticipants.firstIndex(where: { $0.participant.peer.id ==  collapsingItemView.key.id && $0.isPresentation == collapsingItemView.key.isPresentation }) {
                             let targetLocalItemFrame = itemLayout.gridItemFrame(at: index)
                             var targetItemFrame = self.gridItemViewContainer.convert(targetLocalItemFrame, to: self)
                             targetItemFrame.origin.y -= expandedGridItemContainerFrame.minY
@@ -1650,7 +1590,7 @@ final class VideoChatParticipantsComponent: Component {
                 }
             }
             
-            if let expandedVideoState = component.expandedVideoState, expandedVideoState.isMainParticipantPinned, let participants = component.participants, !component.speakingParticipants.isEmpty, let firstOther = component.speakingParticipants.first(where: { expandedVideoState.mainParticipant.id != .peer($0) }), let speakingPeer = participants.participants.first(where: { $0.id == .peer(firstOther) })?.peer {
+            if let expandedVideoState = component.expandedVideoState, expandedVideoState.isMainParticipantPinned, let participants = component.participants, !component.speakingParticipants.isEmpty, let firstOther = component.speakingParticipants.first(where: { $0 != expandedVideoState.mainParticipant.id }), let speakingPeer = participants.participants.first(where: { $0.peer.id == firstOther })?.peer {
                 let expandedSpeakingToast: ComponentView<Empty>
                 var expandedSpeakingToastTransition = transition
                 if let current = self.expandedSpeakingToast {
@@ -1664,21 +1604,21 @@ final class VideoChatParticipantsComponent: Component {
                     transition: expandedSpeakingToastTransition,
                     component: AnyComponent(VideoChatExpandedSpeakingToastComponent(
                         context: component.call.accountContext,
-                        peer: speakingPeer,
+                        peer: EnginePeer(speakingPeer),
                         strings: component.strings,
                         theme: component.theme,
                         action: { [weak self] peer in
                             guard let self, let component = self.component, let participants = component.participants else {
                                 return
                             }
-                            guard let participant = participants.participants.first(where: { $0.id == .peer(peer.id) }) else {
+                            guard let participant = participants.participants.first(where: { $0.peer.id == peer.id }) else {
                                 return
                             }
                             var key: VideoParticipantKey?
                             if participant.presentationDescription != nil {
-                                key = VideoParticipantKey(id: .peer(peer.id), isPresentation: true)
+                                key = VideoParticipantKey(id: peer.id, isPresentation: true)
                             } else if participant.videoDescription != nil {
-                                key = VideoParticipantKey(id: .peer(peer.id), isPresentation: false)
+                                key = VideoParticipantKey(id: peer.id, isPresentation: false)
                             }
                             if let key {
                                 component.updateMainParticipant(key, nil)
@@ -1721,13 +1661,7 @@ final class VideoChatParticipantsComponent: Component {
                 }
             }
             
-            component.visibleParticipantsUpdated(Set(visibleParticipants.compactMap { 
-                if case let .peer(id) = $0 {
-                    return id
-                } else {
-                    return nil
-                }
-            }))
+            component.visibleParticipantsUpdated(Set(visibleParticipants))
         }
         
         func setEventCycleState(scrollView: UIScrollView, eventCycleState: EventCycleState?) {
@@ -1738,7 +1672,7 @@ final class VideoChatParticipantsComponent: Component {
             }
         }
         
-        func itemFrame(peerId: GroupCallParticipantsContext.Participant.Id, isPresentation: Bool) -> CGRect? {
+        func itemFrame(peerId: EnginePeer.Id, isPresentation: Bool) -> CGRect? {
             for (key, itemView) in self.gridItemViews {
                 if key.id == peerId && key.isPresentation == isPresentation {
                     if let itemComponentView = itemView.view.view {
@@ -1749,7 +1683,7 @@ final class VideoChatParticipantsComponent: Component {
             return nil
         }
         
-        func updateItemPlaceholder(peerId: GroupCallParticipantsContext.Participant.Id, isPresentation: Bool, placeholder: VideoSource.Output) {
+        func updateItemPlaceholder(peerId: EnginePeer.Id, isPresentation: Bool, placeholder: VideoSource.Output) {
             for (key, itemView) in self.gridItemViews {
                 if key.id == peerId && key.isPresentation == isPresentation {
                     if let itemComponentView = itemView.view.view as? VideoChatParticipantVideoComponent.View {
@@ -1766,12 +1700,10 @@ final class VideoChatParticipantsComponent: Component {
             }
             
             let previousComponent = self.component
-            let _ = previousComponent
-            
             self.component = component
             self.state = state
             
-            /*if let expandedVideoState = component.expandedVideoState, expandedVideoState.isUIHidden {
+            if let expandedVideoState = component.expandedVideoState, expandedVideoState.isUIHidden {
                 if self.stopRequestingNonCentralVideoTimer == nil || previousComponent?.expandedVideoState != expandedVideoState {
                     self.stopRequestingNonCentralVideoTimer?.invalidate()
                     
@@ -1792,47 +1724,7 @@ final class VideoChatParticipantsComponent: Component {
                     self.stopRequestingNonCentralVideoTimer = nil
                     stopRequestingNonCentralVideoTimer.invalidate()
                 }
-            }*/
-            
-            var gridParticipants: [VideoParticipant] = []
-            var listParticipants: [GroupCallParticipantsContext.Participant] = []
-            if let participants = component.participants {
-                for participant in participants.participants {
-                    var isFullyMuted = false
-                    if let muteState = participant.muteState, !muteState.canUnmute {
-                        isFullyMuted = true
-                    }
-                    
-                    var hasVideo = false
-                    if participant.videoDescription != nil {
-                        hasVideo = true
-                        let videoParticipant = VideoParticipant(participant: participant, isPresentation: false)
-                        if participant.id == .peer(participants.myPeerId) {
-                            gridParticipants.insert(videoParticipant, at: 0)
-                        } else {
-                            gridParticipants.append(videoParticipant)
-                        }
-                    }
-                    if participant.presentationDescription != nil {
-                        hasVideo = true
-                        let videoParticipant = VideoParticipant(participant: participant, isPresentation: true)
-                        if participant.id == .peer(participants.myPeerId) {
-                            gridParticipants.insert(videoParticipant, at: 0)
-                        } else {
-                            gridParticipants.append(videoParticipant)
-                        }
-                    }
-                    if !hasVideo || component.layout.videoColumn != nil {
-                        if participant.id == .peer(participants.myPeerId) && !isFullyMuted {
-                            listParticipants.insert(participant, at: 0)
-                        } else {
-                            listParticipants.append(participant)
-                        }
-                    }
-                }
             }
-            self.gridParticipants = gridParticipants
-            self.listParticipants = listParticipants
             
             let measureListItemSize = self.measureListItemView.update(
                 transition: .immediate,
@@ -1856,66 +1748,72 @@ final class VideoChatParticipantsComponent: Component {
                 containerSize: CGSize(width: availableSize.width, height: 1000.0)
             )
             
-            var inviteListItemSizes: [CGSize] = []
-            if let participants = component.participants {
-                let tempItemLayout = ItemLayout(
-                    containerSize: availableSize,
-                    layout: component.layout,
-                    isUIHidden: component.expandedVideoState?.isUIHidden ?? false,
-                    expandedInsets: component.expandedInsets,
-                    safeInsets: component.safeInsets,
-                    gridItemCount: gridParticipants.count,
-                    listItemCount: listParticipants.count + component.invitedPeers.count,
-                    listItemHeight: measureListItemSize.height,
-                    listTrailingItemHeights: []
-                )
-                
-                for i in 0 ..< participants.inviteOptions.count {
-                    let inviteOption = participants.inviteOptions[i]
-                    let inviteText: String
-                    let iconType: VideoChatListInviteComponent.Icon
-                    switch inviteOption.type {
-                    case let .invite(isMultiple):
-                        if isMultiple {
-                            inviteText = component.strings.VoiceChat_InviteMember
-                        } else {
-                            inviteText = component.strings.VideoChat_InviteMember
+            let inviteText: String
+            if let participants = component.participants, let inviteType = participants.inviteType {
+                switch inviteType {
+                case .invite:
+                    inviteText = component.strings.VoiceChat_InviteMember
+                case .shareLink:
+                    inviteText = component.strings.VoiceChat_Share
+                }
+            } else {
+                inviteText = component.strings.VoiceChat_InviteMember
+            }
+            let inviteListItemSize = self.inviteListItemView.update(
+                transition: transition,
+                component: AnyComponent(VideoChatListInviteComponent(
+                    title: inviteText,
+                    theme: component.theme,
+                    action: { [weak self] in
+                        guard let self, let component = self.component else {
+                            return
                         }
-                        iconType = .addUser
-                    case .shareLink:
-                        inviteText = component.strings.VoiceChat_Share
-                        iconType = .link
+                        component.openInviteMembers()
+                    }
+                )),
+                environment: {},
+                containerSize: CGSize(width: availableSize.width, height: 1000.0)
+            )
+            
+            var gridParticipants: [VideoParticipant] = []
+            var listParticipants: [GroupCallParticipantsContext.Participant] = []
+            if let participants = component.participants {
+                for participant in participants.participants {
+                    var isFullyMuted = false
+                    if let muteState = participant.muteState, !muteState.canUnmute {
+                        isFullyMuted = true
                     }
                     
-                    let inviteListItemView: ComponentView<Empty>
-                    var inviteListItemTransition = transition
-                    if let current = self.inviteListItemViews[inviteOption.id] {
-                        inviteListItemView = current
-                    } else {
-                        inviteListItemView = ComponentView()
-                        self.inviteListItemViews[inviteOption.id] = inviteListItemView
-                        inviteListItemTransition = inviteListItemTransition.withAnimation(.none)
+                    var hasVideo = false
+                    if participant.videoDescription != nil {
+                        hasVideo = true
+                        let videoParticipant = VideoParticipant(participant: participant, isPresentation: false)
+                        if participant.peer.id == participants.myPeerId {
+                            gridParticipants.insert(videoParticipant, at: 0)
+                        } else {
+                            gridParticipants.append(videoParticipant)
+                        }
                     }
-                    
-                    inviteListItemSizes.append(inviteListItemView.update(
-                        transition: inviteListItemTransition,
-                        component: AnyComponent(VideoChatListInviteComponent(
-                            title: inviteText,
-                            icon: iconType,
-                            theme: component.theme,
-                            hasNext: i != participants.inviteOptions.count - 1,
-                            action: { [weak self] in
-                                guard let self, let component = self.component else {
-                                    return
-                                }
-                                component.openInviteMembers(inviteOption.type)
-                            }
-                        )),
-                        environment: {},
-                        containerSize: CGSize(width: availableSize.width - tempItemLayout.list.sideInset * 2.0, height: 1000.0)
-                    ))
+                    if participant.presentationDescription != nil {
+                        hasVideo = true
+                        let videoParticipant = VideoParticipant(participant: participant, isPresentation: true)
+                        if participant.peer.id == participants.myPeerId {
+                            gridParticipants.insert(videoParticipant, at: 0)
+                        } else {
+                            gridParticipants.append(videoParticipant)
+                        }
+                    }
+                    if !hasVideo || component.layout.videoColumn != nil {
+                        if participant.peer.id == participants.myPeerId && !isFullyMuted {
+                            listParticipants.insert(participant, at: 0)
+                        } else {
+                            listParticipants.append(participant)
+                        }
+                    }
                 }
             }
+            self.gridParticipants = gridParticipants
+            self.listParticipants = listParticipants
             
             let itemLayout = ItemLayout(
                 containerSize: availableSize,
@@ -1926,7 +1824,7 @@ final class VideoChatParticipantsComponent: Component {
                 gridItemCount: gridParticipants.count,
                 listItemCount: listParticipants.count + component.invitedPeers.count,
                 listItemHeight: measureListItemSize.height,
-                listTrailingItemHeights: inviteListItemSizes.map(\.height)
+                listTrailingItemHeight: inviteListItemSize.height
             )
             self.itemLayout = itemLayout
             
@@ -1934,7 +1832,7 @@ final class VideoChatParticipantsComponent: Component {
                 transition: transition,
                 component: AnyComponent(RoundedRectangle(
                     color: UIColor(white: 0.1, alpha: 1.0),
-                    cornerRadius: 16.0
+                    cornerRadius: 10.0
                 )),
                 environment: {},
                 containerSize: CGSize(width: itemLayout.listFrame.width - itemLayout.layout.mainColumn.insets.left - itemLayout.layout.mainColumn.insets.right, height: itemLayout.list.contentHeight())
@@ -1953,7 +1851,7 @@ final class VideoChatParticipantsComponent: Component {
                 for participant in participants.participants {
                     var maxVideoQuality: PresentationGroupCallRequestedVideo.Quality = .medium
                     if let expandedVideoState = component.expandedVideoState {
-                        if expandedVideoState.mainParticipant.id == participant.id, !expandedVideoState.mainParticipant.isPresentation {
+                        if expandedVideoState.mainParticipant.id == participant.peer.id, !expandedVideoState.mainParticipant.isPresentation {
                             if component.maxVideoQuality == Int.max {
                                 maxVideoQuality = .full
                             } else if component.maxVideoQuality == 360 {
@@ -1968,7 +1866,7 @@ final class VideoChatParticipantsComponent: Component {
                     
                     var maxPresentationQuality: PresentationGroupCallRequestedVideo.Quality = .medium
                     if let expandedVideoState = component.expandedVideoState {
-                        if expandedVideoState.mainParticipant.id == participant.id, expandedVideoState.mainParticipant.isPresentation {
+                        if expandedVideoState.mainParticipant.id == participant.peer.id, expandedVideoState.mainParticipant.isPresentation {
                             if component.maxVideoQuality == Int.max {
                                 maxVideoQuality = .full
                             } else if component.maxVideoQuality == 360 {
@@ -2018,7 +1916,7 @@ final class VideoChatParticipantsComponent: Component {
             self.scrollViewClippingContainer.update(params: SolidRoundedCornersContainer.Params(
                 size: itemLayout.scrollClippingFrame.size,
                 color: .black,
-                cornerRadius: 16.0,
+                cornerRadius: 10.0,
                 smoothCorners: false
             ), transition: transition)
             
@@ -2059,7 +1957,7 @@ final class VideoChatParticipantsComponent: Component {
             self.separateVideoScrollViewClippingContainer.update(params: SolidRoundedCornersContainer.Params(
                 size: itemLayout.separateVideoScrollClippingFrame.size,
                 color: .black,
-                cornerRadius: 16.0,
+                cornerRadius: 10.0,
                 smoothCorners: false
             ), transition: transition)
             

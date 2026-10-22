@@ -271,7 +271,6 @@ private enum InviteLinkViewEntry: Comparable, Identifiable {
                 }, contextAction: invite.link?.hasSuffix("...") == true ? nil : { node, gesture in
                     interaction.contextAction(invite, node, gesture)
                 }, viewAction: {
-                }, openCallAction: {
                 })
             case let .subscriptionHeader(_, title):
                 return SectionHeaderItem(presentationData: ItemListPresentationData(presentationData), title: title)
@@ -539,7 +538,7 @@ public final class InviteLinkViewController: ViewController {
             self.headerNode.clipsToBounds = true
             
             self.headerBackgroundNode = ASDisplayNode()
-            self.headerBackgroundNode.backgroundColor = self.presentationData.theme.actionSheet.opaqueItemBackgroundColor
+            self.headerBackgroundNode.backgroundColor = self.presentationData.theme.list.plainBackgroundColor
             self.headerBackgroundNode.cornerRadius = 16.0
             
             self.titleNode = ImmediateTextNode()
@@ -755,7 +754,7 @@ public final class InviteLinkViewController: ViewController {
                                         isGroup = true
                                     }
                                     let updatedPresentationData = (strongSelf.presentationData, parentController.presentationDataPromise.get())
-                                    strongSelf.controller?.present(QrCodeScreen(context: context, updatedPresentationData: updatedPresentationData, subject: .invite(invite: invite, type: isGroup ? .group : .channel)), in: .window(.root))
+                                    strongSelf.controller?.present(QrCodeScreen(context: context, updatedPresentationData: updatedPresentationData, subject: .invite(invite: invite, isGroup: isGroup)), in: .window(.root))
                                 })
                             })))
                         }
@@ -808,7 +807,7 @@ public final class InviteLinkViewController: ViewController {
                         }
                     }
                     
-                    let contextController = makeContextController(presentationData: presentationData, source: .reference(InviteLinkContextReferenceContentSource(controller: controller, sourceNode: node)), items: .single(ContextController.Items(content: .list(items))), gesture: gesture)
+                    let contextController = ContextController(presentationData: presentationData, source: .reference(InviteLinkContextReferenceContentSource(controller: controller, sourceNode: node)), items: .single(ContextController.Items(content: .list(items))), gesture: gesture)
                     self?.controller?.presentInGlobalOverlay(contextController)
                 })
             })
@@ -1026,8 +1025,8 @@ public final class InviteLinkViewController: ViewController {
             self.presentationData = presentationData
             self.presentationDataPromise.set(.single(presentationData))
             
-            self.historyBackgroundContentNode.backgroundColor = self.presentationData.theme.actionSheet.opaqueItemBackgroundColor
-            self.headerBackgroundNode.backgroundColor = self.presentationData.theme.actionSheet.opaqueItemBackgroundColor
+            self.historyBackgroundContentNode.backgroundColor = self.presentationData.theme.list.plainBackgroundColor
+            self.headerBackgroundNode.backgroundColor = self.presentationData.theme.list.plainBackgroundColor
             self.titleNode.attributedText = NSAttributedString(string: self.titleNode.attributedText?.string ?? "", font: titleFont, textColor: self.presentationData.theme.actionSheet.primaryTextColor)
             self.subtitleNode.attributedText = NSAttributedString(string: self.subtitleNode.attributedText?.string ?? "", font: subtitleFont, textColor: self.presentationData.theme.list.itemSecondaryTextColor)
             

@@ -52,10 +52,6 @@ swift_library(
         "//submodules/TelegramCore/FlatSerialization",
         "//submodules/TelegramUI/Components/BatchVideoRendering",
         "//submodules/TelegramUI/Components/GifVideoLayer",
-        "//submodules/TelegramUI/Components/GlassBackgroundComponent",
-        "//submodules/TelegramUI/Components/EdgeEffect",
-        "//submodules/TelegramUI/Components/LiquidLens",
-        "//submodules/TelegramUI/Components/TabSelectionRecognizer",
     ],
     visibility = [
         "//visibility:public",

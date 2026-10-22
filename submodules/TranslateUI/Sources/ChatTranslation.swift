@@ -75,16 +75,9 @@ public struct ChatTranslationState: Codable {
     }
 }
 
-private func cachedChatTranslationState(engine: TelegramEngine, peerId: EnginePeer.Id, threadId: Int64?) -> Signal<ChatTranslationState?, NoError> {
-    let key: EngineDataBuffer
-    if let threadId {
-        key = EngineDataBuffer(length: 16)
-        key.setInt64(0, value: peerId.id._internalGetInt64Value())
-        key.setInt64(8, value: threadId)
-    } else {
-        key = EngineDataBuffer(length: 8)
-        key.setInt64(0, value: peerId.id._internalGetInt64Value())
-    }
+private func cachedChatTranslationState(engine: TelegramEngine, peerId: EnginePeer.Id) -> Signal<ChatTranslationState?, NoError> {
+    let key = EngineDataBuffer(length: 8)
+    key.setInt64(0, value: peerId.id._internalGetInt64Value())
     
     return engine.data.subscribe(TelegramEngine.EngineData.Item.ItemCache.Item(collectionId: ApplicationSpecificItemCacheCollectionId.translationState, id: key))
     |> map { entry -> ChatTranslationState? in
@@ -92,16 +85,9 @@ private func cachedChatTranslationState(engine: TelegramEngine, peerId: EnginePe
     }
 }
 
-private func updateChatTranslationState(engine: TelegramEngine, peerId: EnginePeer.Id, threadId: Int64?, state: ChatTranslationState?) -> Signal<Never, NoError> {
-    let key: EngineDataBuffer
-    if let threadId {
-        key = EngineDataBuffer(length: 16)
-        key.setInt64(0, value: peerId.id._internalGetInt64Value())
-        key.setInt64(8, value: threadId)
-    } else {
-        key = EngineDataBuffer(length: 8)
-        key.setInt64(0, value: peerId.id._internalGetInt64Value())
-    }
+private func updateChatTranslationState(engine: TelegramEngine, peerId: EnginePeer.Id, state: ChatTranslationState?) -> Signal<Never, NoError> {
+    let key = EngineDataBuffer(length: 8)
+    key.setInt64(0, value: peerId.id._internalGetInt64Value())
     
     if let state {
         return engine.itemCache.put(collectionId: ApplicationSpecificItemCacheCollectionId.translationState, id: key, item: state)
@@ -110,16 +96,9 @@ private func updateChatTranslationState(engine: TelegramEngine, peerId: EnginePe
     }
 }
 
-public func updateChatTranslationStateInteractively(engine: TelegramEngine, peerId: EnginePeer.Id, threadId: Int64?, _ f: @escaping (ChatTranslationState?) -> ChatTranslationState?) -> Signal<Never, NoError> {
-    let key: EngineDataBuffer
-    if let threadId {
-        key = EngineDataBuffer(length: 16)
-        key.setInt64(0, value: peerId.id._internalGetInt64Value())
-        key.setInt64(8, value: threadId)
-    } else {
-        key = EngineDataBuffer(length: 8)
-        key.setInt64(0, value: peerId.id._internalGetInt64Value())
-    }
+public func updateChatTranslationStateInteractively(engine: TelegramEngine, peerId: EnginePeer.Id, _ f: @escaping (ChatTranslationState?) -> ChatTranslationState?) -> Signal<Never, NoError> {
+    let key = EngineDataBuffer(length: 8)
+    key.setInt64(0, value: peerId.id._internalGetInt64Value())
     
     return engine.data.get(TelegramEngine.EngineData.Item.ItemCache.Item(collectionId: ApplicationSpecificItemCacheCollectionId.translationState, id: key))
     |> map { entry -> ChatTranslationState? in
@@ -127,7 +106,7 @@ public func updateChatTranslationStateInteractively(engine: TelegramEngine, peer
     }
     |> mapToSignal { current -> Signal<Never, NoError> in
         if let current {
-            return updateChatTranslationState(engine: engine, peerId: peerId, threadId: threadId, state: f(current))
+            return updateChatTranslationState(engine: engine, peerId: peerId, state: f(current))
         } else {
             return .never()
         }
@@ -172,11 +151,6 @@ public func translateMessageIds(context: AccountContext, messageIds: [EngineMess
                         messageIdsToTranslate.append(messageId)
                         messageIdsSet.insert(messageId)
                     }
-                } else if let audioTranscription = message.attributes.first(where: { $0 is AudioTranscriptionMessageAttribute }) as? AudioTranscriptionMessageAttribute, !audioTranscription.text.isEmpty && !audioTranscription.isPending {
-                    if !messageIdsSet.contains(messageId) {
-                        messageIdsToTranslate.append(messageId)
-                        messageIdsSet.insert(messageId)
-                    }
                 }
             } else {
                 if !messageIdsSet.contains(messageId) {
@@ -185,30 +159,15 @@ public func translateMessageIds(context: AccountContext, messageIds: [EngineMess
                 }
             }
         }
-        
-        let translationConfiguration = TranslationConfiguration.with(appConfiguration: context.currentAppConfiguration.with { $0 })
-        var enableLocalIfPossible = false
-        switch translationConfiguration.auto {
-        case .system:
-            if #available(iOS 18.0, *) {
-                enableLocalIfPossible = true
-            }
-        default:
-            break
-        }
-        return context.engine.messages.translateMessages(messageIds: messageIdsToTranslate, fromLang: fromLang, toLang: toLang, enableLocalIfPossible: enableLocalIfPossible)
+        return context.engine.messages.translateMessages(messageIds: messageIdsToTranslate, fromLang: fromLang, toLang: toLang, enableLocalIfPossible: context.sharedContext.immediateExperimentalUISettings.enableLocalTranslation)
         |> `catch` { _ -> Signal<Never, NoError> in
             return .complete()
         }
     } |> switchToLatest
 }
 
-public func chatTranslationState(context: AccountContext, peerId: EnginePeer.Id, threadId: Int64?) -> Signal<ChatTranslationState?, NoError> {
+public func chatTranslationState(context: AccountContext, peerId: EnginePeer.Id) -> Signal<ChatTranslationState?, NoError> {
     if peerId.id == EnginePeer.Id.Id._internalFromInt64Value(777000) {
-        return .single(nil)
-    }
-    
-    guard canTranslateChats(context: context) else {
         return .single(nil)
     }
     
@@ -220,16 +179,11 @@ public func chatTranslationState(context: AccountContext, peerId: EnginePeer.Id,
         if baseLang.hasSuffix(rawSuffix) {
             baseLang = String(baseLang.dropLast(rawSuffix.count))
         }
-
-        return combineLatest(
-            context.sharedContext.accountManager.sharedData(keys: [ApplicationSpecificSharedDataKeys.translationSettings])
-            |> map { sharedData -> TranslationSettings in
-                return sharedData.entries[ApplicationSpecificSharedDataKeys.translationSettings]?.get(TranslationSettings.self) ?? TranslationSettings.defaultSettings
-            },
-            context.engine.data.subscribe(TelegramEngine.EngineData.Item.Peer.AutoTranslateEnabled(id: peerId))
-        )
-        |> mapToSignal { settings, autoTranslateEnabled in
-            if !settings.translateChats && !autoTranslateEnabled {
+        
+        return context.sharedContext.accountManager.sharedData(keys: [ApplicationSpecificSharedDataKeys.translationSettings])
+        |> mapToSignal { sharedData in
+            let settings = sharedData.entries[ApplicationSpecificSharedDataKeys.translationSettings]?.get(TranslationSettings.self) ?? TranslationSettings.defaultSettings
+            if !settings.translateChats {
                 return .single(nil)
             }
             
@@ -243,7 +197,7 @@ public func chatTranslationState(context: AccountContext, peerId: EnginePeer.Id,
                 }
             }
             
-            return cachedChatTranslationState(engine: context.engine, peerId: peerId, threadId: threadId)
+            return cachedChatTranslationState(engine: context.engine, peerId: peerId)
             |> mapToSignal { cached in
                 let currentTime = Int32(CFAbsoluteTimeGetCurrent() + kCFAbsoluteTimeIntervalSince1970)
                 if let cached, let timestamp = cached.timestamp, cached.baseLang == baseLang && currentTime - timestamp < 60 * 60 {
@@ -255,7 +209,7 @@ public func chatTranslationState(context: AccountContext, peerId: EnginePeer.Id,
                 } else {
                     return .single(nil)
                     |> then(
-                        context.account.viewTracker.aroundMessageHistoryViewForLocation(.peer(peerId: peerId, threadId: threadId), index: .upperBound, anchorIndex: .upperBound, count: 32, fixedCombinedReadStates: nil)
+                        context.account.viewTracker.aroundMessageHistoryViewForLocation(.peer(peerId: peerId, threadId: nil), index: .upperBound, anchorIndex: .upperBound, count: 32, fixedCombinedReadStates: nil)
                         |> filter { messageHistoryView -> Bool in
                             return messageHistoryView.0.entries.count > 1
                         }
@@ -270,55 +224,47 @@ public func chatTranslationState(context: AccountContext, peerId: EnginePeer.Id,
                             var count = 0
                             for message in messages {
                                 if message.effectivelyIncoming(context.account.peerId), message.text.count >= 10 {
-                                    if let summaryAttribute = message.attributes.first(where: { $0 is SummarizationMessageAttribute }) as? SummarizationMessageAttribute, !summaryAttribute.fromLang.isEmpty {
-                                        let fromLang = normalizeTranslationLanguage(summaryAttribute.fromLang)
-                                        if supportedTranslationLanguages.contains(fromLang) {
-                                            fromLangs[fromLang] = (fromLangs[fromLang] ?? 0) + message.text.count
-                                            count += 1
+                                    var text = String(message.text.prefix(256))
+                                    if var entities = message.textEntitiesAttribute?.entities.filter({ entity in
+                                        switch entity.type {
+                                        case .Pre, .Code, .Url, .Email, .Mention, .Hashtag, .BotCommand:
+                                            return true
+                                        default:
+                                            return false
                                         }
-                                    } else {
-                                        var text = String(message.text.prefix(256))
-                                        if var entities = message.textEntitiesAttribute?.entities.filter({ entity in
-                                            switch entity.type {
-                                            case .Pre, .Code, .Url, .Email, .Mention, .Hashtag, .BotCommand:
-                                                return true
-                                            default:
-                                                return false
+                                    }) {
+                                        entities = entities.sorted(by: { $0.range.lowerBound > $1.range.lowerBound })
+                                        var ranges: [Range<String.Index>] = []
+                                        for entity in entities {
+                                            if entity.range.lowerBound > text.count || entity.range.upperBound > text.count {
+                                                continue
                                             }
-                                        }) {
-                                            entities = entities.sorted(by: { $0.range.lowerBound > $1.range.lowerBound })
-                                            var ranges: [Range<String.Index>] = []
-                                            for entity in entities {
-                                                if entity.range.lowerBound > text.count || entity.range.upperBound > text.count {
-                                                    continue
-                                                }
-                                                ranges.append(text.index(text.startIndex, offsetBy: entity.range.lowerBound) ..< text.index(text.startIndex, offsetBy: entity.range.upperBound))
-                                            }
-                                            for range in ranges {
-                                                if range.upperBound < text.endIndex {
-                                                    text.removeSubrange(range)
-                                                }
+                                            ranges.append(text.index(text.startIndex, offsetBy: entity.range.lowerBound) ..< text.index(text.startIndex, offsetBy: entity.range.upperBound))
+                                        }
+                                        for range in ranges {
+                                            if range.upperBound < text.endIndex {
+                                                text.removeSubrange(range)
                                             }
                                         }
-                                        
-                                        if message.text.count < 10 {
-                                            continue
+                                    }
+                                    
+                                    if message.text.count < 10 {
+                                        continue
+                                    }
+                                    
+                                    languageRecognizer.processString(text)
+                                    let hypotheses = languageRecognizer.languageHypotheses(withMaximum: 4)
+                                    languageRecognizer.reset()
+                                                                        
+                                    let filteredLanguages = hypotheses.filter { supportedTranslationLanguages.contains(normalizeTranslationLanguage($0.key.rawValue)) }.sorted(by: { $0.value > $1.value })
+                                    if let language = filteredLanguages.first {
+                                        let fromLang = normalizeTranslationLanguage(language.key.rawValue)
+                                        if loggingEnabled && !["en", "ru"].contains(fromLang) && !dontTranslateLanguages.contains(fromLang) {
+                                            Logger.shared.log("ChatTranslation", "\(text)")
+                                            Logger.shared.log("ChatTranslation", "Recognized as: \(fromLang), other hypotheses: \(hypotheses.map { $0.key.rawValue }.joined(separator: ",")) ")
                                         }
-                                        
-                                        languageRecognizer.processString(text)
-                                        let hypotheses = languageRecognizer.languageHypotheses(withMaximum: 4)
-                                        languageRecognizer.reset()
-                                        
-                                        let filteredLanguages = hypotheses.filter { supportedTranslationLanguages.contains(normalizeTranslationLanguage($0.key.rawValue)) }.sorted(by: { $0.value > $1.value })
-                                        if let language = filteredLanguages.first {
-                                            let fromLang = normalizeTranslationLanguage(language.key.rawValue)
-                                            if loggingEnabled && !["en", "ru"].contains(fromLang) && !dontTranslateLanguages.contains(fromLang) {
-                                                Logger.shared.log("ChatTranslation", "\(text)")
-                                                Logger.shared.log("ChatTranslation", "Recognized as: \(fromLang), other hypotheses: \(hypotheses.map { $0.key.rawValue }.joined(separator: ",")) ")
-                                            }
-                                            fromLangs[fromLang] = (fromLangs[fromLang] ?? 0) + message.text.count
-                                            count += 1
-                                        }
+                                        fromLangs[fromLang] = (fromLangs[fromLang] ?? 0) + message.text.count
+                                        count += 1
                                     }
                                 }
                                 if count >= 16 {
@@ -340,24 +286,14 @@ public func chatTranslationState(context: AccountContext, peerId: EnginePeer.Id,
                             if loggingEnabled {
                                 Logger.shared.log("ChatTranslation", "Ended with: \(fromLang)")
                             }
-                            
-                            let isEnabled: Bool
-                            if let currentIsEnabled = cached?.isEnabled {
-                                isEnabled = currentIsEnabled
-                            } else if autoTranslateEnabled {
-                                isEnabled = true
-                            } else {
-                                isEnabled = false
-                            }
-                            
                             let state = ChatTranslationState(
                                 baseLang: baseLang,
                                 fromLang: fromLang,
                                 timestamp: currentTime,
                                 toLang: cached?.toLang,
-                                isEnabled: isEnabled
+                                isEnabled: cached?.isEnabled ?? false
                             )
-                            let _ = updateChatTranslationState(engine: context.engine, peerId: peerId, threadId: threadId, state: state).start()
+                            let _ = updateChatTranslationState(engine: context.engine, peerId: peerId, state: state).start()
                             if !dontTranslateLanguages.contains(fromLang) {
                                 return state
                             } else {

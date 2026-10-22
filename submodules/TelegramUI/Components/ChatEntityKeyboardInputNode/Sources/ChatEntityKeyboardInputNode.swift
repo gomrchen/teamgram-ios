@@ -31,9 +31,6 @@ import Pasteboard
 import EntityKeyboardGifContent
 import LegacyMessageInputPanelInputView
 import AttachmentTextInputPanelNode
-import GlassBackgroundComponent
-
-private let keyboardCornerRadius: CGFloat = 30.0
 
 public final class EmptyInputView: UIView, UIInputViewAudioFeedback {
     public var enableInputClicksWhenVisible: Bool {
@@ -48,11 +45,10 @@ public struct ChatMediaInputPaneScrollState {
 
 public final class ChatEntityKeyboardInputNode: ChatInputNode {
     public final class Interaction {
-        let sendSticker: (FileMediaReference, Bool, Bool, String?, Bool, UIView?, CGRect?, CALayer?, [ItemCollectionId]) -> Bool
+        let sendSticker: (FileMediaReference, Bool, Bool, String?, Bool, UIView, CGRect, CALayer?, [ItemCollectionId]) -> Bool
         let sendEmoji: (String, ChatTextInputTextCustomEmojiAttribute, Bool) -> Void
         let sendGif: (FileMediaReference, UIView, CGRect, Bool, Bool) -> Bool
         let sendBotContextResultAsGif: (ChatContextResultCollection, ChatContextResult, UIView, CGRect, Bool, Bool) -> Bool
-        let editGif: (FileMediaReference, Bool) -> Void
         let updateChoosingSticker: (Bool) -> Void
         let switchToTextInput: () -> Void
         let dismissTextInput: () -> Void
@@ -66,11 +62,10 @@ public final class ChatEntityKeyboardInputNode: ChatInputNode {
         public var forceTheme: PresentationTheme?
         
         public init(
-            sendSticker: @escaping (FileMediaReference, Bool, Bool, String?, Bool, UIView?, CGRect?, CALayer?, [ItemCollectionId]) -> Bool,
+            sendSticker: @escaping (FileMediaReference, Bool, Bool, String?, Bool, UIView, CGRect, CALayer?, [ItemCollectionId]) -> Bool,
             sendEmoji: @escaping (String, ChatTextInputTextCustomEmojiAttribute, Bool) -> Void,
             sendGif: @escaping (FileMediaReference, UIView, CGRect, Bool, Bool) -> Bool,
             sendBotContextResultAsGif: @escaping (ChatContextResultCollection, ChatContextResult, UIView, CGRect, Bool, Bool) -> Bool,
-            editGif: @escaping (FileMediaReference, Bool) -> Void,
             updateChoosingSticker: @escaping (Bool) -> Void,
             switchToTextInput: @escaping () -> Void,
             dismissTextInput: @escaping () -> Void,
@@ -86,7 +81,6 @@ public final class ChatEntityKeyboardInputNode: ChatInputNode {
             self.sendEmoji = sendEmoji
             self.sendGif = sendGif
             self.sendBotContextResultAsGif = sendBotContextResultAsGif
-            self.editGif = editGif
             self.updateChoosingSticker = updateChoosingSticker
             self.switchToTextInput = switchToTextInput
             self.dismissTextInput = dismissTextInput
@@ -103,7 +97,6 @@ public final class ChatEntityKeyboardInputNode: ChatInputNode {
             self.sendSticker = chatControllerInteraction.sendSticker
             self.sendEmoji = chatControllerInteraction.sendEmoji
             self.sendGif = chatControllerInteraction.sendGif
-            self.editGif = chatControllerInteraction.editGif
             self.sendBotContextResultAsGif = chatControllerInteraction.sendBotContextResultAsGif
             self.updateChoosingSticker = chatControllerInteraction.updateChoosingSticker
             self.switchToTextInput = { [weak chatControllerInteraction] in
@@ -175,7 +168,6 @@ public final class ChatEntityKeyboardInputNode: ChatInputNode {
         hasStickers: Bool = true,
         hasGifs: Bool = true,
         hideBackground: Bool = false,
-        maskEdge: EmojiPagerContentComponent.MaskEdgeMode = .none,
         forceHasPremium: Bool = false,
         sendGif: ((FileMediaReference, UIView, CGRect, Bool, Bool) -> Bool)?
     ) -> Signal<InputData, NoError> {
@@ -195,8 +187,7 @@ public final class ChatEntityKeyboardInputNode: ChatInputNode {
             chatPeerId: chatPeerId,
             hasSearch: hasSearch,
             forceHasPremium: forceHasPremium,
-            hideBackground: hideBackground,
-            maskEdge: maskEdge
+            hideBackground: hideBackground
         )
         
         let stickerNamespaces: [ItemCollectionId.Namespace] = [Namespaces.ItemCollection.CloudStickerPacks]
@@ -219,8 +210,7 @@ public final class ChatEntityKeyboardInputNode: ChatInputNode {
                 hasEdit: hasEdit,
                 hasAdd: hasEdit,
                 subject: .chatStickers,
-                hideBackground: hideBackground,
-                maskEdge: maskEdge
+                hideBackground: hideBackground
             )
             |> map(Optional.init)
         } else {
@@ -417,20 +407,12 @@ public final class ChatEntityKeyboardInputNode: ChatInputNode {
         }
     }
     
-    public var clipContentToTopPanel: Bool = false
+    fileprivate var clipContentToTopPanel: Bool = false
     
     public var externalTopPanelContainerImpl: PagerExternalTopPanelContainer?
     public override var externalTopPanelContainer: UIView? {
         return self.externalTopPanelContainerImpl
     }
-    
-    private let clippingView: UIView
-    private var backgroundView: BlurredBackgroundView?
-    private var backgroundTintView: UIImageView?
-    private var backgroundChromeView: UIImageView?
-    private var backgroundTintMaskView: UIView?
-    private var backgroundTintMaskContentView: UIView?
-    private var externalBackground: EmojiPagerContentComponent.ExternalBackground?
     
     public var switchToTextInput: (() -> Void)?
     
@@ -494,10 +476,6 @@ public final class ChatEntityKeyboardInputNode: ChatInputNode {
         
         self.interaction = interaction
         
-        self.clippingView = UIView()
-        self.clippingView.clipsToBounds = true
-        self.clippingView.layer.cornerRadius = keyboardCornerRadius
-        
         self.entityKeyboardView = ComponentHostView<Empty>()
         
         super.init()
@@ -507,41 +485,7 @@ public final class ChatEntityKeyboardInputNode: ChatInputNode {
         self.topBackgroundExtension = 34.0
         self.followsDefaultHeight = true
         
-        if "".isEmpty {
-            let backgroundView = BlurredBackgroundView(color: .black, enableBlur: true)
-            self.backgroundView = backgroundView
-            self.view.addSubview(backgroundView)
-            
-            let backgroundTintView = UIImageView()
-            self.backgroundTintView = backgroundTintView
-            self.view.addSubview(backgroundTintView)
-            
-            let backgroundTintMaskView = UIView()
-            backgroundTintMaskView.backgroundColor = .white
-            self.backgroundTintMaskView = backgroundTintMaskView
-            if let filter = CALayer.luminanceToAlpha() {
-                backgroundTintMaskView.layer.filters = [filter]
-            }
-            backgroundTintView.mask = backgroundTintMaskView
-            
-            let backgroundTintMaskContentView = UIView()
-            backgroundTintMaskView.addSubview(backgroundTintMaskContentView)
-            self.backgroundTintMaskContentView = backgroundTintMaskContentView
-            
-            let backgroundChromeView = UIImageView()
-            self.backgroundChromeView = backgroundChromeView
-            
-            self.externalBackground = EmojiPagerContentComponent.ExternalBackground(
-                effectContainerView: backgroundTintMaskContentView
-            )
-        }
-        
-        self.clippingView.addSubview(self.entityKeyboardView)
-        self.view.addSubview(self.clippingView)
-        
-        if let backgroundChromeView = self.backgroundChromeView {
-            self.view.addSubview(backgroundChromeView)
-        }
+        self.view.addSubview(self.entityKeyboardView)
         
         self.externalTopPanelContainerImpl = PagerExternalTopPanelContainer()
         
@@ -1218,7 +1162,7 @@ public final class ChatEntityKeyboardInputNode: ChatInputNode {
             chatPeerId: chatPeerId,
             peekBehavior: stickerPeekBehavior,
             customLayout: nil,
-            externalBackground: self.externalBackground,
+            externalBackground: nil,
             externalExpansionView: nil,
             customContentView: nil,
             useOpaqueTheme: self.useOpaqueTheme,
@@ -1565,7 +1509,7 @@ public final class ChatEntityKeyboardInputNode: ChatInputNode {
             chatPeerId: chatPeerId,
             peekBehavior: stickerPeekBehavior,
             customLayout: nil,
-            externalBackground: self.externalBackground,
+            externalBackground: nil,
             externalExpansionView: nil,
             customContentView: nil,
             useOpaqueTheme: self.useOpaqueTheme,
@@ -1795,22 +1739,6 @@ public final class ChatEntityKeyboardInputNode: ChatInputNode {
         let _ = self.updateLayout(width: width, leftInset: leftInset, rightInset: rightInset, bottomInset: bottomInset, standardInputHeight: standardInputHeight, inputHeight: inputHeight, maximumHeight: maximumHeight, inputPanelHeight: inputPanelHeight, transition: .immediate, interfaceState: interfaceState, layoutMetrics: layoutMetrics, deviceMetrics: deviceMetrics, isVisible: isVisible, isExpanded: isExpanded)
     }
     
-    override public func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
-        if let result = super.hitTest(point, with: event) {
-            return result
-        }
-        
-        if let backgroundView = self.backgroundView, backgroundView.frame.contains(point) {
-            for subview in self.view.subviews.reversed() {
-                if let result = subview.hitTest(self.view.convert(point, to: subview), with: event) {
-                    return result
-                }
-            }
-        }
-        
-        return nil
-    }
-    
     public override func updateLayout(width: CGFloat, leftInset: CGFloat, rightInset: CGFloat, bottomInset: CGFloat, standardInputHeight: CGFloat, inputHeight: CGFloat, maximumHeight: CGFloat, inputPanelHeight: CGFloat, transition: ContainedViewLayoutTransition, interfaceState: ChatPresentationInterfaceState, layoutMetrics: LayoutMetrics, deviceMetrics: DeviceMetrics, isVisible: Bool, isExpanded: Bool) -> (CGFloat, CGFloat) {
         self.currentState = (width, leftInset, rightInset, bottomInset, standardInputHeight, inputHeight, maximumHeight, inputPanelHeight, interfaceState, layoutMetrics, deviceMetrics, isVisible, isExpanded)
         
@@ -1910,8 +1838,8 @@ public final class ChatEntityKeyboardInputNode: ChatInputNode {
                 theme: interfaceState.theme,
                 strings: interfaceState.strings,
                 isContentInFocus: isVisible,
-                containerInsets: UIEdgeInsets(top: self.isEmojiSearchActive ? -42.0 : 0.0, left: leftInset, bottom: keyboardBottomInset, right: rightInset),
-                topPanelInsets: UIEdgeInsets(top: 0.0, left: 5.0, bottom: 0.0, right: 5.0),
+                containerInsets: UIEdgeInsets(top: self.isEmojiSearchActive ? -34.0 : 0.0, left: leftInset, bottom: keyboardBottomInset, right: rightInset),
+                topPanelInsets: UIEdgeInsets(),
                 emojiContent: emojiContent,
                 stickerContent: stickerContent,
                 maskContent: nil,
@@ -1921,7 +1849,6 @@ public final class ChatEntityKeyboardInputNode: ChatInputNode {
                 defaultToEmojiTab: self.defaultToEmojiTab,
                 externalTopPanelContainer: self.externalTopPanelContainerImpl,
                 externalBottomPanelContainer: nil,
-                externalTintMaskContainer: self.backgroundTintMaskContentView,
                 displayTopPanelBackground: self.opaqueTopPanelBackground ? .opaque : .none,
                 topPanelExtensionUpdated: { [weak self] topPanelExtension, transition in
                     guard let strongSelf = self else {
@@ -2012,52 +1939,7 @@ public final class ChatEntityKeyboardInputNode: ChatInputNode {
             environment: {},
             containerSize: CGSize(width: width, height: expandedHeight)
         )
-        
-        var clippingFrame = CGRect(origin: CGPoint(), size: entityKeyboardSize)
-        clippingFrame.size.height += 32.0
-        
-        var entityKeyboardSizeFrame = CGRect(origin: CGPoint(), size: entityKeyboardSize)
-        if self.hideInput {
-            clippingFrame.size.height += self.topBackgroundExtension
-            clippingFrame.origin.y -= self.topBackgroundExtension
-            entityKeyboardSizeFrame.origin.y += self.topBackgroundExtension
-        }
-        
-        transition.updateFrame(view: self.entityKeyboardView, frame: entityKeyboardSizeFrame)
-        
-        transition.updateFrame(view: self.clippingView, frame: clippingFrame)
-        
-        if let backgroundView = self.backgroundView, let backgroundTintView = self.backgroundTintView, let backgroundTintMaskView = self.backgroundTintMaskView, let backgroundTintMaskContentView = self.backgroundTintMaskContentView, let backgroundChromeView = self.backgroundChromeView {
-            var backgroundFrame = CGRect(origin: CGPoint(x: 0.0, y: 0.0), size: entityKeyboardSize)
-            if self.hideInput {
-                backgroundFrame.size.height += self.topBackgroundExtension
-                backgroundFrame.origin.y -= self.topBackgroundExtension
-            }
-            backgroundFrame.size.height += 32.0
-            
-            if backgroundChromeView.image == nil {
-                backgroundChromeView.image = GlassBackgroundView.generateForegroundImage(size: CGSize(width: keyboardCornerRadius * 2.0, height: keyboardCornerRadius * 2.0), isDark: interfaceState.theme.overallDarkAppearance, fillColor: .clear)
-            }
-            if backgroundTintView.image == nil {
-                backgroundTintView.image = generateStretchableFilledCircleImage(diameter: keyboardCornerRadius * 2.0, color: .white)?.withRenderingMode(.alwaysTemplate)
-            }
-            backgroundTintView.tintColor = interfaceState.theme.chat.inputMediaPanel.backgroundColor
-            
-            transition.updateFrame(view: backgroundView, frame: backgroundFrame)
-            backgroundView.updateColor(color: .clear, forceKeepBlur: true, transition: .immediate)
-            backgroundView.update(size: backgroundFrame.size, cornerRadius: keyboardCornerRadius, maskedCorners: [.layerMinXMinYCorner, .layerMaxXMinYCorner], transition: transition)
-            
-            transition.updateFrame(view: backgroundChromeView, frame: backgroundFrame.insetBy(dx: -1.0, dy: 0.0))
-            
-            var backgroundTintMaskContentFrame = CGRect(origin: CGPoint(), size: backgroundFrame.size)
-            if self.hideInput {
-                backgroundTintMaskContentFrame.origin.y += self.topBackgroundExtension
-            }
-            transition.updateFrame(view: backgroundTintView, frame: backgroundFrame)
-            
-            transition.updateFrame(view: backgroundTintMaskView, frame: CGRect(origin: CGPoint(), size: backgroundFrame.size))
-            transition.updateFrame(view: backgroundTintMaskContentView, frame: backgroundTintMaskContentFrame)
-        }
+        transition.updateFrame(view: self.entityKeyboardView, frame: CGRect(origin: CGPoint(x: 0.0, y: 0.0), size: entityKeyboardSize))
         
         let layoutTime = CFAbsoluteTimeGetCurrent() - startTime
         if layoutTime > 0.1 {
@@ -2285,24 +2167,6 @@ public final class ChatEntityKeyboardInputNode: ChatInputNode {
                 }
             }
             
-            items.append(.action(ContextMenuActionItem(text: presentationData.strings.Preview_Gif_AddCaption, icon: { theme in
-                return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/AddCaption"), color: theme.actionSheet.primaryTextColor)
-            }, action: { [weak self] _, f in
-                f(.default)
-                if let self {
-                    let _ = self.interaction?.editGif(file, true)
-                }
-            })))
-            
-            items.append(.action(ContextMenuActionItem(text: presentationData.strings.Preview_Gif_Edit, icon: { theme in
-                return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Draw"), color: theme.actionSheet.primaryTextColor)
-            }, action: { [weak self] _, f in
-                f(.default)
-                if let self {
-                    let _ = self.interaction?.editGif(file, false)
-                }
-            })))
-            
             if isSaved || isGifSaved {
                 items.append(.action(ContextMenuActionItem(text: presentationData.strings.Conversation_ContextMenuDelete, textColor: .destructive, icon: { theme in
                     return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Delete"), color: theme.actionSheet.destructiveActionTextColor)
@@ -2358,7 +2222,7 @@ public final class ChatEntityKeyboardInputNode: ChatInputNode {
                 })))
             }
             
-            let contextController = makeContextController(presentationData: presentationData, source: .controller(ContextControllerContentSourceImpl(controller: gallery, sourceView: sourceView, sourceRect: sourceRect)), items: .single(ContextController.Items(content: .list(items))), gesture: gesture)
+            let contextController = ContextController(presentationData: presentationData, source: .controller(ContextControllerContentSourceImpl(controller: gallery, sourceView: sourceView, sourceRect: sourceRect)), items: .single(ContextController.Items(content: .list(items))), gesture: gesture)
             strongSelf.interaction?.presentGlobalOverlayController(contextController, nil)
         })
     }
@@ -2675,7 +2539,6 @@ public final class EntityInputView: UIInputView, AttachmentTextInputPanelInputVi
         let presentationInterfaceState = ChatPresentationInterfaceState(
             chatWallpaper: .builtin(WallpaperSettings()),
             theme: self.presentationData.theme,
-            preferredGlassType: .default,
             strings: self.presentationData.strings,
             dateTimeFormat: self.presentationData.dateTimeFormat,
             nameDisplayOrder: self.presentationData.nameDisplayOrder,
@@ -2691,11 +2554,13 @@ public final class EntityInputView: UIInputView, AttachmentTextInputPanelInputVi
             pendingUnpinnedAllMessages: false,
             activeGroupCallInfo: nil,
             hasActiveGroupCall: false,
+            importState: nil,
             threadData: nil,
             isGeneralThreadClosed: nil,
             replyMessage: nil,
             accountPeerColor: nil,
-            businessIntro: nil
+            businessIntro: nil,
+            starGiftsAvailable: false
         )
 
         let _ = inputNode.updateLayout(
@@ -2720,7 +2585,7 @@ public final class EntityInputView: UIInputView, AttachmentTextInputPanelInputVi
 
 public final class EmojiContentPeekBehaviorImpl: EmojiContentPeekBehavior {
     public class Interaction {
-        public let sendSticker: (FileMediaReference, Bool, Bool, String?, Bool, UIView?, CGRect?, CALayer?, [ItemCollectionId]) -> Bool
+        public let sendSticker: (FileMediaReference, Bool, Bool, String?, Bool, UIView, CGRect, CALayer?, [ItemCollectionId]) -> Bool
         public let sendEmoji: (TelegramMediaFile) -> Void
         public let setStatus: (TelegramMediaFile) -> Void
         public let copyEmoji: (TelegramMediaFile) -> Void
@@ -2729,7 +2594,7 @@ public final class EmojiContentPeekBehaviorImpl: EmojiContentPeekBehavior {
         public let navigationController: () -> NavigationController?
         public let updateIsPreviewing: (Bool) -> Void
         
-        public init(sendSticker: @escaping (FileMediaReference, Bool, Bool, String?, Bool, UIView?, CGRect?, CALayer?, [ItemCollectionId]) -> Bool, sendEmoji: @escaping (TelegramMediaFile) -> Void, setStatus: @escaping (TelegramMediaFile) -> Void, copyEmoji: @escaping (TelegramMediaFile) -> Void, presentController: @escaping (ViewController, Any?) -> Void, presentGlobalOverlayController: @escaping (ViewController, Any?) -> Void, navigationController: @escaping () -> NavigationController?, updateIsPreviewing: @escaping (Bool) -> Void) {
+        public init(sendSticker: @escaping (FileMediaReference, Bool, Bool, String?, Bool, UIView, CGRect, CALayer?, [ItemCollectionId]) -> Bool, sendEmoji: @escaping (TelegramMediaFile) -> Void, setStatus: @escaping (TelegramMediaFile) -> Void, copyEmoji: @escaping (TelegramMediaFile) -> Void, presentController: @escaping (ViewController, Any?) -> Void, presentGlobalOverlayController: @escaping (ViewController, Any?) -> Void, navigationController: @escaping () -> NavigationController?, updateIsPreviewing: @escaping (Bool) -> Void) {
             self.sendSticker = sendSticker
             self.sendEmoji = sendEmoji
             self.setStatus = setStatus
@@ -2928,7 +2793,7 @@ public final class EmojiContentPeekBehaviorImpl: EmojiContentPeekBehavior {
                         let isLocked = file.isPremiumSticker && !hasPremium
                         
                         if let interaction = strongSelf.interaction {
-                            let sendSticker: (FileMediaReference, Bool, Bool, String?, Bool, UIView?, CGRect?, CALayer?) -> Void = { fileReference, silentPosting, schedule, query, clearInput, sourceView, sourceRect, sourceLayer in
+                            let sendSticker: (FileMediaReference, Bool, Bool, String?, Bool, UIView, CGRect, CALayer?) -> Void = { fileReference, silentPosting, schedule, query, clearInput, sourceView, sourceRect, sourceLayer in
                                 let _ = interaction.sendSticker(fileReference, silentPosting, schedule, query, clearInput, sourceView, sourceRect, sourceLayer, bubbleUpEmojiOrStickersets)
                             }
                             
@@ -2994,32 +2859,6 @@ public final class EmojiContentPeekBehaviorImpl: EmojiContentPeekBehavior {
                                     })
                                 }))
                             )
-                            
-                            if !file.isPremiumSticker {
-                                menuItems.append(.action(ContextMenuActionItem(text: presentationData.strings.Stickers_EditSticker, icon: { theme in generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Draw"), color: theme.contextMenu.primaryColor) }, action: { [weak self] _, f in
-                                    f(.default)
-                                    
-                                    var emoji: [String] = []
-                                    for attribute in file.attributes {
-                                        if case let .Sticker(displayText, _, _) = attribute {
-                                            emoji = [displayText]
-                                        }
-                                    }
-                                    
-                                    let controller = context.sharedContext.makeStickerEditorScreen(
-                                        context: context,
-                                        source: (file, emoji),
-                                        mode: .generic(canSend: self?.chatPeerId != nil),
-                                        transitionArguments: nil,
-                                        completion: { file, _, commit in
-                                            commit()
-                                            sendSticker(.standalone(media: file), false, false, nil, false, nil, .zero, nil)
-                                        },
-                                        cancelled: {}
-                                    )
-                                    interaction.navigationController()?.pushViewController(controller)
-                                })))
-                            }
                             
                             loop: for attribute in file.attributes {
                                 switch attribute {
@@ -3093,7 +2932,7 @@ public final class EmojiContentPeekBehaviorImpl: EmojiContentPeekBehavior {
                 if let forceTheme = strongSelf.forceTheme {
                     presentationData = presentationData.withUpdated(theme: forceTheme)
                 }
-                let controller = makePeekController(presentationData: presentationData, content: content, sourceView: {
+                let controller = PeekController(presentationData: presentationData, content: content, sourceView: {
                     return (sourceView, sourceRect)
                 })
                 controller.visibilityUpdated = { [weak self] visible in

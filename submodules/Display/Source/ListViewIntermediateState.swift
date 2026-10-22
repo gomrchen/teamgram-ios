@@ -138,22 +138,18 @@ public struct ListViewUpdateSizeAndInsets {
     public var insets: UIEdgeInsets
     public var headerInsets: UIEdgeInsets?
     public var scrollIndicatorInsets: UIEdgeInsets?
-    public var itemOffsetInsets: UIEdgeInsets?
     public var duration: Double
     public var curve: ListViewAnimationCurve
     public var ensureTopInsetForOverlayHighlightedItems: CGFloat?
-    public var customAnimationTransition: ControlledTransition?
     
-    public init(size: CGSize, insets: UIEdgeInsets, headerInsets: UIEdgeInsets? = nil, scrollIndicatorInsets: UIEdgeInsets? = nil, itemOffsetInsets: UIEdgeInsets? = nil, duration: Double, curve: ListViewAnimationCurve, ensureTopInsetForOverlayHighlightedItems: CGFloat? = nil, customAnimationTransition: ControlledTransition? = nil) {
+    public init(size: CGSize, insets: UIEdgeInsets, headerInsets: UIEdgeInsets? = nil, scrollIndicatorInsets: UIEdgeInsets? = nil, duration: Double, curve: ListViewAnimationCurve, ensureTopInsetForOverlayHighlightedItems: CGFloat? = nil) {
         self.size = size
         self.insets = insets
         self.headerInsets = headerInsets
         self.scrollIndicatorInsets = scrollIndicatorInsets
-        self.itemOffsetInsets = itemOffsetInsets
         self.duration = duration
         self.curve = curve
         self.ensureTopInsetForOverlayHighlightedItems = ensureTopInsetForOverlayHighlightedItems
-        self.customAnimationTransition = customAnimationTransition
     }
 }
 
@@ -308,7 +304,6 @@ struct ListViewInsertionPoint {
 
 struct ListViewState {
     var insets: UIEdgeInsets
-    var itemOffsetInsets: UIEdgeInsets
     var visibleSize: CGSize
     let invisibleInset: CGFloat
     var nodes: [ListViewStateNode]
@@ -527,7 +522,7 @@ struct ListViewState {
         if fixedNode == nil {
             for i in 0 ..< self.nodes.count {
                 let node = self.nodes[i]
-                if let index = node.index , node.frame.maxY >= self.itemOffsetInsets.top {
+                if let index = node.index , node.frame.maxY >= self.insets.top {
                     fixedNode = (i, index, node.frame)
                     break
                 }
@@ -552,7 +547,7 @@ struct ListViewState {
                     if index != currentUpperNode.index - 1 {
                         if currentUpperNode.frame.minY > -self.invisibleInset - CGFloat.ulpOfOne {
                             var directionHint: ListViewInsertionOffsetDirection?
-                            if let hint = insertDirectionHints[currentUpperNode.index - 1] , currentUpperNode.frame.minY > self.itemOffsetInsets.top - CGFloat.ulpOfOne {
+                            if let hint = insertDirectionHints[currentUpperNode.index - 1] , currentUpperNode.frame.minY > self.insets.top - CGFloat.ulpOfOne {
                                 directionHint = ListViewInsertionOffsetDirection(hint)
                             }
                             return ListViewInsertionPoint(index: currentUpperNode.index - 1, point: CGPoint(x: 0.0, y: currentUpperNode.frame.minY), direction: directionHint ?? .Up)
@@ -567,10 +562,10 @@ struct ListViewState {
             if currentUpperNode.index != 0 && currentUpperNode.frame.minY > -self.invisibleInset - CGFloat.ulpOfOne {
                 var directionHint: ListViewInsertionOffsetDirection?
                 if let hint = insertDirectionHints[currentUpperNode.index - 1] {
-                    if currentUpperNode.frame.minY >= self.itemOffsetInsets.top - CGFloat.ulpOfOne {
+                    if currentUpperNode.frame.minY >= self.insets.top - CGFloat.ulpOfOne {
                         directionHint = ListViewInsertionOffsetDirection(hint)
                     }
-                } else if currentUpperNode.frame.minY >= self.itemOffsetInsets.top - CGFloat.ulpOfOne && !fixedNodeIsStationary {
+                } else if currentUpperNode.frame.minY >= self.insets.top - CGFloat.ulpOfOne && !fixedNodeIsStationary {
                     directionHint = .Down
                 }
                 
@@ -585,7 +580,7 @@ struct ListViewState {
                         if index != currentLowerNode.index + 1 {
                             if currentLowerNode.frame.maxY < self.visibleSize.height + self.invisibleInset - CGFloat.ulpOfOne {
                                 var directionHint: ListViewInsertionOffsetDirection?
-                                if let hint = insertDirectionHints[currentLowerNode.index + 1] , currentLowerNode.frame.maxY < self.visibleSize.height - self.itemOffsetInsets.bottom + CGFloat.ulpOfOne {
+                                if let hint = insertDirectionHints[currentLowerNode.index + 1] , currentLowerNode.frame.maxY < self.visibleSize.height - self.insets.bottom + CGFloat.ulpOfOne {
                                     directionHint = ListViewInsertionOffsetDirection(hint)
                                 }
                                 return ListViewInsertionPoint(index: currentLowerNode.index + 1, point: CGPoint(x: 0.0, y: currentLowerNode.frame.maxY), direction: directionHint ?? .Down)
@@ -600,7 +595,7 @@ struct ListViewState {
             
             if currentLowerNode.index != itemCount - 1 && currentLowerNode.frame.maxY < self.visibleSize.height + self.invisibleInset - CGFloat.ulpOfOne {
                 var directionHint: ListViewInsertionOffsetDirection?
-                if let hint = insertDirectionHints[currentLowerNode.index + 1] , currentLowerNode.frame.maxY < self.visibleSize.height - self.itemOffsetInsets.bottom + CGFloat.ulpOfOne {
+                if let hint = insertDirectionHints[currentLowerNode.index + 1] , currentLowerNode.frame.maxY < self.visibleSize.height - self.insets.bottom + CGFloat.ulpOfOne {
                     directionHint = ListViewInsertionOffsetDirection(hint)
                 }
                 return ListViewInsertionPoint(index: currentLowerNode.index + 1, point: CGPoint(x: 0.0, y: currentLowerNode.frame.maxY), direction: directionHint ?? .Down)
@@ -813,7 +808,7 @@ struct ListViewState {
             if let direction = direction {
                 offsetDirection = ListViewInsertionOffsetDirection(direction)
             } else {
-                if nodeFrame.maxY < self.itemOffsetInsets.top + CGFloat.ulpOfOne {
+                if nodeFrame.maxY < self.insets.top + CGFloat.ulpOfOne {
                     offsetDirection = .Down
                 } else {
                     offsetDirection = .Up
@@ -821,12 +816,12 @@ struct ListViewState {
             }
             operations.append(.Remove(index: index, offsetDirection: offsetDirection))
             
-            if let referenceNode = referenceNode, animated {
+            if let referenceNode = referenceNode , animated {
                 self.nodes.insert(.Placeholder(frame: nodeFrame), at: index)
                 operations.append(.InsertDisappearingPlaceholder(index: index, referenceNode: referenceNode, offsetDirection: offsetDirection.inverted()))
             } else {
-                if nodeFrame.maxY > self.itemOffsetInsets.top - CGFloat.ulpOfOne {
-                    if let direction = direction , direction == .Down && node.frame.minY < self.visibleSize.height - self.itemOffsetInsets.bottom + CGFloat.ulpOfOne {
+                if nodeFrame.maxY > self.insets.top - CGFloat.ulpOfOne {
+                    if let direction = direction , direction == .Down && node.frame.minY < self.visibleSize.height - self.insets.bottom + CGFloat.ulpOfOne {
                         for i in (0 ..< index).reversed() {
                             var frame = self.nodes[i].frame
                             frame.origin.y += nodeFrame.size.height
@@ -862,7 +857,7 @@ struct ListViewState {
                     if let direction = direction {
                         offsetDirection = ListViewInsertionOffsetDirection(direction)
                     } else {
-                        if node.frame.maxY < self.itemOffsetInsets.top + CGFloat.ulpOfOne {
+                        if node.frame.maxY < self.insets.top + CGFloat.ulpOfOne {
                             offsetDirection = .Down
                         } else {
                             offsetDirection = .Up

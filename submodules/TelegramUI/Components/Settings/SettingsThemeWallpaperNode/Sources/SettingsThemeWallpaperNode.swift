@@ -273,9 +273,9 @@ public final class SettingsThemeWallpaperNode: ASDisplayNode {
                             self.arguments = PatternWallpaperArguments(colors: [.clear], rotation: nil, customPatternColor: isLight ? .black : .white)
                         }
                         imageSignal = patternWallpaperImage(account: context.account, accountManager: context.sharedContext.accountManager, representations: convertedRepresentations, mode: .thumbnail, autoFetchFullSize: true)
-                        |> mapToSignal { generatorAndRects -> Signal<(TransformImageArguments) -> DrawingContext?, NoError> in
-                            if let (generator, _) = generatorAndRects {
-                                return .single(generator)
+                        |> mapToSignal { value -> Signal<(TransformImageArguments) -> DrawingContext?, NoError> in
+                            if let value = value {
+                                return .single(value)
                             } else {
                                 return .complete()
                             }

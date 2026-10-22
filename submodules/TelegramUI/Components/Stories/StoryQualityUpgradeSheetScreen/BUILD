@@ -22,7 +22,6 @@ swift_library(
         "//submodules/Components/SheetComponent",
         "//submodules/TelegramUI/Components/ButtonComponent",
         "//submodules/TelegramUI/Components/LottieComponent",
-        "//submodules/TelegramUI/Components/GlassBarButtonComponent",
     ],
     visibility = [
         "//visibility:public",

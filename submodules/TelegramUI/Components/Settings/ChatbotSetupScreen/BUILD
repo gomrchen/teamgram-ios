@@ -34,7 +34,6 @@ swift_library(
         "//submodules/AvatarNode",
         "//submodules/TelegramUI/Components/PlainButtonComponent",
         "//submodules/TelegramUI/Components/Stories/PeerListItemComponent",
-        "//submodules/TelegramUI/Components/AlertComponent",
         "//submodules/ShimmerEffect",
     ],
     visibility = [

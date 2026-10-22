@@ -74,7 +74,6 @@ final class ChatbotSearchResultItemComponent: Component {
         private weak var state: EmptyComponentState?
         
         var customUpdateIsHighlighted: ((Bool) -> Void)?
-        var enumerateSiblings: (((UIView) -> Void) -> Void)?
         private(set) var separatorInset: CGFloat = 0.0
         
         override init(frame: CGRect) {
@@ -129,7 +128,7 @@ final class ChatbotSearchResultItemComponent: Component {
                         animateScale: false
                     )),
                     environment: {},
-                    containerSize: CGSize(width: 140.0, height: 100.0)
+                    containerSize: CGSize(width: 100.0, height: 100.0)
                 )
             } else {
                 if let addButton = self.addButton {

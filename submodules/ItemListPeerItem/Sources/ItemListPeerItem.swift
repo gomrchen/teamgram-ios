@@ -248,7 +248,7 @@ public enum ItemListPeerItemLabelFont {
 
 public enum ItemListPeerItemLabel {
     case none
-    case text(String, ItemListPeerItemLabelFont, UIColor?, Bool)
+    case text(String, ItemListPeerItemLabelFont)
     case disclosure(String)
     case badge(String)
     case attributedText(NSAttributedString)
@@ -440,7 +440,6 @@ public final class ItemListPeerItem: ListViewItem, ItemListItem {
     }
     
     let presentationData: ItemListPresentationData
-    let systemStyle: ItemListSystemStyle
     let dateTimeFormat: PresentationDateTimeFormat
     let nameDisplayOrder: PresentationPersonNameOrder
     let context: Context
@@ -477,14 +476,12 @@ public final class ItemListPeerItem: ListViewItem, ItemListItem {
     let header: ListViewItemHeader?
     let shimmering: ItemListPeerItemShimmering?
     let displayDecorations: Bool
-    let displayBackground: Bool
     let disableInteractiveTransitionIfNecessary: Bool
     let storyStats: PeerStoryStats?
     let openStories: ((UIView) -> Void)?
     
     public init(
         presentationData: ItemListPresentationData,
-        systemStyle: ItemListSystemStyle = .legacy,
         dateTimeFormat: PresentationDateTimeFormat,
         nameDisplayOrder: PresentationPersonNameOrder,
         context: AccountContext,
@@ -521,13 +518,11 @@ public final class ItemListPeerItem: ListViewItem, ItemListItem {
         header: ListViewItemHeader? = nil,
         shimmering: ItemListPeerItemShimmering? = nil,
         displayDecorations: Bool = true,
-        displayBackground: Bool = true,
         disableInteractiveTransitionIfNecessary: Bool = false,
         storyStats: PeerStoryStats? = nil,
         openStories: ((UIView) -> Void)? = nil
     ) {
         self.presentationData = presentationData
-        self.systemStyle = systemStyle
         self.dateTimeFormat = dateTimeFormat
         self.nameDisplayOrder = nameDisplayOrder
         self.context = .account(context)
@@ -564,7 +559,6 @@ public final class ItemListPeerItem: ListViewItem, ItemListItem {
         self.header = header
         self.shimmering = shimmering
         self.displayDecorations = displayDecorations
-        self.displayBackground = displayBackground
         self.disableInteractiveTransitionIfNecessary = disableInteractiveTransitionIfNecessary
         self.storyStats = storyStats
         self.openStories = openStories
@@ -572,7 +566,6 @@ public final class ItemListPeerItem: ListViewItem, ItemListItem {
         
     public init(
         presentationData: ItemListPresentationData,
-        systemStyle: ItemListSystemStyle = .legacy,
         dateTimeFormat: PresentationDateTimeFormat,
         nameDisplayOrder: PresentationPersonNameOrder,
         context: Context,
@@ -609,13 +602,11 @@ public final class ItemListPeerItem: ListViewItem, ItemListItem {
         header: ListViewItemHeader? = nil,
         shimmering: ItemListPeerItemShimmering? = nil,
         displayDecorations: Bool = true,
-        displayBackground: Bool = true,
         disableInteractiveTransitionIfNecessary: Bool = false,
         storyStats: PeerStoryStats? = nil,
         openStories: ((UIView) -> Void)? = nil
     ) {
         self.presentationData = presentationData
-        self.systemStyle = systemStyle
         self.dateTimeFormat = dateTimeFormat
         self.nameDisplayOrder = nameDisplayOrder
         self.context = context
@@ -652,7 +643,6 @@ public final class ItemListPeerItem: ListViewItem, ItemListItem {
         self.header = header
         self.shimmering = shimmering
         self.displayDecorations = displayDecorations
-        self.displayBackground = displayBackground
         self.disableInteractiveTransitionIfNecessary = disableInteractiveTransitionIfNecessary
         self.storyStats = storyStats
         self.openStories = openStories
@@ -860,7 +850,7 @@ public class ItemListPeerItemNode: ItemListRevealOptionsItemNode, ItemListItemNo
         self.highlightedBackgroundNode = ASDisplayNode()
         self.highlightedBackgroundNode.isLayerBacked = true
         
-        super.init(layerBacked: false, rotated: false, seeThrough: false)
+        super.init(layerBacked: false, dynamicBounce: false, rotated: false, seeThrough: false)
         
         self.isAccessibilityElement = true
         
@@ -985,8 +975,6 @@ public class ItemListPeerItemNode: ItemListRevealOptionsItemNode, ItemListItemNo
             var badgeColor: UIColor?
             if case .badge = item.label {
                 badgeColor = item.presentationData.theme.list.itemAccentColor
-            } else if case let .text(_, _, color, hasBackground) = item.label, let color, hasBackground {
-                badgeColor = color.withMultipliedAlpha(0.1)
             }
             
             let badgeDiameter: CGFloat = 20.0
@@ -1039,7 +1027,7 @@ public class ItemListPeerItemNode: ItemListRevealOptionsItemNode, ItemListItemNo
             var additionalLeftInset: CGFloat = 0.0
             var leftInset: CGFloat = params.leftInset
             var rightInset: CGFloat = params.rightInset
-            var switchSize = CGSize(width: 51.0, height: 31.0)
+            let switchSize = CGSize(width: 51.0, height: 31.0)
             var checkImage: UIImage?
             
             if let switchValue = item.switchValue {
@@ -1066,13 +1054,6 @@ public class ItemListPeerItemNode: ItemListRevealOptionsItemNode, ItemListItemNo
             } else {
                 currentSwitchNode = nil
                 currentCheckNode = nil
-            }
-            
-            if let currentSwitchNode, let switchView = currentSwitchNode.view as? UISwitch {
-                if currentSwitchNode.bounds.size.width.isZero {
-                    switchView.sizeToFit()
-                }
-                switchSize = switchView.bounds.size
             }
             
             let titleColor: UIColor
@@ -1165,11 +1146,7 @@ public class ItemListPeerItemNode: ItemListRevealOptionsItemNode, ItemListItemNo
             switch item.height {
             case .generic:
                 if case .none = item.text {
-                    if case .glass = item.systemStyle {
-                        verticalInset = 15.0
-                    } else {
-                        verticalInset = 11.0
-                    }
+                    verticalInset = 11.0
                 } else {
                     verticalInset = 6.0
                 }
@@ -1179,17 +1156,9 @@ public class ItemListPeerItemNode: ItemListRevealOptionsItemNode, ItemListItemNo
                 avatarFontSize = floor(31.0 * 16.0 / 37.0)
             case .peerList:
                 if case .none = item.text {
-                    if case .glass = item.systemStyle {
-                        verticalInset = 15.0
-                    } else {
-                        verticalInset = 14.0
-                    }
+                    verticalInset = 14.0
                 } else {
-                    if case .glass = item.systemStyle {
-                        verticalInset = 10.0
-                    } else {
-                        verticalInset = 8.0
-                    }
+                    verticalInset = 8.0
                 }
                 verticalOffset = 0.0
                 avatarSize = 40.0
@@ -1219,7 +1188,6 @@ public class ItemListPeerItemNode: ItemListRevealOptionsItemNode, ItemListItemNo
             var labelMaximumNumberOfLines = 1
             var labelInset: CGFloat = 0.0
             var labelAlignment: NSTextAlignment = .natural
-            var labelLineSpacing: CGFloat = 0.0
             var updatedLabelArrowNode: ASImageNode?
             switch item.label {
             case .none:
@@ -1229,8 +1197,7 @@ public class ItemListPeerItemNode: ItemListRevealOptionsItemNode, ItemListItemNo
                 labelInset += 15.0
                 labelMaximumNumberOfLines = 2
                 labelAlignment = .right
-                labelLineSpacing = 0.3
-            case let .text(text, font, color, _):
+            case let .text(text, font):
                 let selectedFont: UIFont
                 switch font {
                 case .standard:
@@ -1238,7 +1205,7 @@ public class ItemListPeerItemNode: ItemListRevealOptionsItemNode, ItemListItemNo
                 case let .custom(value):
                     selectedFont = value
                 }
-                labelAttributedString = NSAttributedString(string: text, font: selectedFont, textColor: color ?? item.presentationData.theme.list.itemSecondaryTextColor)
+                labelAttributedString = NSAttributedString(string: text, font: selectedFont, textColor: item.presentationData.theme.list.itemSecondaryTextColor)
                 labelInset += 15.0
             case let .disclosure(text):
                 if let currentLabelArrowNode = currentLabelArrowNode {
@@ -1260,7 +1227,7 @@ public class ItemListPeerItemNode: ItemListRevealOptionsItemNode, ItemListItemNo
             
             labelInset += reorderInset
             
-            let (labelLayout, labelApply) = makeLabelLayout(TextNodeLayoutArguments(attributedString: labelAttributedString, backgroundColor: nil, maximumNumberOfLines: labelMaximumNumberOfLines, truncationType: .end, constrainedSize: CGSize(width: params.width - leftInset - 16.0 - editingOffset - rightInset, height: CGFloat.greatestFiniteMagnitude), alignment: labelAlignment, lineSpacing: labelLineSpacing, cutout: nil, insets: UIEdgeInsets()))
+            let (labelLayout, labelApply) = makeLabelLayout(TextNodeLayoutArguments(attributedString: labelAttributedString, backgroundColor: nil, maximumNumberOfLines: labelMaximumNumberOfLines, truncationType: .end, constrainedSize: CGSize(width: params.width - leftInset - 16.0 - editingOffset - rightInset, height: CGFloat.greatestFiniteMagnitude), alignment: labelAlignment, lineSpacing: 0.0, cutout: nil, insets: UIEdgeInsets()))
             
             let constrainedTitleSize = CGSize(width: params.width - leftInset - 12.0 - editingOffset - rightInset - labelLayout.size.width - labelInset - titleIconsWidth, height: CGFloat.greatestFiniteMagnitude)
             let (titleLayout, titleApply) = makeTitleLayout(TextNodeLayoutArguments(attributedString: titleAttributedString, backgroundColor: nil, maximumNumberOfLines: 1, truncationType: .end, constrainedSize: constrainedTitleSize, alignment: .natural, cutout: nil, insets: UIEdgeInsets()))
@@ -1292,7 +1259,6 @@ public class ItemListPeerItemNode: ItemListRevealOptionsItemNode, ItemListItemNo
             
             let contentSize = CGSize(width: params.width, height: max(minHeight, rawHeight))
             let separatorHeight = UIScreenPixel
-            let separatorRightInset: CGFloat = item.systemStyle == .glass ? 16.0 : 0.0
             
             let layout = ListViewItemNodeLayout(contentSize: contentSize, insets: insets)
             let layoutSize = layout.size
@@ -1345,8 +1311,6 @@ public class ItemListPeerItemNode: ItemListRevealOptionsItemNode, ItemListItemNo
                     strongSelf.bottomStripeNode.backgroundColor = itemSeparatorColor
                     strongSelf.backgroundNode.backgroundColor = itemBackgroundColor
                     strongSelf.highlightedBackgroundNode.backgroundColor = item.presentationData.theme.list.itemHighlightedBackgroundColor
-                    
-                    strongSelf.backgroundNode.isHidden = !item.displayBackground
                     
                     let revealOffset = strongSelf.revealOffset
                     
@@ -1467,12 +1431,12 @@ public class ItemListPeerItemNode: ItemListRevealOptionsItemNode, ItemListItemNo
                         strongSelf.bottomStripeNode.isHidden = hasCorners || !item.displayDecorations
                     }
                     
-                    strongSelf.maskNode.image = hasCorners ? PresentationResourcesItemList.cornersImage(item.presentationData.theme, top: hasTopCorners, bottom: hasBottomCorners, glass: item.systemStyle == .glass) : nil
+                    strongSelf.maskNode.image = hasCorners ? PresentationResourcesItemList.cornersImage(item.presentationData.theme, top: hasTopCorners, bottom: hasBottomCorners) : nil
                     
                     strongSelf.backgroundNode.frame = CGRect(origin: CGPoint(x: 0.0, y: -min(insets.top, separatorHeight)), size: CGSize(width: params.width, height: contentSize.height + min(insets.top, separatorHeight) + min(insets.bottom, separatorHeight)))
                     strongSelf.maskNode.frame = strongSelf.backgroundNode.frame.insetBy(dx: params.leftInset, dy: 0.0)
                     transition.updateFrame(node: strongSelf.topStripeNode, frame: CGRect(origin: CGPoint(x: 0.0, y: -min(insets.top, separatorHeight)), size: CGSize(width: layoutSize.width, height: separatorHeight)))
-                    transition.updateFrame(node: strongSelf.bottomStripeNode, frame: CGRect(origin: CGPoint(x: bottomStripeInset, y: contentSize.height + bottomStripeOffset), size: CGSize(width: layoutSize.width - bottomStripeInset - params.rightInset - separatorRightInset, height: separatorHeight)))
+                    transition.updateFrame(node: strongSelf.bottomStripeNode, frame: CGRect(origin: CGPoint(x: bottomStripeInset, y: contentSize.height + bottomStripeOffset), size: CGSize(width: layoutSize.width - bottomStripeInset, height: separatorHeight)))
                     
                     var titleFrame = CGRect(origin: CGPoint(x: leftInset + revealOffset + editingOffset, y: verticalInset + verticalOffset), size: titleLayout.size)
                     
@@ -1482,12 +1446,10 @@ public class ItemListPeerItemNode: ItemListRevealOptionsItemNode, ItemListItemNo
                         let animationCache = item.context.animationCache
                         let animationRenderer = item.context.animationRenderer
                         
-                        var verifiedIconTransition = transition
                         let verifiedIconView: ComponentHostView<Empty>
                         if let current = strongSelf.verifiedIconView {
                             verifiedIconView = current
                         } else {
-                            verifiedIconTransition = .immediate
                             verifiedIconView = ComponentHostView<Empty>()
                             strongSelf.containerNode.view.addSubview(verifiedIconView)
                             strongSelf.verifiedIconView = verifiedIconView
@@ -1513,7 +1475,7 @@ public class ItemListPeerItemNode: ItemListRevealOptionsItemNode, ItemListItemNo
                             containerSize: CGSize(width: 16.0, height: 16.0)
                         )
                         
-                        verifiedIconTransition.updateFrame(view: verifiedIconView, frame: CGRect(origin: CGPoint(x: titleFrame.minX, y: floorToScreenPixels(titleFrame.midY - iconSize.height / 2.0)), size: iconSize))
+                        transition.updateFrame(view: verifiedIconView, frame: CGRect(origin: CGPoint(x: titleFrame.minX, y: floorToScreenPixels(titleFrame.midY - iconSize.height / 2.0)), size: iconSize))
                       
                         titleLeftOffset += iconSize.width + 4.0
                         nextIconX += iconSize.width + 4.0
@@ -1530,12 +1492,10 @@ public class ItemListPeerItemNode: ItemListRevealOptionsItemNode, ItemListItemNo
                         let animationCache = item.context.animationCache
                         let animationRenderer = item.context.animationRenderer
                         
-                        var creditibilityIconTransition = transition
                         let credibilityIconView: ComponentHostView<Empty>
                         if let current = strongSelf.credibilityIconView {
                             credibilityIconView = current
                         } else {
-                            creditibilityIconTransition = .immediate
                             credibilityIconView = ComponentHostView<Empty>()
                             strongSelf.containerNode.view.addSubview(credibilityIconView)
                             strongSelf.credibilityIconView = credibilityIconView
@@ -1562,7 +1522,7 @@ public class ItemListPeerItemNode: ItemListRevealOptionsItemNode, ItemListItemNo
                         )
                         
                         nextIconX += 4.0
-                        creditibilityIconTransition.updateFrame(view: credibilityIconView, frame: CGRect(origin: CGPoint(x: nextIconX, y: floorToScreenPixels(titleFrame.midY - iconSize.height / 2.0)), size: iconSize))
+                        transition.updateFrame(view: credibilityIconView, frame: CGRect(origin: CGPoint(x: nextIconX, y: floorToScreenPixels(titleFrame.midY - iconSize.height / 2.0)), size: iconSize))
                     } else if let credibilityIconView = strongSelf.credibilityIconView {
                         strongSelf.credibilityIconView = nil
                         credibilityIconView.removeFromSuperview()
@@ -1619,6 +1579,16 @@ public class ItemListPeerItemNode: ItemListRevealOptionsItemNode, ItemListItemNo
                         strongSelf.labelArrowNode = nil
                     }
                     
+                    let badgeWidth = max(badgeDiameter, labelLayout.size.width + 10.0)
+                    let labelFrame: CGRect
+                    if case .badge = item.label {
+                        labelFrame = CGRect(origin: CGPoint(x: revealOffset + params.width - rightLabelInset - badgeWidth + (badgeWidth - labelLayout.size.width) / 2.0, y: floor((contentSize.height - labelLayout.size.height) / 2.0) + 1.0), size: labelLayout.size)
+                        strongSelf.labelNode.textNode.frame = labelFrame
+                    } else {
+                        labelFrame = CGRect(origin: CGPoint(x: revealOffset + params.width - labelLayout.size.width - rightLabelInset, y: floor((contentSize.height - labelLayout.size.height) / 2.0) + 1.0), size: labelLayout.size)
+                        transition.updateFrame(node: strongSelf.labelNode.textNode, frame: labelFrame)
+                    }
+                    
                     if let updateBadgeImage = updatedLabelBadgeImage {
                         if strongSelf.labelBadgeNode.supernode == nil {
                             strongSelf.containerNode.insertSubnode(strongSelf.labelBadgeNode, belowSubnode: strongSelf.labelNode.textNode)
@@ -1630,14 +1600,7 @@ public class ItemListPeerItemNode: ItemListRevealOptionsItemNode, ItemListItemNo
                         strongSelf.labelBadgeNode.removeFromSupernode()
                     }
                     
-                    let badgeWidth = max(badgeDiameter, labelLayout.size.width + 12.0)
-                    var labelFrame = CGRect(origin: CGPoint(x: revealOffset + params.width - labelLayout.size.width - rightLabelInset, y: floor((contentSize.height - labelLayout.size.height) / 2.0) + 1.0), size: labelLayout.size)
-                    if strongSelf.labelBadgeNode.image != nil {
-                        labelFrame.origin.x -= 6.0
-                    }
-                    transition.updateFrame(node: strongSelf.labelNode.textNode, frame: labelFrame)
-                    
-                    strongSelf.labelBadgeNode.frame = CGRect(origin: CGPoint(x: floorToScreenPixels(labelFrame.midX - badgeWidth * 0.5), y: floorToScreenPixels(labelFrame.midY - badgeDiameter * 0.5)), size: CGSize(width: badgeWidth, height: badgeDiameter))
+                    strongSelf.labelBadgeNode.frame = CGRect(origin: CGPoint(x: revealOffset + params.width - rightLabelInset - badgeWidth, y: labelFrame.minY - 1.0), size: CGSize(width: badgeWidth, height: badgeDiameter))
                     
                     let avatarFrame = CGRect(origin: CGPoint(x: params.leftInset + additionalLeftInset + revealOffset + editingOffset + 15.0, y: floorToScreenPixels((layout.contentSize.height - avatarSize) / 2.0)), size: CGSize(width: avatarSize, height: avatarSize))
                     transition.updateFrame(node: strongSelf.avatarNode, frame: avatarFrame)
@@ -1758,7 +1721,7 @@ public class ItemListPeerItemNode: ItemListRevealOptionsItemNode, ItemListItemNo
                             strongSelf.avatarNode.imageNode.animateFirstTransition = item.animateFirstAvatarTransition
                             
                             var clipStyle: AvatarNodeClipStyle = .round
-                            if case let .channel(channel) = item.peer, channel.isForumOrMonoForum {
+                            if case let .channel(channel) = item.peer, channel.isForum {
                                 clipStyle = .roundedRect
                             }
                             
@@ -1779,8 +1742,7 @@ public class ItemListPeerItemNode: ItemListRevealOptionsItemNode, ItemListItemNo
                                 return AvatarNode.StoryStats(
                                     totalCount: storyStats.totalCount,
                                     unseenCount: storyStats.unseenCount,
-                                    hasUnseenCloseFriendsItems: storyStats.hasUnseenCloseFriends,
-                                    hasLiveItems: storyStats.hasLiveItems
+                                    hasUnseenCloseFriendsItems: storyStats.hasUnseenCloseFriends
                                 )
                             }, presentationParams: AvatarNode.StoryPresentationParams(
                                 colors: AvatarNode.Colors(theme: item.presentationData.theme),
@@ -1986,15 +1948,16 @@ public class ItemListPeerItemNode: ItemListRevealOptionsItemNode, ItemListItemNo
         let badgeDiameter: CGFloat = 20.0
         let labelSize = self.labelNode.textNode.frame.size
         
-        let badgeWidth = max(badgeDiameter, labelSize.width + 12.0)
-        var labelFrame = CGRect(origin: CGPoint(x: offset + params.width - self.labelNode.textNode.bounds.size.width - rightLabelInset, y: self.labelNode.textNode.frame.minY), size: self.labelNode.textNode.bounds.size)
-        if self.labelBadgeNode.image != nil {
-            labelFrame.origin.x -= 6.0
+        let badgeWidth = max(badgeDiameter, labelSize.width + 10.0)
+        let labelFrame: CGRect
+        if case .badge = item.label {
+            labelFrame = CGRect(origin: CGPoint(x: offset + params.width - rightLabelInset - badgeWidth + (badgeWidth - labelSize.width) / 2.0, y: self.labelNode.textNode.frame.minY), size: labelSize)
+        } else {
+            labelFrame = CGRect(origin: CGPoint(x: offset + params.width - self.labelNode.textNode.bounds.size.width - rightLabelInset, y: self.labelNode.textNode.frame.minY), size: self.labelNode.textNode.bounds.size)
         }
-        
         transition.updateFrame(node: self.labelNode.textNode, frame: labelFrame)
         
-        transition.updateFrame(node: self.labelBadgeNode, frame: CGRect(origin: CGPoint(x: floorToScreenPixels(labelFrame.midX - badgeWidth * 0.5), y: floorToScreenPixels(labelFrame.midY - badgeDiameter * 0.5)), size: CGSize(width: badgeWidth, height: badgeDiameter)))
+        transition.updateFrame(node: self.labelBadgeNode, frame: CGRect(origin: CGPoint(x: offset + params.width - rightLabelInset - badgeWidth, y: self.labelBadgeNode.frame.minY), size: CGSize(width: badgeWidth, height: badgeDiameter)))
         
         let avatarFrame = CGRect(origin: CGPoint(x: revealOffset + editingOffset + params.leftInset + 15.0, y: self.avatarNode.frame.minY), size: self.avatarNode.bounds.size)
         transition.updateFrame(node: self.avatarNode, frame: avatarFrame)
@@ -2082,7 +2045,6 @@ public class ItemListPeerItemNode: ItemListRevealOptionsItemNode, ItemListItemNo
 
 public final class ItemListPeerItemHeader: ListViewItemHeader {
     public let id: ListViewItemNode.HeaderId
-    public let stackingId: ListViewItemNode.HeaderId? = nil
     public let context: AccountContext
     public let text: NSAttributedString
     public let additionalText: String
@@ -2239,11 +2201,11 @@ public final class ItemListPeerItemHeaderNode: ListViewItemHeaderNode, ItemListH
         self.actionTextNode.attributedText = NSAttributedString(string: actionTitle ?? "", font: titleFont, textColor: action == nil ? theme.list.sectionHeaderTextColor : theme.list.itemAccentColor)
         self.actionButton.isUserInteractionEnabled = self.action != nil
         if let (size, leftInset, rightInset) = self.validLayout {
-            self.updateLayout(size: size, leftInset: leftInset, rightInset: rightInset, transition: .immediate)
+            self.updateLayout(size: size, leftInset: leftInset, rightInset: rightInset)
         }
     }
     
-    override public func updateLayout(size: CGSize, leftInset: CGFloat, rightInset: CGFloat, transition: ContainedViewLayoutTransition) {
+    override public func updateLayout(size: CGSize, leftInset: CGFloat, rightInset: CGFloat) {
         self.validLayout = (size, leftInset, rightInset)
         self.backgroundNode.frame = CGRect(origin: CGPoint(), size: size)
         self.snappedBackgroundNode.frame = CGRect(origin: CGPoint(), size: size)
@@ -2267,7 +2229,7 @@ public final class ItemListPeerItemHeaderNode: ListViewItemHeaderNode, ItemListH
         self.layer.animateAlpha(from: 1.0, to: 0.0, duration: duration, removeOnCompletion: true)
     }
     
-    override public func updateStickDistanceFactor(_ factor: CGFloat, distance: CGFloat, transition: ContainedViewLayoutTransition) {
+    override public func updateStickDistanceFactor(_ factor: CGFloat, transition: ContainedViewLayoutTransition) {
         if self.stickDistanceFactor == factor {
             return
         }

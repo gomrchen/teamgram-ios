@@ -1,9 +1,5 @@
 import Foundation
 
-// Incuding at least one Objective-C class in a swift file ensures that it doesn't get stripped by the linker
-private final class LinkHelperClass: NSObject {
-}
-
 public func fileSize(_ path: String, useTotalFileAllocatedSize: Bool = false) -> Int64? {
     /*if useTotalFileAllocatedSize {
         let url = URL(fileURLWithPath: path)

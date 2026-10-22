@@ -29,8 +29,6 @@ swift_library(
         "//submodules/TelegramUI/Components/AnimationCache",
         "//submodules/TelegramUI/Components/MultiAnimationRenderer",
         "//submodules/TelegramUI/Components/Chat/AccessoryPanelNode",
-        "//submodules/ComponentFlow",
-        "//submodules/TelegramUI/Components/AlertComponent",
     ],
     visibility = [
         "//visibility:public",

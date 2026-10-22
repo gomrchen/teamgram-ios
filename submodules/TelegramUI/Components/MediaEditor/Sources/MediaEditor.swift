@@ -286,7 +286,7 @@ public final class MediaEditor {
     }
     
     public var sourceIsVideo: Bool {
-        return self.player != nil
+        self.player != nil
     }
     
     public var resultIsVideo: Bool {
@@ -352,8 +352,6 @@ public final class MediaEditor {
             return state.position
         }
     }
-    
-    public var maxDuration: Double = 60.0
    
     public var duration: Double? {
         if let stickerEntity = self.stickerEntity {
@@ -362,7 +360,7 @@ public final class MediaEditor {
             if let trimRange = self.values.videoTrimRange {
                 return trimRange.upperBound - trimRange.lowerBound
             } else {
-                return min(self.maxDuration, self.playerPlaybackState.duration)
+                return min(60.0, self.playerPlaybackState.duration)
             }
         } else {
             return nil
@@ -371,7 +369,7 @@ public final class MediaEditor {
     
     public var mainVideoDuration: Double? {
         if self.player != nil {
-            return min(self.maxDuration, self.playerPlaybackState.duration)
+            return min(60.0, self.playerPlaybackState.duration)
         } else {
             return nil
         }
@@ -379,7 +377,7 @@ public final class MediaEditor {
     
     public var additionalVideoDuration: Double? {
         if let additionalPlayer = self.additionalPlayers.first {
-            return min(self.maxDuration, additionalPlayer.currentItem?.asset.duration.seconds ?? 0.0)
+            return min(60.0, additionalPlayer.currentItem?.asset.duration.seconds ?? 0.0)
         } else {
             return nil
         }
@@ -387,15 +385,7 @@ public final class MediaEditor {
     
     public var originalDuration: Double? {
         if self.player != nil || !self.additionalPlayers.isEmpty {
-            return self.playerPlaybackState.duration
-        } else {
-            return nil
-        }
-    }
-    
-    public var originalCappedDuration: Double? {
-        if self.player != nil || !self.additionalPlayers.isEmpty {
-            return min(self.maxDuration, self.playerPlaybackState.duration)
+            return min(60.0, self.playerPlaybackState.duration)
         } else {
             return nil
         }
@@ -540,11 +530,10 @@ public final class MediaEditor {
         }
     }
     
-    public init(context: AccountContext, mode: Mode, subject: Subject, values: MediaEditorValues? = nil, hasHistogram: Bool = false, isStandalone: Bool = false) {
+    public init(context: AccountContext, mode: Mode, subject: Subject, values: MediaEditorValues? = nil, hasHistogram: Bool = false) {
         self.context = context
         self.mode = mode
         self.subject = subject
-    
         if let values {
             self.values = values
             self.updateRenderChain()
@@ -560,7 +549,6 @@ public final class MediaEditor {
                 cropOrientation: nil,
                 gradientColors: nil,
                 videoTrimRange: nil,
-                videoBounce: false,
                 videoIsMuted: false,
                 videoIsFullHd: false,
                 videoIsMirrored: false,
@@ -593,9 +581,6 @@ public final class MediaEditor {
         }
         self.valuesPromise.set(.single(self.values))
 
-        if isStandalone, let device = MTLCreateSystemDefaultDevice() {
-            self.renderer.setupForStandaloneDevice(device: device)
-        }
         self.renderer.addRenderChain(self.renderChain)
         if hasHistogram {
             self.renderer.addRenderPass(self.histogramCalculationPass)
@@ -626,7 +611,7 @@ public final class MediaEditor {
     }
     
     public func replaceSource(_ image: UIImage, additionalImage: UIImage?, time: CMTime, mirror: Bool) {
-        guard let device = self.renderer.effectiveDevice, let texture = loadTexture(image: image, device: device) else {
+        guard let renderTarget = self.previewView, let device = renderTarget.mtlDevice, let texture = loadTexture(image: image, device: device) else {
             return
         }
         let additionalTexture = additionalImage.flatMap { loadTexture(image: $0, device: device) }
@@ -989,8 +974,6 @@ public final class MediaEditor {
                     if let trimRange = self.values.videoTrimRange {
                         player.currentItem?.forwardPlaybackEndTime = CMTime(seconds: trimRange.upperBound, preferredTimescale: CMTimeScale(1000))
 //                        additionalPlayer?.currentItem?.forwardPlaybackEndTime = CMTime(seconds: trimRange.upperBound, preferredTimescale: CMTimeScale(1000))
-                    } else if let duration = player.currentItem?.duration.seconds, duration > self.maxDuration {
-                        player.currentItem?.forwardPlaybackEndTime = CMTime(seconds: self.maxDuration, preferredTimescale: CMTimeScale(1000))
                     }
 
                     if let initialSeekPosition = self.initialSeekPosition {
@@ -2259,11 +2242,13 @@ public final class MediaEditor {
                     Queue.mainQueue().after(delay - (currentTime - previousUpdateTime)) {
                         self.scheduledUpdate = false
                         self.previousUpdateTime = CACurrentMediaTime()
-                        self.requestRenderFrame()
+                        self.renderer.willRenderFrame()
+                        self.renderer.renderFrame()
                     }
                 } else {
                     self.previousUpdateTime = currentTime
-                    self.requestRenderFrame()
+                    self.renderer.willRenderFrame()
+                    self.renderer.renderFrame()
                 }
             }
         }

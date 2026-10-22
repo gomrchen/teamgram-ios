@@ -15,15 +15,16 @@ import ChatControllerInteraction
 
 extension ChatControllerImpl {    
     var keyShortcutsInternal: [KeyShortcut] {
-        if !isTopmostChatController(self) {
+        if !self.traceVisibility() || !isTopmostChatController(self) {
             return []
         }
         
         let strings = self.presentationData.strings
         
-        var inputShortcuts: [KeyShortcut] = []
+        var inputShortcuts: [KeyShortcut]
         if self.chatDisplayNode.isInputViewFocused {
             inputShortcuts = [
+                KeyShortcut(title: strings.KeyCommand_SendMessage, input: "\r", action: {}),
                 KeyShortcut(input: "B", modifiers: [.command], action: { [weak self] in
                     if let strongSelf = self {
                         strongSelf.interfaceInteraction?.updateTextInputStateAndMode { current, inputMode in
@@ -79,16 +80,6 @@ extension ChatControllerImpl {
                     }
                 })
             ]
-            
-            if self.context.sharedContext.currentChatSettings.with({ $0 }).sendWithCmdEnter {
-                inputShortcuts.append(
-                    KeyShortcut(title: strings.KeyCommand_SendMessage, input: "\r", modifiers: [.command], action: {})
-                )
-            } else {
-                inputShortcuts.append(
-                    KeyShortcut(title: strings.KeyCommand_SendMessage, input: "\r", action: {})
-                )
-            }
         } else if UIResponder.currentFirst() == nil {
             inputShortcuts = [
                 KeyShortcut(title: strings.KeyCommand_FocusOnInputField, input: "\r", action: { [weak self] in
@@ -173,8 +164,7 @@ extension ChatControllerImpl {
                                     var updatedState = state.updatedInterfaceState({ state in
                                         return state.withUpdatedReplyMessageSubject(ChatInterfaceState.ReplyMessageSubject(
                                             messageId: message.id,
-                                            quote: nil,
-                                            todoItemId: nil
+                                            quote: nil
                                         ))
                                     })
                                     if updatedState.inputMode == .none {
@@ -194,8 +184,7 @@ extension ChatControllerImpl {
                                         return state.withUpdatedReplyMessageSubject((lastMessage?.id).flatMap { id in
                                             return ChatInterfaceState.ReplyMessageSubject(
                                                 messageId: id,
-                                                quote: nil,
-                                                todoItemId: nil
+                                                quote: nil
                                             )
                                         })
                                     })
@@ -229,7 +218,7 @@ extension ChatControllerImpl {
                             if replyMessageSubject.messageId == lastMessage?.id {
                                 updatedReplyMessageSubject = nil
                             } else if let message = strongSelf.chatDisplayNode.historyNode.messageInCurrentHistoryView(after: replyMessageSubject.messageId) {
-                                updatedReplyMessageSubject = ChatInterfaceState.ReplyMessageSubject(messageId: message.id, quote: nil, todoItemId: nil)
+                                updatedReplyMessageSubject = ChatInterfaceState.ReplyMessageSubject(messageId: message.id, quote: nil)
                             }
                             
                             strongSelf.updateChatPresentationInterfaceState(interactive: true, { state in

@@ -16,7 +16,6 @@ import BundleIconComponent
 import Markdown
 import SolidRoundedButtonNode
 import BlurredBackgroundComponent
-import PremiumCoinComponent
 
 public class PremiumLimitsListScreen: ViewController {
     final class Node: ViewControllerTracingNode, ASScrollViewDelegate, ASGestureRecognizerDelegate {
@@ -401,7 +400,7 @@ public class PremiumLimitsListScreen: ViewController {
             case .business:
                 isReady = true
             default:
-                isReady = !videos.isEmpty
+                isReady = true
             }
             
             if isReady {
@@ -843,47 +842,24 @@ public class PremiumLimitsListScreen: ViewController {
                         )
                     )
                 )
-                
-                availableItems[.todo] = DemoPagerComponent.Item(
+                availableItems[.paidMessages] = DemoPagerComponent.Item(
                     AnyComponentWithIdentity(
-                        id: PremiumDemoScreen.Subject.todo,
+                        id: PremiumDemoScreen.Subject.paidMessages,
                         component: AnyComponent(
                             PageComponent(
                                 content: AnyComponent(PhoneDemoComponent(
                                     context: context,
                                     position: .top,
-                                    model: .island,
-                                    videoFile: videos["todo"],
-                                    decoration: .todo
-                                )),
-                                title: strings.Premium_Todo,
-                                text: strings.Premium_TodoInfo,
-                                textColor: textColor
-                            )
-                        )
-                    )
-                )
-                
-                availableItems[.copyProtection] = DemoPagerComponent.Item(
-                    AnyComponentWithIdentity(
-                        id: PremiumDemoScreen.Subject.copyProtection,
-                        component: AnyComponent(
-                            PageComponent(
-                                content: AnyComponent(PhoneDemoComponent(
-                                    context: context,
-                                    position: .top,
-                                    model: .island,
-                                    videoFile: videos["pm_noforwards"],
+                                    videoFile: videos["paid_messages"],
                                     decoration: .badgeStars
                                 )),
-                                title: strings.Premium_CopyProtection,
-                                text: strings.Premium_CopyProtectionInfo,
+                                title: strings.Premium_PaidMessages,
+                                text: strings.Premium_PaidMessagesInfo,
                                 textColor: textColor
                             )
                         )
                     )
                 )
-                
                 availableItems[.business] = DemoPagerComponent.Item(
                     AnyComponentWithIdentity(
                         id: PremiumDemoScreen.Subject.business,
@@ -1555,7 +1531,7 @@ private class FooterNode: ASDisplayNode {
         self.backgroundNode = NavigationBackgroundNode(color: theme.rootController.tabBar.backgroundColor)
         self.separatorNode = ASDisplayNode()
         
-        self.buttonNode = SolidRoundedButtonNode(theme: SolidRoundedButtonTheme(backgroundColor: .black, foregroundColor: .white), height: 52.0, cornerRadius: 26.0, isShimmering: gloss)
+        self.buttonNode = SolidRoundedButtonNode(theme: SolidRoundedButtonTheme(backgroundColor: .black, foregroundColor: .white), height: 50.0, cornerRadius: 11.0, gloss: gloss)
         self.buttonNode.title = title
         
         self.coverNode = ASDisplayNode()
@@ -1613,7 +1589,7 @@ private class FooterNode: ASDisplayNode {
     func updateLayout(layout: ContainerViewLayout, transition: ContainedViewLayoutTransition) -> CGFloat {
         self.validLayout = layout
         
-        let buttonInset: CGFloat = 30.0
+        let buttonInset: CGFloat = 16.0
         let buttonWidth = layout.size.width - layout.safeInsets.left - layout.safeInsets.right - buttonInset * 2.0
         let buttonHeight = self.buttonNode.updateLayout(width: buttonWidth, transition: transition)
         let bottomPanelPadding: CGFloat = 12.0
@@ -1623,7 +1599,7 @@ private class FooterNode: ASDisplayNode {
         var buttonOffset: CGFloat = 20.0
         if let order, order.count > 1 {
             panelHeight += 20.0
-            buttonOffset += 19.0
+            buttonOffset += 20.0
         }
         
         let panelFrame = CGRect(origin: CGPoint(x: 0.0, y: 0.0), size: CGSize(width: layout.size.width, height: panelHeight))

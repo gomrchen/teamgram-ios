@@ -11,20 +11,6 @@ public func formatTonAddress(_ address: String) -> String {
     return address
 }
 
-public func convertStarsToTon(_ amount: StarsAmount, tonUsdRate: Double, starsUsdRate: Double) -> Int64 {
-    let usdRate = starsUsdRate / 1000.0 / 100.0
-    let usdValue = Double(amount.value) * usdRate
-    let tonValue = usdValue / tonUsdRate * 1000000000.0
-    return Int64(tonValue)
-}
-
-public func convertTonToStars(_ amount: StarsAmount, tonUsdRate: Double, starsUsdRate: Double) -> Int64 {
-    let usdRate = starsUsdRate / 1000.0 / 100.0
-    let usdValue = Double(amount.value) / 1000000000 * tonUsdRate
-    let starsValue = usdValue / usdRate
-    return Int64(starsValue)
-}
-
 public func formatTonUsdValue(_ value: Int64, divide: Bool = true, rate: Double = 1.0, dateTimeFormat: PresentationDateTimeFormat) -> String {
     let decimalSeparator = dateTimeFormat.decimalSeparator
     let normalizedValue: Double = divide ? Double(value) / 1000000000 : Double(value)
@@ -42,7 +28,7 @@ public func formatTonUsdValue(_ value: Int64, divide: Bool = true, rate: Double 
     return "$\(formattedValue)"
 }
 
-public func formatTonAmountText(_ value: Int64, dateTimeFormat: PresentationDateTimeFormat, showPlus: Bool = false, maxDecimalPositions: Int? = 2) -> String {
+public func formatTonAmountText(_ value: Int64, dateTimeFormat: PresentationDateTimeFormat, showPlus: Bool = false) -> String {
     var balanceText = "\(abs(value))"
     while balanceText.count < 10 {
         balanceText.insert("0", at: balanceText.startIndex)
@@ -63,12 +49,10 @@ public func formatTonAmountText(_ value: Int64, dateTimeFormat: PresentationDate
     }
     
     if let dotIndex = balanceText.range(of: dateTimeFormat.decimalSeparator) {
-        if let maxDecimalPositions {
-            if let endIndex = balanceText.index(dotIndex.upperBound, offsetBy: maxDecimalPositions, limitedBy: balanceText.endIndex) {
-                balanceText = String(balanceText[balanceText.startIndex..<endIndex])
-            } else {
-                balanceText = String(balanceText[balanceText.startIndex..<balanceText.endIndex])
-            }
+        if let endIndex = balanceText.index(dotIndex.upperBound, offsetBy: 2, limitedBy: balanceText.endIndex) {
+            balanceText = String(balanceText[balanceText.startIndex..<endIndex])
+        } else {
+            balanceText = String(balanceText[balanceText.startIndex..<balanceText.endIndex])
         }
         
         let integerPartString = balanceText[..<dotIndex.lowerBound]
@@ -96,8 +80,8 @@ public func formatTonAmountText(_ value: Int64, dateTimeFormat: PresentationDate
 }
 
 public func formatStarsAmountText(_ amount: StarsAmount, dateTimeFormat: PresentationDateTimeFormat, showPlus: Bool = false) -> String {
-    var balanceText = presentationStringsFormattedNumber(Int32(clamping: amount.value), dateTimeFormat.groupingSeparator)
-    let fraction = abs(Double(amount.nanos)) / 10e6
+    var balanceText = presentationStringsFormattedNumber(Int32(amount.value), dateTimeFormat.groupingSeparator)
+    let fraction = Double(amount.nanos) / 10e6
     if fraction > 0.0 {
         balanceText.append(dateTimeFormat.decimalSeparator)
         balanceText.append("\(Int32(fraction))")
@@ -107,15 +91,6 @@ public func formatStarsAmountText(_ amount: StarsAmount, dateTimeFormat: Present
         balanceText.insert("+", at: balanceText.startIndex)
     }
     return balanceText
-}
-
-public func formatCurrencyAmountText(_ amount: CurrencyAmount, dateTimeFormat: PresentationDateTimeFormat, showPlus: Bool = false, maxDecimalPositions: Int? = 2) -> String {
-    switch amount.currency {
-    case .stars:
-        return formatStarsAmountText(amount.amount, dateTimeFormat: dateTimeFormat, showPlus: showPlus)
-    case .ton:
-        return formatTonAmountText(amount.amount.value, dateTimeFormat: dateTimeFormat, showPlus: showPlus, maxDecimalPositions: maxDecimalPositions)
-    }
 }
 
 private let invalidAddressCharacters = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_=").inverted

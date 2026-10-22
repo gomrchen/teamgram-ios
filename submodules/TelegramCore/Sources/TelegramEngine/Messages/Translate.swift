@@ -11,14 +11,13 @@ public enum TranslationError {
     case textTooLong
     case invalidLanguage
     case limitExceeded
-    case tryAlternative
 }
 
 func _internal_translate(network: Network, text: String, toLang: String, entities: [MessageTextEntity] = []) -> Signal<(String, [MessageTextEntity])?, TranslationError> {
     var flags: Int32 = 0
     flags |= (1 << 1)
 
-    return network.request(Api.functions.messages.translateText(flags: flags, peer: nil, id: nil, text: [.textWithEntities(.init(text: text, entities: apiEntitiesFromMessageTextEntities(entities, associatedPeers: SimpleDictionary())))], toLang: toLang))
+    return network.request(Api.functions.messages.translateText(flags: flags, peer: nil, id: nil, text: [.textWithEntities(text: text, entities: apiEntitiesFromMessageTextEntities(entities, associatedPeers: SimpleDictionary()))], toLang: toLang))
     |> mapError { error -> TranslationError in
         if error.errorDescription.hasPrefix("FLOOD_WAIT") {
             return .limitExceeded
@@ -30,18 +29,14 @@ func _internal_translate(network: Network, text: String, toLang: String, entitie
             return .textTooLong
         } else if error.errorDescription == "TO_LANG_INVALID" {
             return .invalidLanguage
-        } else if error.errorDescription == "TRANSLATIONS_DISABLED_ALT" {
-            return .tryAlternative
         } else {
             return .generic
         }
     }
     |> mapToSignal { result -> Signal<(String, [MessageTextEntity])?, TranslationError> in
         switch result {
-        case let .translateResult(translateResultData):
-            let results = translateResultData.result
-            if case let .textWithEntities(textWithEntitiesData) = results.first {
-                let (text, entities) = (textWithEntitiesData.text, textWithEntitiesData.entities)
+        case let .translateResult(results):
+            if case let .textWithEntities(text, entities) = results.first {
                 return .single((text, messageTextEntitiesFromApiEntities(entities)))
             } else {
                 return .single(nil)
@@ -50,13 +45,13 @@ func _internal_translate(network: Network, text: String, toLang: String, entitie
     }
 }
 
-func _internal_translateTexts(network: Network, texts: [(String, [MessageTextEntity])], toLang: String) -> Signal<[(String, [MessageTextEntity])], TranslationError> {
+func _internal_translate_texts(network: Network, texts: [(String, [MessageTextEntity])], toLang: String) -> Signal<[(String, [MessageTextEntity])], TranslationError> {
     var flags: Int32 = 0
     flags |= (1 << 1)
     
     var apiTexts: [Api.TextWithEntities] = []
     for text in texts {
-        apiTexts.append(.textWithEntities(.init(text: text.0, entities: apiEntitiesFromMessageTextEntities(text.1, associatedPeers: SimpleDictionary()))))
+        apiTexts.append(.textWithEntities(text: text.0, entities: apiEntitiesFromMessageTextEntities(text.1, associatedPeers: SimpleDictionary())))
     }
 
     return network.request(Api.functions.messages.translateText(flags: flags, peer: nil, id: nil, text: apiTexts, toLang: toLang))
@@ -78,11 +73,9 @@ func _internal_translateTexts(network: Network, texts: [(String, [MessageTextEnt
     |> mapToSignal { result -> Signal<[(String, [MessageTextEntity])], TranslationError> in
         var texts: [(String, [MessageTextEntity])] = []
         switch result {
-        case let .translateResult(translateResultData):
-            let results = translateResultData.result
+        case let .translateResult(results):
             for result in results {
-                if case let .textWithEntities(textWithEntitiesData) = result {
-                    let (text, entities) = (textWithEntitiesData.text, textWithEntitiesData.entities)
+                if case let .textWithEntities(text, entities) = result {
                     texts.append((text, messageTextEntitiesFromApiEntities(entities)))
                 }
             }
@@ -116,9 +109,9 @@ private func _internal_translateMessagesByPeerId(account: Account, peerId: Engin
             return .never()
         }
         
-        let polls = messages.compactMap { message in
-            if let poll = message.media.first as? TelegramMediaPoll {
-                return (poll, message.id)
+        let polls = messages.compactMap { msg in
+            if let poll = msg.media.first as? TelegramMediaPoll {
+                return (poll, msg.id)
             } else {
                 return nil
             }
@@ -132,19 +125,9 @@ private func _internal_translateMessagesByPeerId(account: Account, peerId: Engin
             if let solution = poll.results.solution {
                 texts.append((solution.text, solution.entities))
             }
-            return _internal_translateTexts(network: account.network, texts: texts, toLang: toLang)
+            return _internal_translate_texts(network: account.network, texts: texts, toLang: toLang)
         }
         
-        let audioTranscriptions = messages.compactMap { message in
-            if let audioTranscription = message.attributes.first(where: { $0 is AudioTranscriptionMessageAttribute }) as? AudioTranscriptionMessageAttribute, !audioTranscription.text.isEmpty && !audioTranscription.isPending {
-                return (audioTranscription.text, message.id)
-            } else {
-                return nil
-            }
-        }
-        let audioTranscriptionsSignals = audioTranscriptions.map { (text, id) in
-            return _internal_translate(network: account.network, text: text, toLang: toLang)
-        }
         
         var flags: Int32 = 0
         flags |= (1 << 0)
@@ -180,14 +163,14 @@ private func _internal_translateMessagesByPeerId(account: Account, peerId: Engin
                         var result: [Api.TextWithEntities] = []
                         for messageId in messageIds {
                             if let text = resultTexts[AnyHashable(messageId)] {
-                                result.append(.textWithEntities(.init(text: text, entities: [])))
+                                result.append(.textWithEntities(text: text, entities: []))
                             } else if let text = messageTexts[messageId] {
-                                result.append(.textWithEntities(.init(text: text, entities: [])))
+                                result.append(.textWithEntities(text: text, entities: []))
                             } else {
-                                result.append(.textWithEntities(.init(text: "", entities: [])))
+                                result.append(.textWithEntities(text: "", entities: []))
                             }
                         }
-                        return .single(.translateResult(.init(result: result)))
+                        return .single(.translateResult(result: result))
                     }
                 }
             } else {
@@ -211,16 +194,14 @@ private func _internal_translateMessagesByPeerId(account: Account, peerId: Engin
             }
         }
         
-        return combineLatest(msgs, combineLatest(pollSignals), combineLatest(audioTranscriptionsSignals))
-        |> mapToSignal { (result, pollResults, audioTranscriptionsResults) -> Signal<Void, TranslationError> in
+        return combineLatest(msgs, combineLatest(pollSignals))
+        |> mapToSignal { (result, pollResults) -> Signal<Void, TranslationError> in
             return account.postbox.transaction { transaction in
-                if case let .translateResult(translateResultData) = result {
-                    let results = translateResultData.result
+                if case let .translateResult(results) = result {
                     var index = 0
                     for result in results {
                         let messageId = messageIds[index]
-                        if case let .textWithEntities(textWithEntitiesData) = result {
-                            let (text, entities) = (textWithEntitiesData.text, textWithEntitiesData.entities)
+                        if case let .textWithEntities(text, entities) = result {
                             let updatedAttribute: TranslationMessageAttribute = TranslationMessageAttribute(text: text, entities: messageTextEntitiesFromApiEntities(entities), toLang: toLang)
                             transaction.updateMessage(messageId, update: { currentMessage in
                                 let storeForwardInfo = currentMessage.forwardInfo.flatMap(StoreMessageForwardInfo.init)
@@ -228,13 +209,12 @@ private func _internal_translateMessagesByPeerId(account: Account, peerId: Engin
                                 
                                 attributes.append(updatedAttribute)
                                 
-                                return .update(StoreMessage(id: currentMessage.id, customStableId: nil, globallyUniqueId: currentMessage.globallyUniqueId, groupingKey: currentMessage.groupingKey, threadId: currentMessage.threadId, timestamp: currentMessage.timestamp, flags: StoreMessageFlags(currentMessage.flags), tags: currentMessage.tags, globalTags: currentMessage.globalTags, localTags: currentMessage.localTags, forwardInfo: storeForwardInfo, authorId: currentMessage.author?.id, text: currentMessage.text, attributes: attributes, media: currentMessage.media))
+                                return .update(StoreMessage(id: currentMessage.id, globallyUniqueId: currentMessage.globallyUniqueId, groupingKey: currentMessage.groupingKey, threadId: currentMessage.threadId, timestamp: currentMessage.timestamp, flags: StoreMessageFlags(currentMessage.flags), tags: currentMessage.tags, globalTags: currentMessage.globalTags, localTags: currentMessage.localTags, forwardInfo: storeForwardInfo, authorId: currentMessage.author?.id, text: currentMessage.text, attributes: attributes, media: currentMessage.media))
                             })
                         }
                         index += 1
                     }
                 }
-                
                 if !pollResults.isEmpty {
                     for (i, poll) in polls.enumerated() {
                         let result = pollResults[i]
@@ -248,12 +228,12 @@ private func _internal_translateMessagesByPeerId(account: Account, peerId: Engin
                                     if translated.0.isEmpty {
                                         translated = (poll.0.options[i].text, poll.0.options[i].entities)
                                     }
-                                    attrOptions.append(TranslationMessageAttribute.Additional(text: translated.0, entities: translated.1))
+                                    attrOptions.append(.init(text: translated.0, entities: translated.1))
                                 }
                                 
                                 let solution: TranslationMessageAttribute.Additional?
                                 if result.count > 1 + poll.0.options.count, !result[result.count - 1].0.isEmpty {
-                                    solution = TranslationMessageAttribute.Additional(text: result[result.count - 1].0, entities: result[result.count - 1].1)
+                                    solution = .init(text: result[result.count - 1].0, entities: result[result.count - 1].1)
                                 } else {
                                     solution = nil
                                 }
@@ -263,23 +243,7 @@ private func _internal_translateMessagesByPeerId(account: Account, peerId: Engin
                                 let updatedAttribute: TranslationMessageAttribute = TranslationMessageAttribute(text: title.0, entities: title.1, additional: attrOptions, pollSolution: solution, toLang: toLang)
                                 attributes.append(updatedAttribute)
                                 
-                                return .update(StoreMessage(id: currentMessage.id, customStableId: nil, globallyUniqueId: currentMessage.globallyUniqueId, groupingKey: currentMessage.groupingKey, threadId: currentMessage.threadId, timestamp: currentMessage.timestamp, flags: StoreMessageFlags(currentMessage.flags), tags: currentMessage.tags, globalTags: currentMessage.globalTags, localTags: currentMessage.localTags, forwardInfo: storeForwardInfo, authorId: currentMessage.author?.id, text: currentMessage.text, attributes: attributes, media: currentMessage.media))
-                            })
-                        }
-                    }
-                }
-                
-                if !audioTranscriptionsResults.isEmpty {
-                    for (i, audioTranscription) in audioTranscriptions.enumerated() {
-                        if let result = audioTranscriptionsResults[i] {
-                            transaction.updateMessage(audioTranscription.1, update: { currentMessage in
-                                let storeForwardInfo = currentMessage.forwardInfo.flatMap(StoreMessageForwardInfo.init)
-                                var attributes = currentMessage.attributes.filter { !($0 is TranslationMessageAttribute) }
-                                
-                                let updatedAttribute: TranslationMessageAttribute = TranslationMessageAttribute(text: result.0, entities: result.1, additional: [], pollSolution: nil, toLang: toLang)
-                                attributes.append(updatedAttribute)
-                                
-                                return .update(StoreMessage(id: currentMessage.id, customStableId: nil, globallyUniqueId: currentMessage.globallyUniqueId, groupingKey: currentMessage.groupingKey, threadId: currentMessage.threadId, timestamp: currentMessage.timestamp, flags: StoreMessageFlags(currentMessage.flags), tags: currentMessage.tags, globalTags: currentMessage.globalTags, localTags: currentMessage.localTags, forwardInfo: storeForwardInfo, authorId: currentMessage.author?.id, text: currentMessage.text, attributes: attributes, media: currentMessage.media))
+                                return .update(StoreMessage(id: currentMessage.id, globallyUniqueId: currentMessage.globallyUniqueId, groupingKey: currentMessage.groupingKey, threadId: currentMessage.threadId, timestamp: currentMessage.timestamp, flags: StoreMessageFlags(currentMessage.flags), tags: currentMessage.tags, globalTags: currentMessage.globalTags, localTags: currentMessage.localTags, forwardInfo: storeForwardInfo, authorId: currentMessage.author?.id, text: currentMessage.text, attributes: attributes, media: currentMessage.media))
                             })
                         }
                     }

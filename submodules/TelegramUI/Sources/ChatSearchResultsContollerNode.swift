@@ -118,7 +118,7 @@ private enum ChatListSearchEntry: Comparable, Identifiable {
                     hasActiveRevealControls: false,
                     selected: false,
                     header: nil,
-                    enabledContextActions: nil,
+                    enableContextActions: false,
                     hiddenOffset: false,
                     interaction: interaction
                 )
@@ -185,7 +185,7 @@ class ChatSearchResultsControllerNode: ViewControllerTracingNode, ASScrollViewDe
         self.searchState = searchState
         
         if case let .peer(peerId, _, _, _, _, _, _) = location, peerId == context.account.peerId {
-            self.mappedLocation = .savedMessagesChats(peerId: peerId)
+            self.mappedLocation = .savedMessagesChats
         } else {
             self.mappedLocation = .chatList(groupId: .root)
         }
@@ -269,7 +269,7 @@ class ChatSearchResultsControllerNode: ViewControllerTracingNode, ASScrollViewDe
                 if let message = peerData.messages.first {
                     let chatController = strongSelf.context.sharedContext.makeChatController(context: strongSelf.context, chatLocation: .peer(id: peerData.peer.peerId), subject: .message(id: .id(message.id), highlight: ChatControllerSubject.MessageHighlight(quote: nil), timecode: nil, setupReply: false), botStart: nil, mode: .standard(.previewing), params: nil)
                     chatController.canReadHistory.set(false)
-                    let contextController = makeContextController(presentationData: strongSelf.presentationData, source: .controller(ContextControllerContentSourceImpl(controller: chatController, sourceNode: node)), items: .single(ContextController.Items(content: .list([]))), gesture: gesture)
+                    let contextController = ContextController(presentationData: strongSelf.presentationData, source: .controller(ContextControllerContentSourceImpl(controller: chatController, sourceNode: node)), items: .single(ContextController.Items(content: .list([]))), gesture: gesture)
                     presentInGlobalOverlay(contextController)
                 } else {
                     gesture?.cancel()
@@ -291,12 +291,11 @@ class ChatSearchResultsControllerNode: ViewControllerTracingNode, ASScrollViewDe
         }, hideChatFolderUpdates: {
         }, openStories: { _, _ in
         }, openStarsTopup: { _ in
+        }, dismissNotice: { _ in
         }, editPeer: { _ in
         }, openWebApp: { _ in
         }, openPhotoSetup: {
-        }, openAdInfo: { _, _ in
-        }, openAccountFreezeInfo: {
-        }, openUrl: { _ in
+        }, openAdInfo: { _ in
         })
         interaction.searchTextHighightState = searchQuery
         self.interaction = interaction

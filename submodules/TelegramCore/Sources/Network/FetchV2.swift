@@ -103,10 +103,6 @@ private final class FetchImpl {
         init(range: Range<Int64>) {
             self.range = range
         }
-        
-        deinit {
-            self.disposable?.dispose()
-        }
     }
     
     private final class HashRangeData {
@@ -801,8 +797,7 @@ private final class FetchImpl {
                 )
                 |> map { result -> FilePartResult in
                     switch result {
-                    case let .cdnFile(cdnFileData):
-                        let bytes = cdnFileData.bytes
+                    case let .cdnFile(bytes):
                         if bytes.size == 0 {
                             return .data(data: Data(), verifyPartHashData: nil)
                         } else {
@@ -820,8 +815,7 @@ private final class FetchImpl {
                                 verifyPartHashData: VerifyPartHashData(fetchRange: fetchRange, fetchedData: fetchedData)
                             )
                         }
-                    case let .cdnFileReuploadNeeded(cdnFileReuploadNeededData):
-                        let requestToken = cdnFileReuploadNeededData.requestToken
+                    case let .cdnFileReuploadNeeded(requestToken):
                         return .cdnRefresh(cdnData: cdnData, refreshToken: requestToken.makeData())
                     }
                 }
@@ -860,11 +854,9 @@ private final class FetchImpl {
                         )
                         |> map { result -> FilePartResult in
                             switch result {
-                            case let .file(fileData):
-                                let bytes = fileData.bytes
+                            case let .file(_, _, bytes):
                                 return .data(data: bytes.makeData(), verifyPartHashData: nil)
-                            case let .fileCdnRedirect(fileCdnRedirectData):
-                                let (dcId, fileToken, encryptionKey, encryptionIv, fileHashes) = (fileCdnRedirectData.dcId, fileCdnRedirectData.fileToken, fileCdnRedirectData.encryptionKey, fileCdnRedirectData.encryptionIv, fileCdnRedirectData.fileHashes)
+                            case let .fileCdnRedirect(dcId, fileToken, encryptionKey, encryptionIv, fileHashes):
                                 let _ = fileHashes
                                 return .cdnRedirect(CdnData(
                                     id: Int(dcId),
@@ -981,7 +973,6 @@ private final class FetchImpl {
             }
             
             let queue = self.queue
-            hashRange.disposable?.dispose()
             hashRange.disposable = (fetchRequest
             |> deliverOn(self.queue)).startStrict(next: { [weak self, weak state, weak hashRange] result in
                 queue.async {
@@ -999,8 +990,7 @@ private final class FetchImpl {
                         var filledRange = RangeSet<Int64>()
                         for hashItem in result {
                             switch hashItem {
-                            case let .fileHash(fileHashData):
-                                let (offset, limit, hash) = (fileHashData.offset, fileHashData.limit, fileHashData.hash)
+                            case let .fileHash(offset, limit, hash):
                                 let rangeValue: Range<Int64> = offset ..< (offset + Int64(limit))
                                 filledRange.formUnion(RangeSet<Int64>(rangeValue))
                                 state.hashRanges[rangeValue.lowerBound] = HashRangeData(

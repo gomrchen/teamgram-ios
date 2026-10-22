@@ -23,7 +23,6 @@ import ChatListHeaderComponent
 import UndoUI
 import NewSessionInfoScreen
 import PresentationDataUtils
-import GlobalControlPanelsContext
 
 public enum ChatListNodeMode {
     case chatList(appendContacts: Bool)
@@ -111,12 +110,11 @@ public final class ChatListNodeInteraction {
     let hideChatFolderUpdates: () -> Void
     let openStories: (ChatListNode.OpenStoriesSubject, ASDisplayNode?) -> Void
     let openStarsTopup: (Int64?) -> Void
+    let dismissNotice: (ChatListNotice) -> Void
     let editPeer: (ChatListItem) -> Void
     let openWebApp: (TelegramUser) -> Void
     let openPhotoSetup: () -> Void
-    let openAdInfo: (ASDisplayNode, AdPeer) -> Void
-    let openAccountFreezeInfo: () -> Void
-    let openUrl: (String) -> Void
+    let openAdInfo: (ASDisplayNode) -> Void
     
     public var searchTextHighightState: String?
     var highlightedChatLocation: ChatListHighlightedLocation?
@@ -171,12 +169,11 @@ public final class ChatListNodeInteraction {
         hideChatFolderUpdates: @escaping () -> Void,
         openStories: @escaping (ChatListNode.OpenStoriesSubject, ASDisplayNode?) -> Void,
         openStarsTopup: @escaping (Int64?) -> Void,
+        dismissNotice: @escaping (ChatListNotice) -> Void,
         editPeer: @escaping (ChatListItem) -> Void,
         openWebApp: @escaping (TelegramUser) -> Void,
         openPhotoSetup: @escaping () -> Void,
-        openAdInfo: @escaping (ASDisplayNode, AdPeer) -> Void,
-        openAccountFreezeInfo: @escaping () -> Void,
-        openUrl: @escaping (String) -> Void
+        openAdInfo: @escaping (ASDisplayNode) -> Void
     ) {
         self.activateSearch = activateSearch
         self.peerSelected = peerSelected
@@ -218,12 +215,11 @@ public final class ChatListNodeInteraction {
         self.hideChatFolderUpdates = hideChatFolderUpdates
         self.openStories = openStories
         self.openStarsTopup = openStarsTopup
+        self.dismissNotice = dismissNotice
         self.editPeer = editPeer
         self.openWebApp = openWebApp
         self.openPhotoSetup = openPhotoSetup
         self.openAdInfo = openAdInfo
-        self.openAccountFreezeInfo = openAccountFreezeInfo
-        self.openUrl = openUrl
     }
 }
 
@@ -461,12 +457,12 @@ private func mappedInsertEntries(context: AccountContext, nodeInteraction: ChatL
                             hasActiveRevealControls: hasActiveRevealControls,
                             selected: selected,
                             header: nil,
-                            enabledContextActions: .auto,
+                            enableContextActions: true,
                             hiddenOffset: threadInfo?.isHidden == true && !revealed,
                             interaction: nodeInteraction
                         ), directionHint: entry.directionHint)
                     case let .peers(filter, isSelecting, _, filters, displayAutoremoveTimeout, displayPresence):
-                        let itemPeer = peer.chatOrMonoforumMainPeer
+                        let itemPeer = peer.chatMainPeer
                         var chatPeer: EnginePeer?
                         if let peer = peer.peers[peer.peerId] {
                             chatPeer = peer
@@ -596,7 +592,7 @@ private func mappedInsertEntries(context: AccountContext, nodeInteraction: ChatL
                         }
                     
                         var isForum = false
-                        if let peer = chatPeer, case let .channel(channel) = peer, channel.isForumOrMonoForum {
+                        if let peer = chatPeer, case let .channel(channel) = peer, channel.flags.contains(.isForum) {
                             isForum = true
                             if editing, case .chatList = mode {
                                 enabled = false
@@ -641,7 +637,7 @@ private func mappedInsertEntries(context: AccountContext, nodeInteraction: ChatL
                             animationRenderer: nodeInteraction.animationRenderer
                         ), directionHint: entry.directionHint)
                 case .peerType:
-                    let itemPeer = peer.chatOrMonoforumMainPeer
+                    let itemPeer = peer.chatMainPeer
                     var chatPeer: EnginePeer?
                     if let peer = peer.peers[peer.peerId] {
                         chatPeer = peer
@@ -696,7 +692,6 @@ private func mappedInsertEntries(context: AccountContext, nodeInteraction: ChatL
                         message: groupReferenceEntry.message,
                         unreadCount: groupReferenceEntry.unreadCount,
                         hiddenByDefault: groupReferenceEntry.hiddenByDefault,
-                        appearsPinned: groupReferenceEntry.appearsPinned,
                         storyState: groupReferenceEntry.storyState.flatMap { storyState in
                             return ChatListItemContent.StoryState(
                                 stats: storyState.stats,
@@ -708,7 +703,7 @@ private func mappedInsertEntries(context: AccountContext, nodeInteraction: ChatL
                     hasActiveRevealControls: false,
                     selected: false,
                     header: nil,
-                    enabledContextActions: .auto,
+                    enableContextActions: true,
                     hiddenOffset: groupReferenceEntry.hiddenByDefault && !groupReferenceEntry.revealed,
                     interaction: nodeInteraction
                 ), directionHint: entry.directionHint)
@@ -750,6 +745,43 @@ private func mappedInsertEntries(context: AccountContext, nodeInteraction: ChatL
                 return ListViewInsertItem(index: entry.index, previousIndex: entry.previousIndex, item: ChatListSectionHeaderItem(theme: presentationData.theme, strings: presentationData.strings, hide: displayHide ? {
                     hideChatListContacts(context: context)
                 } : nil), directionHint: entry.directionHint)
+            case let .Notice(presentationData, notice):
+                return ListViewInsertItem(index: entry.index, previousIndex: entry.previousIndex, item: ChatListNoticeItem(context: context, theme: presentationData.theme, strings: presentationData.strings, notice: notice, action: { [weak nodeInteraction] action in
+                    switch action {
+                    case .activate:
+                        switch notice {
+                        case .clearStorage:
+                            nodeInteraction?.openStorageManagement()
+                        case .setupPassword:
+                            nodeInteraction?.openPasswordSetup()
+                        case .premiumUpgrade, .premiumAnnualDiscount, .premiumRestore:
+                            nodeInteraction?.openPremiumIntro()
+                        case .xmasPremiumGift:
+                            nodeInteraction?.openPremiumGift([], nil)
+                        case .premiumGrace:
+                            nodeInteraction?.openPremiumManagement()
+                        case .setupBirthday:
+                            nodeInteraction?.openBirthdaySetup()
+                        case let .birthdayPremiumGift(peers, birthdays):
+                            nodeInteraction?.openPremiumGift(peers, birthdays)
+                        case .reviewLogin:
+                            break
+                        case let .starsSubscriptionLowBalance(amount, _):
+                            nodeInteraction?.openStarsTopup(amount.value)
+                        case .setupPhoto:
+                            nodeInteraction?.openPhotoSetup()
+                        }
+                    case .hide:
+                        nodeInteraction?.dismissNotice(notice)
+                    case let .buttonChoice(isPositive):
+                        switch notice {
+                        case let .reviewLogin(newSessionReview, _):
+                            nodeInteraction?.performActiveSessionAction(newSessionReview, isPositive)
+                        default:
+                            break
+                        }
+                    }
+                }), directionHint: entry.directionHint)
         }
     }
 }
@@ -820,12 +852,12 @@ private func mappedUpdateEntries(context: AccountContext, nodeInteraction: ChatL
                             hasActiveRevealControls: hasActiveRevealControls,
                             selected: selected,
                             header: nil,
-                            enabledContextActions: .auto,
+                            enableContextActions: true,
                             hiddenOffset: threadInfo?.isHidden == true && !revealed,
                             interaction: nodeInteraction
                     ), directionHint: entry.directionHint)
                     case let .peers(filter, isSelecting, _, filters, displayAutoremoveTimeout, displayPresence):
-                        let itemPeer = peer.chatOrMonoforumMainPeer
+                        let itemPeer = peer.chatMainPeer
                         var chatPeer: EnginePeer?
                         if let peer = peer.peers[peer.peerId] {
                             chatPeer = peer
@@ -906,7 +938,7 @@ private func mappedUpdateEntries(context: AccountContext, nodeInteraction: ChatL
                         }
                         
                         var isForum = false
-                        if let peer = chatPeer, case let .channel(channel) = peer, channel.isForumOrMonoForum {
+                        if let peer = chatPeer, case let .channel(channel) = peer, channel.flags.contains(.isForum) {
                             isForum = true
                             if editing, case .chatList = mode {
                                 enabled = false
@@ -951,7 +983,7 @@ private func mappedUpdateEntries(context: AccountContext, nodeInteraction: ChatL
                             animationRenderer: nodeInteraction.animationRenderer
                         ), directionHint: entry.directionHint)
                     case .peerType:
-                        let itemPeer = peer.chatOrMonoforumMainPeer
+                        let itemPeer = peer.chatMainPeer
                         var chatPeer: EnginePeer?
                         if let peer = peer.peers[peer.peerId] {
                             chatPeer = peer
@@ -1006,7 +1038,6 @@ private func mappedUpdateEntries(context: AccountContext, nodeInteraction: ChatL
                             message: groupReferenceEntry.message,
                             unreadCount: groupReferenceEntry.unreadCount,
                             hiddenByDefault: groupReferenceEntry.hiddenByDefault,
-                            appearsPinned: groupReferenceEntry.appearsPinned,
                             storyState: groupReferenceEntry.storyState.flatMap { storyState in
                                 return ChatListItemContent.StoryState(
                                     stats: storyState.stats,
@@ -1018,7 +1049,7 @@ private func mappedUpdateEntries(context: AccountContext, nodeInteraction: ChatL
                         hasActiveRevealControls: false,
                         selected: false,
                         header: nil,
-                        enabledContextActions: .auto,
+                        enableContextActions: true,
                         hiddenOffset: groupReferenceEntry.hiddenByDefault && !groupReferenceEntry.revealed,
                         interaction: nodeInteraction
                 ), directionHint: entry.directionHint)
@@ -1060,6 +1091,43 @@ private func mappedUpdateEntries(context: AccountContext, nodeInteraction: ChatL
                 return ListViewUpdateItem(index: entry.index, previousIndex: entry.previousIndex, item: ChatListSectionHeaderItem(theme: presentationData.theme, strings: presentationData.strings, hide: displayHide ? {
                     hideChatListContacts(context: context)
                 } : nil), directionHint: entry.directionHint)
+            case let .Notice(presentationData, notice):
+                return ListViewUpdateItem(index: entry.index, previousIndex: entry.previousIndex, item: ChatListNoticeItem(context: context, theme: presentationData.theme, strings: presentationData.strings, notice: notice, action: { [weak nodeInteraction] action in
+                    switch action {
+                    case .activate:
+                        switch notice {
+                        case .clearStorage:
+                            nodeInteraction?.openStorageManagement()
+                        case .setupPassword:
+                            nodeInteraction?.openPasswordSetup()
+                        case .premiumUpgrade, .premiumAnnualDiscount, .premiumRestore:
+                            nodeInteraction?.openPremiumIntro()
+                        case .xmasPremiumGift:
+                            nodeInteraction?.openPremiumGift([], nil)
+                        case .premiumGrace:
+                            nodeInteraction?.openPremiumManagement()
+                        case .setupBirthday:
+                            nodeInteraction?.openBirthdaySetup()
+                        case let .birthdayPremiumGift(peers, birthdays):
+                            nodeInteraction?.openPremiumGift(peers, birthdays)
+                        case .reviewLogin:
+                            break
+                        case let .starsSubscriptionLowBalance(amount, _):
+                            nodeInteraction?.openStarsTopup(amount.value)
+                        case .setupPhoto:
+                            nodeInteraction?.openPhotoSetup()
+                        }
+                    case .hide:
+                        nodeInteraction?.dismissNotice(notice)
+                    case let .buttonChoice(isPositive):
+                        switch notice {
+                        case let .reviewLogin(newSessionReview, _):
+                            nodeInteraction?.performActiveSessionAction(newSessionReview, isPositive)
+                        default:
+                            break
+                        }
+                    }
+                }), directionHint: entry.directionHint)
             case .HeaderEntry:
                 return ListViewUpdateItem(index: entry.index, previousIndex: entry.previousIndex, item: ChatListEmptyHeaderItem(), directionHint: entry.directionHint)
             case let .AdditionalCategory(index: _, id, title, image, appearance, selected, presentationData):
@@ -1170,8 +1238,7 @@ public final class ChatListNode: ListView {
     public var openStarsTopup: ((Int64?) -> Void)?
     public var openWebApp: ((TelegramUser) -> Void)?
     public var openPhotoSetup: (() -> Void)?
-    public var openAdInfo: ((ASDisplayNode, AdPeer) -> Void)?
-    public var openAccountFreezeInfo: (() -> Void)?
+    public var openAdInfo: ((ASDisplayNode) -> Void)?
     
     private var theme: PresentationTheme
     
@@ -1200,7 +1267,7 @@ public final class ChatListNode: ListView {
             return []
         }
     }
-    public private(set) var interaction: ChatListNodeInteraction?
+    private var interaction: ChatListNodeInteraction?
     
     private var dequeuedInitialTransitionOnLayout = false
     private var enqueuedTransition: (ChatListNodeListViewTransition, () -> Void)?
@@ -1251,8 +1318,6 @@ public final class ChatListNode: ListView {
     }
     
     public var contentOffsetChanged: ((ListViewVisibleContentOffset) -> Void)?
-    public private(set) var pinnedScrollFraction: CGFloat = 0.0
-    public var pinnedHeaderDisplayFractionUpdated: ((ContainedViewLayoutTransition) -> Void)?
     public var contentScrollingEnded: ((ListView) -> Bool)?
     public var didBeginInteractiveDragging: ((ListView) -> Void)?
     
@@ -1303,6 +1368,7 @@ public final class ChatListNode: ListView {
     private let autoSetReady: Bool
     
     public let isMainTab = ValuePromise<Bool>(false, ignoreRepeated: true)
+    private let suggestedChatListNotice = Promise<ChatListNotice?>(nil)
     
     public var synchronousDrawingWhenNotAnimated: Bool = false
     
@@ -1367,6 +1433,7 @@ public final class ChatListNode: ListView {
                 return
             }
             var didBeginSelecting = false
+            var count = 0
             strongSelf.updateState { [weak self] state in
                 var state = state
                 if state.selectedPeerIds.contains(peer.id) {
@@ -1382,8 +1449,10 @@ public final class ChatListNode: ListView {
                         self?.reachedSelectionLimit?(Int32(state.selectedPeerIds.count))
                     }
                 }
+                count = state.selectedPeerIds.count
                 return state
             }
+            strongSelf.selectionCountChanged?(count)
             if didBeginSelecting {
                 strongSelf.didBeginSelectingChats?()
             }
@@ -1454,9 +1523,9 @@ public final class ChatListNode: ListView {
                 }
             }
         }, setItemPinned: { [weak self] itemId, _ in
-            if case let .savedMessagesChats(peerId) = location {
+            if case .savedMessagesChats = location {
                 if case let .peer(itemPeerId) = itemId {
-                    let _ = (context.engine.peers.toggleForumChannelTopicPinned(id: peerId, threadId: itemPeerId.toInt64())
+                    let _ = (context.engine.peers.toggleForumChannelTopicPinned(id: context.account.peerId, threadId: itemPeerId.toInt64())
                     |> deliverOnMainQueue).start(error: { error in
                         guard let self else {
                             return
@@ -1650,7 +1719,7 @@ public final class ChatListNode: ListView {
             }
             Queue.mainQueue().after(0.6) { [weak self] in
                 if let self {
-                    let _ = self.context.engine.notices.dismissServerProvidedSuggestion(suggestion: ServerProvidedSuggestion.setupPassword.id).startStandalone()
+                    let _ = self.context.engine.notices.dismissServerProvidedSuggestion(suggestion: .setupPassword).startStandalone()
                 }
             }
             let controller = self.context.sharedContext.makeSetupTwoFactorAuthController(context: self.context)
@@ -1661,9 +1730,9 @@ public final class ChatListNode: ListView {
             }
             Queue.mainQueue().after(0.6) { [weak self] in
                 if let self {
-                    let _ = self.context.engine.notices.dismissServerProvidedSuggestion(suggestion: ServerProvidedSuggestion.annualPremium.id).startStandalone()
-                    let _ = self.context.engine.notices.dismissServerProvidedSuggestion(suggestion: ServerProvidedSuggestion.upgradePremium.id).startStandalone()
-                    let _ = self.context.engine.notices.dismissServerProvidedSuggestion(suggestion: ServerProvidedSuggestion.restorePremium.id).startStandalone()
+                    let _ = self.context.engine.notices.dismissServerProvidedSuggestion(suggestion: .annualPremium).startStandalone()
+                    let _ = self.context.engine.notices.dismissServerProvidedSuggestion(suggestion: .upgradePremium).startStandalone()
+                    let _ = self.context.engine.notices.dismissServerProvidedSuggestion(suggestion: .restorePremium).startStandalone()
                 }
             }
             let controller = self.context.sharedContext.makePremiumIntroController(context: self.context, source: .ads, forceDark: false, dismissed: nil)
@@ -1744,10 +1813,10 @@ public final class ChatListNode: ListView {
             } else {
                 self.push?(NewSessionInfoScreen(context: self.context, newSessionReview: newSessionReview))
                 
-                #if DEBUG
-                #else
+                //#if DEBUG
+                //#else
                 let _ = self.context.engine.privacy.terminateAnotherSession(id: newSessionReview.id).startStandalone()
-                #endif
+                //#endif
             }
         }, openChatFolderUpdates: { [weak self] in
             guard let self else {
@@ -1787,6 +1856,36 @@ public final class ChatListNode: ListView {
                 return
             }
             self.openStarsTopup?(amount)
+        }, dismissNotice: { [weak self] notice in
+            guard let self else {
+                return
+            }
+            let presentationData = self.context.sharedContext.currentPresentationData.with { $0 }
+            switch notice {
+            case .xmasPremiumGift:
+                let _ = self.context.engine.notices.dismissServerProvidedSuggestion(suggestion: .xmasPremiumGift).startStandalone()
+                self.present?(UndoOverlayController(presentationData: presentationData, content: .info(title: nil, text: presentationData.strings.ChatList_PremiumGiftInSettingsInfo, timeout: 5.0, customUndoText: nil), elevatedLayout: false, action: { _ in
+                    return true
+                }))
+            case .setupBirthday:
+                let _ = self.context.engine.notices.dismissServerProvidedSuggestion(suggestion: .setupBirthday).startStandalone()
+                self.present?(UndoOverlayController(presentationData: presentationData, content: .info(title: nil, text: presentationData.strings.ChatList_BirthdayInSettingsInfo, timeout: 5.0, customUndoText: nil), elevatedLayout: false, action: { _ in
+                    return true
+                }))
+            case .birthdayPremiumGift:
+                let _ = self.context.engine.notices.dismissServerProvidedSuggestion(suggestion: .todayBirthdays).startStandalone()
+                self.present?(UndoOverlayController(presentationData: presentationData, content: .info(title: nil, text: presentationData.strings.ChatList_PremiumGiftInSettingsInfo, timeout: 5.0, customUndoText: nil), elevatedLayout: false, action: { _ in
+                    return true
+                }))
+            case .premiumGrace:
+                let _ = self.context.engine.notices.dismissServerProvidedSuggestion(suggestion: .gracePremium).startStandalone()
+            case .setupPhoto:
+                let _ = self.context.engine.notices.dismissServerProvidedSuggestion(suggestion: .setupPhoto).startStandalone()
+            case .starsSubscriptionLowBalance:
+                let _ = self.context.engine.notices.dismissServerProvidedSuggestion(suggestion: .starsSubscriptionLowBalance).startStandalone()
+            default:
+                break
+            }
         }, editPeer: { _ in
         }, openWebApp: { [weak self] user in
             guard let self else {
@@ -1798,16 +1897,8 @@ public final class ChatListNode: ListView {
                 return
             }
             self.openPhotoSetup?()
-        }, openAdInfo: { [weak self] node, adPeer in
-            self?.openAdInfo?(node, adPeer)
-        }, openAccountFreezeInfo: { [weak self] in
-            self?.openAccountFreezeInfo?()
-        }, openUrl: { [weak self] url in
-            guard let self else {
-                return
-            }
-            let presentationData = self.context.sharedContext.currentPresentationData.with { $0 }
-            context.sharedContext.openExternalUrl(context: self.context, urlContext: .generic, url: url, forceExternal: false, presentationData: presentationData, navigationController: self.context.sharedContext.mainWindow?.viewController as? NavigationController, dismissInput: {})
+        }, openAdInfo: { [weak self] node in
+            self?.openAdInfo?(node)
         })
         nodeInteraction.isInlineMode = isInlineMode
         
@@ -1879,12 +1970,162 @@ public final class ChatListNode: ListView {
         } else {
             displayArchiveIntro = .single(false)
         }
+        
+        let starsSubscriptionsContextPromise = Promise<StarsSubscriptionsContext?>(nil)
     
         self.updateIsMainTabDisposable = (self.isMainTab.get()
-        |> deliverOnMainQueue).startStrict(next: { isMainTab in
-            if isMainTab {
-                let _ = context.engine.privacy.cleanupSessionReviews().startStandalone()
+        |> deliverOnMainQueue).startStrict(next: { [weak self] isMainTab in
+            guard let self else {
+                return
             }
+            
+            guard case .chatList(groupId: .root) = location, isMainTab else {
+                self.suggestedChatListNotice.set(.single(nil))
+                return
+            }
+            
+            let _ = context.engine.privacy.cleanupSessionReviews().startStandalone()
+            
+            let twoStepData: Signal<TwoStepVerificationConfiguration?, NoError> = .single(nil) |> then(context.engine.auth.twoStepVerificationConfiguration() |> map(Optional.init))
+            
+            let suggestedChatListNoticeSignal: Signal<ChatListNotice?, NoError> = combineLatest(
+                context.engine.notices.getServerProvidedSuggestions(),
+                context.engine.notices.getServerDismissedSuggestions(),
+                twoStepData,
+                newSessionReviews(postbox: context.account.postbox),
+                context.engine.data.subscribe(
+                    TelegramEngine.EngineData.Item.Peer.Peer(id: context.account.peerId),
+                    TelegramEngine.EngineData.Item.Peer.Birthday(id: context.account.peerId)
+                ),
+                context.account.stateManager.contactBirthdays,
+                starsSubscriptionsContextPromise.get()
+            )
+            |> mapToSignal { suggestions, dismissedSuggestions, configuration, newSessionReviews, data, birthdays, starsSubscriptionsContext -> Signal<ChatListNotice?, NoError> in                
+                let (accountPeer, birthday) = data
+                
+                if let newSessionReview = newSessionReviews.first {
+                    return .single(.reviewLogin(newSessionReview: newSessionReview, totalCount: newSessionReviews.count))
+                }
+                if suggestions.contains(.setupPassword), let configuration {
+                    var notSet = false
+                    switch configuration {
+                    case let .notSet(pendingEmail):
+                        if pendingEmail == nil {
+                            notSet = true
+                        }
+                    case .set:
+                        break
+                    }
+                    if notSet {
+                        return .single(.setupPassword)
+                    }
+                }
+                
+                let today = Calendar(identifier: .gregorian).component(.day, from: Date())
+                var todayBirthdayPeerIds: [EnginePeer.Id] = []
+                for (peerId, birthday) in birthdays {
+                    if birthday.day == today {
+                        todayBirthdayPeerIds.append(peerId)
+                    }
+                }
+                todayBirthdayPeerIds.sort { lhs, rhs in
+                    return lhs < rhs
+                }
+                
+                if dismissedSuggestions.contains(.todayBirthdays) {
+                    todayBirthdayPeerIds = []
+                }
+                
+                if suggestions.contains(.starsSubscriptionLowBalance) {
+                    if let starsSubscriptionsContext {
+                        return starsSubscriptionsContext.state
+                        |> map { state in
+                            if state.balance > StarsAmount.zero && !state.subscriptions.isEmpty {
+                                return .starsSubscriptionLowBalance(
+                                    amount: state.balance,
+                                    peers: state.subscriptions.map { $0.peer }
+                                )
+                            } else {
+                                return nil
+                            }
+                        }
+                    } else {
+                        starsSubscriptionsContextPromise.set(.single(context.engine.payments.peerStarsSubscriptionsContext(starsContext: nil, missingBalance: true)))
+                        return .single(nil)
+                    }
+                } else if suggestions.contains(.setupPhoto), let accountPeer, accountPeer.smallProfileImage == nil {
+                    return .single(.setupPhoto(accountPeer))
+                } else if suggestions.contains(.gracePremium) {
+                    return .single(.premiumGrace)
+                } else if suggestions.contains(.setupBirthday) && birthday == nil {
+                    return .single(.setupBirthday)
+                } else if suggestions.contains(.xmasPremiumGift) {
+                    return .single(.xmasPremiumGift)
+                } else if suggestions.contains(.annualPremium) || suggestions.contains(.upgradePremium) || suggestions.contains(.restorePremium), let inAppPurchaseManager = context.inAppPurchaseManager {
+                    return inAppPurchaseManager.availableProducts
+                    |> map { products -> ChatListNotice? in
+                        if products.count > 1 {
+                            let shortestOptionPrice: (Int64, NSDecimalNumber)
+                            if let product = products.first(where: { $0.id.hasSuffix(".monthly") }) {
+                                shortestOptionPrice = (Int64(Float(product.priceCurrencyAndAmount.amount)), product.priceValue)
+                            } else {
+                                shortestOptionPrice = (1, NSDecimalNumber(decimal: 1))
+                            }
+                            for product in products {
+                                if product.id.hasSuffix(".annual") {
+                                    let fraction = Float(product.priceCurrencyAndAmount.amount) / Float(12) / Float(shortestOptionPrice.0)
+                                    let discount = Int32(round((1.0 - fraction) * 20.0) * 5.0)
+                                    if discount > 0 {
+                                        if suggestions.contains(.restorePremium) {
+                                            return .premiumRestore(discount: discount)
+                                        } else if suggestions.contains(.annualPremium) {
+                                            return .premiumAnnualDiscount(discount: discount)
+                                        } else if suggestions.contains(.upgradePremium) {
+                                            return .premiumUpgrade(discount: discount)
+                                        }
+                                    }
+                                    break
+                                }
+                            }
+                            return nil
+                        } else {
+                            if !GlobalExperimentalSettings.isAppStoreBuild {
+                                if suggestions.contains(.restorePremium) {
+                                    return .premiumRestore(discount: 0)
+                                } else if suggestions.contains(.annualPremium) {
+                                    return .premiumAnnualDiscount(discount: 0)
+                                } else if suggestions.contains(.upgradePremium) {
+                                    return .premiumUpgrade(discount: 0)
+                                }
+                            }
+                            return nil
+                        }
+                    }
+                } else if !todayBirthdayPeerIds.isEmpty {
+                    return context.engine.data.get(
+                        EngineDataMap(todayBirthdayPeerIds.map(TelegramEngine.EngineData.Item.Peer.Peer.init(id:)))
+                    )
+                    |> map { result -> ChatListNotice? in
+                        var todayBirthdayPeers: [EnginePeer] = []
+                        for (peerId, _) in birthdays {
+                            if let maybePeer = result[peerId], let peer = maybePeer {
+                                todayBirthdayPeers.append(peer)
+                            }
+                        }
+                        return .birthdayPremiumGift(peers: todayBirthdayPeers, birthdays: birthdays)
+                    }
+                } else {
+                    return .single(nil)
+                }
+            }
+            |> distinctUntilChanged
+            
+            self.suggestedChatListNotice.set(suggestedChatListNoticeSignal)
+            
+            /*#if DEBUG
+            let testNotice: Signal<ChatListNotice?, NoError> = Signal<ChatListNotice?, NoError>.single(.setupPassword) |> then(Signal<ChatListNotice?, NoError>.complete() |> delay(1.0, queue: .mainQueue())) |> then(Signal<ChatListNotice?, NoError>.single(.xmasPremiumGift)) |> then(Signal<ChatListNotice?, NoError>.complete() |> delay(1.0, queue: .mainQueue())) |> restart
+            self.suggestedChatListNotice.set(testNotice)
+            #endif*/
         }).strict()
         
         let storageInfo: Signal<Double?, NoError>
@@ -2073,6 +2314,7 @@ public final class ChatListNode: ListView {
             hideArchivedFolderByDefault,
             displayArchiveIntro,
             storageInfo,
+            suggestedChatListNotice.get(),
             savedMessagesPeer,
             chatListViewUpdate,
             self.statePromise.get(),
@@ -2080,14 +2322,23 @@ public final class ChatListNode: ListView {
             chatListFilters,
             accountIsPremium
         )
-        |> mapToQueue { (hideArchivedFolderByDefault, displayArchiveIntro, storageInfo, savedMessagesPeer, updateAndFilter, state, contacts, chatListFilters, accountIsPremium) -> Signal<ChatListNodeListViewTransition, NoError> in
+        |> mapToQueue { (hideArchivedFolderByDefault, displayArchiveIntro, storageInfo, suggestedChatListNotice, savedMessagesPeer, updateAndFilter, state, contacts, chatListFilters, accountIsPremium) -> Signal<ChatListNodeListViewTransition, NoError> in
             let (update, filter) = updateAndFilter
             
             let previousHideArchivedFolderByDefaultValue = previousHideArchivedFolderByDefault.swap(hideArchivedFolderByDefault)
             
+            let notice: ChatListNotice?
+            if let suggestedChatListNotice {
+                notice = suggestedChatListNotice
+            } else if let storageInfo {
+                notice = .clearStorage(sizeFraction: storageInfo)
+            } else {
+                notice = nil
+            }
+            
             let innerIsMainTab = location == .chatList(groupId: .root) && chatListFilter == nil
             
-            let (rawEntries, isLoading) = chatListNodeEntriesForView(view: update.list, state: state, savedMessagesPeer: savedMessagesPeer, foundPeers: state.foundPeers, hideArchivedFolderByDefault: hideArchivedFolderByDefault, displayArchiveIntro: displayArchiveIntro, mode: mode, chatListLocation: location, contacts: contacts, accountPeerId: accountPeerId, isMainTab: innerIsMainTab)
+            let (rawEntries, isLoading) = chatListNodeEntriesForView(view: update.list, state: state, savedMessagesPeer: savedMessagesPeer, foundPeers: state.foundPeers, hideArchivedFolderByDefault: hideArchivedFolderByDefault, displayArchiveIntro: displayArchiveIntro, notice: notice, mode: mode, chatListLocation: location, contacts: contacts, accountPeerId: accountPeerId, isMainTab: innerIsMainTab)
             var isEmpty = true
             var entries = rawEntries.filter { entry in
                 switch entry {
@@ -2220,7 +2471,7 @@ public final class ChatListNode: ListView {
                                 case let .user(userType):
                                     if case let .user(user) = peer {
                                         match = true
-                                        if user.id.isVerificationCodes || user.id.isTelegramNotifications {
+                                        if user.id.isVerificationCodes {
                                             match = false
                                         }
                                         if let isBot = userType.isBot {
@@ -2272,7 +2523,7 @@ public final class ChatListNode: ListView {
                                             }
                                         }
                                         if let isForum = groupType.isForum {
-                                            if isForum != channel.isForum {
+                                            if isForum != channel.flags.contains(.isForum) {
                                                 match = false
                                             }
                                         }
@@ -2414,6 +2665,7 @@ public final class ChatListNode: ListView {
                 var didIncludeRemovingPeerId = false
                 var didIncludeHiddenByDefaultArchive = false
                 var didIncludeHiddenThread = false
+                var didIncludeNotice = false
                 if let previous = previousView {
                     for entry in previous.filteredEntries {
                         if case let .PeerEntry(peerEntry) = entry {
@@ -2440,12 +2692,15 @@ public final class ChatListNode: ListView {
                             }
                         } else if case let .GroupReferenceEntry(groupReferenceEntry) = entry {
                             didIncludeHiddenByDefaultArchive = groupReferenceEntry.hiddenByDefault
+                        } else if case .Notice = entry {
+                            didIncludeNotice = true
                         }
                     }
                 }
                 var doesIncludeRemovingPeerId = false
                 var doesIncludeArchive = false
                 var doesIncludeHiddenByDefaultArchive = false
+                var doesIncludeNotice = false
                 
                 var doesIncludeHiddenThread = false
                 for entry in processedView.filteredEntries {
@@ -2474,6 +2729,8 @@ public final class ChatListNode: ListView {
                     } else if case let .GroupReferenceEntry(groupReferenceEntry) = entry {
                         doesIncludeArchive = true
                         doesIncludeHiddenByDefaultArchive = groupReferenceEntry.hiddenByDefault
+                    } else if case .Notice = entry {
+                        doesIncludeNotice = true
                     }
                 }
                 if previousPinnedChats != updatedPinnedChats || previousPinnedThreads != updatedPinnedThreads {
@@ -2498,6 +2755,9 @@ public final class ChatListNode: ListView {
                     disableAnimations = false
                 }
                 if didIncludeHiddenThread != doesIncludeHiddenThread {
+                    disableAnimations = false
+                }
+                if didIncludeNotice != doesIncludeNotice {
                     disableAnimations = false
                 }
             }
@@ -2695,7 +2955,7 @@ public final class ChatListNode: ListView {
                             guard case .global = chatPeerId.category else {
                                 continue
                             }
-                            if case let .channel(channel) = peerMap[chatPeerId.peerId], channel.isForumOrMonoForum {
+                            if case let .channel(channel) = peerMap[chatPeerId.peerId], channel.flags.contains(.isForum) {
                                 continue
                             }
                             itemId = ChatListNodePeerInputActivities.ItemId(peerId: chatPeerId.peerId, threadId: nil)
@@ -2939,6 +3199,7 @@ public final class ChatListNode: ListView {
                 return .single(false)
             }
         }
+        var startedScrollingWithCanExpandHiddenItems = false
         
         self.beganInteractiveDragging = { [weak self] _ in
             guard let strongSelf = self else {
@@ -2949,6 +3210,12 @@ public final class ChatListNode: ListView {
                 strongSelf.startedScrollingAtUpperBound = false
             case let .known(value):
                 strongSelf.startedScrollingAtUpperBound = value <= 0.001
+            }
+            
+            if let canExpandHiddenItems = strongSelf.canExpandHiddenItems {
+                startedScrollingWithCanExpandHiddenItems = canExpandHiddenItems()
+            } else {
+                startedScrollingWithCanExpandHiddenItems = true
             }
             
             if strongSelf.currentState.peerIdWithRevealedOptions != nil {
@@ -2994,7 +3261,7 @@ public final class ChatListNode: ListView {
             }
         })
         
-        self.visibleContentOffsetChanged = { [weak self] offset, transition in
+        self.visibleContentOffsetChanged = { [weak self] offset in
             guard let strongSelf = self else {
                 return
             }
@@ -3002,38 +3269,21 @@ public final class ChatListNode: ListView {
                 return
             }
             let atTop: Bool
+            var revealHiddenItems: Bool = false
             switch offset {
-            case .none, .unknown:
-                atTop = false
-            case let .known(value):
+                case .none, .unknown:
+                    atTop = false
+                case let .known(value):
                 atTop = value <= -strongSelf.tempTopInset
+                    if strongSelf.startedScrollingAtUpperBound && startedScrollingWithCanExpandHiddenItems && strongSelf.isTracking {
+                        revealHiddenItems = value <= -strongSelf.tempTopInset - 60.0
+                    }
             }
             strongSelf.scrolledAtTopValue = atTop
-            
-            var maxPinnedOffset: CGFloat = 0.0
-            strongSelf.forEachItemNode { itemNode in
-                if let itemNode = itemNode as? ChatListItemNode, let item = itemNode.item {
-                    if item.isPinned {
-                        if case let .groupReference(groupReference) = item.content, groupReference.hiddenByDefault {
-                        } else {
-                            maxPinnedOffset = max(maxPinnedOffset, itemNode.frame.maxY)
-                        }
-                    }
-                }
-            }
-            maxPinnedOffset = max(0.0, maxPinnedOffset)
-            var pinnedScrollFraction = 1.0
-            if strongSelf.insets.top == 0.0 {
-                pinnedScrollFraction = 0.0
-            } else {
-                if maxPinnedOffset < strongSelf.insets.top {
-                    pinnedScrollFraction = maxPinnedOffset / strongSelf.insets.top
-                }
-            }
-            
             strongSelf.contentOffsetChanged?(offset)
-            strongSelf.pinnedScrollFraction = pinnedScrollFraction
-            strongSelf.pinnedHeaderDisplayFractionUpdated?(transition)
+            if revealHiddenItems && !strongSelf.currentState.hiddenItemShouldBeTemporaryRevealed {
+                //strongSelf.revealScrollHiddenItem()
+            }
         }
         
         self.dynamicVisualInsets = { [weak self] in
@@ -3188,7 +3438,6 @@ public final class ChatListNode: ListView {
         if state != self.currentState {
             self.currentState = state
             self.statePromise.set(state)
-            self.selectionCountChanged?(state.selectedPeerIds.count)
         }
     }
     
@@ -3261,25 +3510,16 @@ public final class ChatListNode: ListView {
                     if case .chatList = strongSelf.mode {
                         let entryCount = transition.chatListView.filteredEntries.count
                         if entryCount >= 1 {
-                            for i in 0 ..< 3 {
+                            for i in 0 ..< 2 {
                                 if entryCount - 1 - i < 0 {
                                     continue
                                 }
-                                switch transition.chatListView.filteredEntries[entryCount - 1 - i] {
-                                case .PeerEntry, .GroupReferenceEntry:
-                                    break
-                                default:
+                                if case .PeerEntry = transition.chatListView.filteredEntries[entryCount - 1 - i] {
+                                } else {
                                     continue
                                 }
-                                if case let .index(index) = transition.chatListView.filteredEntries[entryCount - 1 - i].sortIndex {
-                                    if case let .chatList(chatListIndex) = index, chatListIndex.pinningIndex != nil {
-                                        if case let .GroupReferenceEntry(data) = transition.chatListView.filteredEntries[entryCount - 1 - i], data.hiddenByDefault {
-                                        } else {
-                                            pinnedOverscroll = true
-                                        }
-                                    } else if case let .forum(pinnedIndex, _, _, _, _) = index, case .index = pinnedIndex {
-                                        pinnedOverscroll = true
-                                    }
+                                if case let .index(index) = transition.chatListView.filteredEntries[entryCount - 1 - i].sortIndex, case let .chatList(chatListIndex) = index, chatListIndex.pinningIndex != nil {
+                                    pinnedOverscroll = true
                                 }
                             }
                         }
@@ -3385,7 +3625,7 @@ public final class ChatListNode: ListView {
                                 } else {
                                     break loop
                                 }
-                            case .ArchiveIntro, .EmptyIntro, .SectionHeader, .HeaderEntry, .AdditionalCategory:
+                            case .ArchiveIntro, .EmptyIntro, .SectionHeader, .Notice, .HeaderEntry, .AdditionalCategory:
                                 break
                             }
                         }

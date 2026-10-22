@@ -353,18 +353,14 @@ public struct PatternWallpaperArguments: TransformImageCustomArguments {
     let customPatternColor: UIColor?
     let bakePatternAlpha: CGFloat
     let displayMode: DisplayMode
-    let symbolImage: UIImage?
-    let modelRectIndex: Int32?
     
-    public init(colors: [UIColor], rotation: Int32?, customPatternColor: UIColor? = nil, preview: Bool = false, bakePatternAlpha: CGFloat = 1.0, displayMode: DisplayMode = .aspectFill, symbolImage: UIImage? = nil, modelRectIndex: Int32? = nil) {
+    public init(colors: [UIColor], rotation: Int32?, customPatternColor: UIColor? = nil, preview: Bool = false, bakePatternAlpha: CGFloat = 1.0, displayMode: DisplayMode = .aspectFill) {
         self.colors = colors
         self.rotation = rotation
         self.customPatternColor = customPatternColor
         self.preview = preview
         self.bakePatternAlpha = bakePatternAlpha
         self.displayMode = displayMode
-        self.symbolImage = symbolImage
-        self.modelRectIndex = modelRectIndex
     }
     
     public func serialized() -> NSArray {
@@ -377,9 +373,6 @@ public struct PatternWallpaperArguments: TransformImageCustomArguments {
         array.add(NSNumber(value: self.preview))
         array.add(NSNumber(value: Double(self.bakePatternAlpha)))
         array.add(NSNumber(value: self.displayMode.rawValue))
-        if let symbolImage {
-            array.add(symbolImage)
-        }
         return array
     }
 }
@@ -477,34 +470,18 @@ private func patternWallpaperDatas(account: Account, accountManager: AccountMana
     }
 }
 
-public struct WallpaperGiftPatternRect: Equatable {
-    public let containerSize: CGSize
-    public let center: CGPoint
-    public let side: CGFloat
-    public let scale: CGFloat
-    public let rotation: CGFloat
-    
-    fileprivate init(containerSize: CGSize, rect: GiftPatternRect) {
-        self.containerSize = containerSize
-        self.center = rect.center
-        self.side = rect.side
-        self.scale = rect.scale
-        self.rotation = rect.rotation
-    }
-}
-
-public func patternWallpaperImage(account: Account, accountManager: AccountManager<TelegramAccountManagerTypes>, representations: [ImageRepresentationWithReference], mode: PatternWallpaperDrawMode, autoFetchFullSize: Bool = false, forcePrepared: Bool = false) -> Signal<(generator: (TransformImageArguments) -> DrawingContext?, rects: [WallpaperGiftPatternRect])?, NoError> {
+public func patternWallpaperImage(account: Account, accountManager: AccountManager<TelegramAccountManagerTypes>, representations: [ImageRepresentationWithReference], mode: PatternWallpaperDrawMode, autoFetchFullSize: Bool = false) -> Signal<((TransformImageArguments) -> DrawingContext?)?, NoError> {
     return patternWallpaperDatas(account: account, accountManager: accountManager, representations: representations, mode: mode, autoFetchFullSize: autoFetchFullSize)
     |> mapToSignal { fullSizeData, fullSizeComplete in
         if !autoFetchFullSize || fullSizeComplete {
-            return patternWallpaperImageInternal(fullSizeData: fullSizeData, fullSizeComplete: fullSizeComplete, mode: mode, forcePrepared: forcePrepared)
+            return patternWallpaperImageInternal(fullSizeData: fullSizeData, fullSizeComplete: fullSizeComplete, mode: mode)
         } else {
             return .single(nil)
         }
     }
 }
 
-private func patternWallpaperImageInternal(fullSizeData: Data?, fullSizeComplete: Bool, mode: PatternWallpaperDrawMode, forcePrepared: Bool = false) -> Signal<(generator: (TransformImageArguments) -> DrawingContext?, rects: [WallpaperGiftPatternRect])?, NoError> {
+private func patternWallpaperImageInternal(fullSizeData: Data?, fullSizeComplete: Bool, mode: PatternWallpaperDrawMode) -> Signal<((TransformImageArguments) -> DrawingContext?)?, NoError> {
     var prominent = false
     if case .thumbnail = mode {
         prominent = true
@@ -514,11 +491,7 @@ private func patternWallpaperImageInternal(fullSizeData: Data?, fullSizeComplete
     
     return .single((fullSizeData, fullSizeComplete))
     |> map { fullSizeData, fullSizeComplete in
-        var rects: [WallpaperGiftPatternRect] = []
-        if let fullSizeData, let patternData = getGiftPatternData(fullSizeData) {
-            rects = patternData.rects.map { WallpaperGiftPatternRect(containerSize: patternData.size, rect: $0) }
-        }
-        return ({ arguments in
+        return { arguments in
             var scale = scale
             if scale.isZero {
                 scale = arguments.scale ?? UIScreenScale
@@ -588,12 +561,12 @@ private func patternWallpaperImageInternal(fullSizeData: Data?, fullSizeComplete
                         var image: UIImage?
                         if let fullSizeData = fullSizeData {
                             if mode == .screen {
-                                image = renderPreparedImageWithSymbol(fullSizeData, CGSize(width: size.width * context.scale, height: size.height * context.scale), .black, 1.0, displayMode == .aspectFit, customArguments.symbolImage, customArguments.modelRectIndex ?? -1)
+                                image = renderPreparedImage(fullSizeData, CGSize(width: size.width * context.scale, height: size.height * context.scale), .black, 1.0, displayMode == .aspectFit)
                             } else {
                                 image = UIImage(data: fullSizeData)
                             }
                         }
-                        
+
                         if let customPatternColor = customArguments.customPatternColor, customPatternColor.alpha < 1.0 {
                             patternIsInverted = true
                             c.setBlendMode(.copy)
@@ -701,7 +674,7 @@ private func patternWallpaperImageInternal(fullSizeData: Data?, fullSizeComplete
             } else {
                 return nil
             }
-        }, rects)
+        }
     }
 }
 
@@ -1360,7 +1333,7 @@ public func themeImage(account: Account, accountManager: AccountManager<Telegram
                     case let .pattern(data, colors, intensity):
                         let wallpaperImage = generateImage(arguments.drawingSize, rotatedContext: { size, context in
                             drawWallpaperGradientImage(colors.map(UIColor.init(rgb:)), context: context, size: size)
-                            if let unpackedData = TGGUnzipData(data, 2 * 1024 * 1024), let image = drawSvgImage(unpackedData, arguments.drawingSize, .clear, .black, 1.0, true) {
+                            if let unpackedData = TGGUnzipData(data, 2 * 1024 * 1024), let image = drawSvgImage(unpackedData, arguments.drawingSize, .clear, .black, true) {
                                 context.setBlendMode(.softLight)
                                 context.setAlpha(abs(CGFloat(intensity)) / 100.0)
                                 context.draw(image.cgImage!, in: CGRect(origin: CGPoint(), size: arguments.drawingSize))
@@ -1479,10 +1452,6 @@ public func themeIconImage(account: Account, accountManager: AccountManager<Tele
                         wallpaperSignal = .single((backgroundColor, incomingColors, outgoingColors, image, options.blur, false, 1.0, rotation))
                     }
                 case let .file(file):
-                    if file.settings.intensity == 100 {
-                        print()
-                    }
-                
                     rotation = file.settings.rotation
                     if file.isPattern, let intensity = file.settings.intensity, intensity < 0 {
                         backgroundColor = (.black, nil, [])
@@ -1495,7 +1464,6 @@ public func themeIconImage(account: Account, accountManager: AccountManager<Tele
                     } else {
                         backgroundColor = (theme.chatList.backgroundColor, nil, [])
                     }
-                
                     wallpaperSignal = cachedWallpaper(account: account, slug: file.slug, settings: file.settings)
                     |> mapToSignal { wallpaper in
                         if let wallpaper = wallpaper, case let .file(file) = wallpaper.wallpaper {
@@ -1511,7 +1479,6 @@ public func themeIconImage(account: Account, accountManager: AccountManager<Tele
                             let convertedPreviewRepresentations : [ImageRepresentationWithReference] = file.file.previewRepresentations.map {
                                 ImageRepresentationWithReference(representation: $0, reference: .wallpaper(wallpaper: .slug(file.slug), resource: $0.resource))
                             }
-                            let useFallback = convertedPreviewRepresentations.isEmpty
                             
                             var convertedRepresentations: [ImageRepresentationWithReference] = []
                             convertedRepresentations.append(ImageRepresentationWithReference(representation: TelegramMediaImageRepresentation(dimensions: PixelDimensions(width: 100, height: 100), resource: file.file.resource, progressiveSizes: [], immediateThumbnailData: nil, hasVideo: false, isPersonal: false), reference: .wallpaper(wallpaper: .slug(file.slug), resource: file.file.resource)))
@@ -1544,11 +1511,12 @@ public func themeIconImage(account: Account, accountManager: AccountManager<Tele
                                         let isLight = UIColor.average(of: file.settings.colors.map(UIColor.init(rgb:))).hsb.b > 0.3
                                         arguments = PatternWallpaperArguments(colors: [.clear], rotation: nil, customPatternColor: isLight ? .black : .white)
                                     }
-                                    return patternWallpaperImage(account: account, accountManager: accountManager, representations: useFallback ? convertedRepresentations : convertedPreviewRepresentations, mode: useFallback ? .screen : .thumbnail, autoFetchFullSize: true)
-                                    |> mapToSignal { generatorAndRects -> Signal<((UIColor, UIColor?, [UInt32]), [UIColor], [UIColor], UIImage?, Bool, Bool, CGFloat, Int32?), NoError> in
+                                    
+                                    return patternWallpaperImage(account: account, accountManager: accountManager, representations: convertedPreviewRepresentations, mode: .thumbnail, autoFetchFullSize: true)
+                                    |> mapToSignal { generator -> Signal<((UIColor, UIColor?, [UInt32]), [UIColor], [UIColor], UIImage?, Bool, Bool, CGFloat, Int32?), NoError> in
                                         let imageSize = CGSize(width: 148.0, height: 320.0)
                                         let imageArguments = TransformImageArguments(corners: ImageCorners(), imageSize: imageSize, boundingSize: imageSize, intrinsicInsets: UIEdgeInsets(), emptyColor: nil, custom: arguments)
-                                        let context = generatorAndRects?.generator(imageArguments)
+                                        let context = generator?(imageArguments)
                                         let image = context?.generateImage()
                                         
                                         if !file.settings.colors.isEmpty {
@@ -1803,7 +1771,7 @@ public func themeIconImage(account: Account, accountManager: AccountManager<Tele
                             
                             c.restoreGState()
                         } else {
-                            let rect = CGRect(x: 8.0, y: arguments.drawingSize.height - 24.0 - 9.0 - 3.0, width: 48.0, height: 24.0)
+                            let rect = CGRect(x: 8.0, y: arguments.drawingSize.height - 24.0 - 9.0 - 3.0, width: arguments.drawingSize.width - 8.0 * 2.0, height: 24.0)
                             c.addPath(UIBezierPath(roundedRect: rect, cornerRadius: 12.0).cgPath)
                             c.clip()
                             

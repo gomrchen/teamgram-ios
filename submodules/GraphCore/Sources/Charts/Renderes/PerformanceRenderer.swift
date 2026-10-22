@@ -14,7 +14,7 @@ import UIKit
 #endif
 
 class PerformanceRenderer: ChartViewRenderer {
-    var containerViews: [ContainerViewReference] = []
+    var containerViews: [GView] = []
     
     private var previousTickTime: TimeInterval = CACurrentMediaTime()
 

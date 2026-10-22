@@ -1,13 +1,9 @@
 import Foundation
 import UIKit
 import Display
-import SSignalKit
 import SwiftSignalKit
 import LegacyComponents
 import TelegramPresentationData
-import Camera
-import DeviceModel
-import TooltipUI
 
 public enum LegacyControllerPresentation {
     case custom
@@ -142,7 +138,7 @@ public final class LegacyControllerContext: NSObject, LegacyComponentsContext {
     }
     
     public func statusBarFrame() -> CGRect {
-        return legacyComponentsApplication!.delegate!.window!?.windowScene!.statusBarManager?.statusBarFrame ?? CGRect()
+        return legacyComponentsApplication!.statusBarFrame
     }
     
     public func isStatusBarHidden() -> Bool {
@@ -195,11 +191,6 @@ public final class LegacyControllerContext: NSObject, LegacyComponentsContext {
     }
     
     public func forceStatusBarAppearanceUpdate() {
-    }
-    
-    public func cameraZoomLevels() -> [NSNumber]! {
-        let metrics = Camera.Metrics(model: DeviceModel.current)
-        return metrics.zoomLevels.map { NSNumber(value: $0) }
     }
     
     public func currentlyInSplitView() -> Bool {
@@ -265,37 +256,6 @@ public final class LegacyControllerContext: NSObject, LegacyComponentsContext {
     
     public func presentActionSheet(_ actions: [LegacyComponentsActionSheetAction]!, view: UIView!, sourceRect: (() -> CGRect)!, completion: ((LegacyComponentsActionSheetAction?) -> Void)!) {
         
-    }
-    
-    public func presentTooltip(_ text: String!, icon: UIImage!, sourceRect: CGRect) {
-        guard let context = legacyContextGet() else {
-            return
-        }
-        
-        var position: TooltipScreen.ArrowPosition = .bottom
-        if let layout = self.controller?.currentlyAppliedLayout, let orientation = layout.metrics.orientation {
-            switch orientation {
-            case .landscapeLeft:
-                position = .left
-            case .landscapeRight:
-                position = .right
-            default:
-                break
-            }
-        }
-                
-        let controller = TooltipScreen(
-            account: context.account,
-            sharedContext: context.sharedContext,
-            text: .plain(text: text),
-            style: .customBlur(UIColor(rgb: 0x18181a), 0.0),
-            icon: .image(icon),
-            location: .point(sourceRect, position),
-            displayDuration: .custom(2.0),
-            shouldDismissOnTouch: { _, _ in
-            return .dismiss(consume: false)
-        })
-        context.sharedContext.presentGlobalController(controller, nil)
     }
     
     public func makeOverlayWindowManager() -> LegacyComponentsOverlayWindowManager! {

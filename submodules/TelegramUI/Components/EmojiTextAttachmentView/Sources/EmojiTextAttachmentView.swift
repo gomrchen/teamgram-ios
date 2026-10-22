@@ -19,8 +19,6 @@ import TelegramUIPreferences
 import GenerateStickerPlaceholderImage
 import UIKitRuntimeUtils
 import ComponentFlow
-import RLottieBinding
-import GZip
 
 public func generateTopicIcon(title: String, backgroundColors: [UIColor], strokeColors: [UIColor], size: CGSize) -> UIImage? {
     let realSize = size
@@ -84,20 +82,18 @@ public func generateTopicIcon(title: String, backgroundColors: [UIColor], stroke
     })
 }
 
-public enum AnimationCacheAnimationType: Equatable {
+public enum AnimationCacheAnimationType {
     case still
     case lottie
-    case video(isVP9: Bool)
+    case video
 }
 
 public extension AnimationCacheAnimationType {
     init(file: TelegramMediaFile) {
         if file.isVideoSticker || file.isVideoEmoji {
-            self = .video(isVP9: true)
+            self = .video
         } else if file.isAnimatedSticker {
             self = .lottie
-        } else if file.isVideo {
-            self = .video(isVP9: false)
         } else {
             self = .still
         }
@@ -126,8 +122,8 @@ public func animationCacheFetchFile(postbox: Postbox, userLocation: MediaResourc
             }
             
             switch type {
-            case let .video(isVP9):
-                cacheVideoAnimation(path: result, hintVP9: isVP9, width: Int(options.size.width), height: Int(options.size.height), writer: options.writer, firstFrameOnly: options.firstFrameOnly, customColor: customColor)
+            case .video:
+                cacheVideoAnimation(path: result, width: Int(options.size.width), height: Int(options.size.height), writer: options.writer, firstFrameOnly: options.firstFrameOnly, customColor: customColor)
             case .lottie:
                 guard let data = try? Data(contentsOf: URL(fileURLWithPath: result)) else {
                     options.writer.finish()
@@ -157,8 +153,8 @@ public func animationCacheLoadLocalFile(name: String, type: AnimationCacheAnimat
             }
             
             switch type {
-            case let .video(isVP9):
-                cacheVideoAnimation(path: result, hintVP9: isVP9, width: Int(options.size.width), height: Int(options.size.height), writer: options.writer, firstFrameOnly: options.firstFrameOnly, customColor: customColor)
+            case .video:
+                cacheVideoAnimation(path: result, width: Int(options.size.width), height: Int(options.size.height), writer: options.writer, firstFrameOnly: options.firstFrameOnly, customColor: customColor)
             case .lottie:
                 guard let data = try? Data(contentsOf: URL(fileURLWithPath: result)) else {
                     options.writer.finish()
@@ -373,7 +369,6 @@ public final class InlineStickerItemLayer: MultiAnimationRenderTarget {
         }
     }
     
-    private var overrideLoopCount: Int?
     private var currentLoopCount: Int = 0
     
     public var isUnique: Bool = false
@@ -420,20 +415,7 @@ public final class InlineStickerItemLayer: MultiAnimationRenderTarget {
     }
     
     override public var contents: Any? {
-        get {
-            return super.contents
-        } set(value) {
-            #if targetEnvironment(simulator)
-            if let value, CFGetTypeID(value as CFTypeRef) == CVPixelBufferGetTypeID() {
-                let pixelBuffer = value as! CVPixelBuffer
-                super.contents = CVPixelBufferGetIOSurface(pixelBuffer)
-            } else {
-                super.contents = value
-            }
-            #else
-            super.contents = value
-            #endif
-            
+        didSet {
             if let mirrorLayer = self.mirrorLayer {
                 mirrorLayer.contents = self.contents
             }
@@ -489,20 +471,13 @@ public final class InlineStickerItemLayer: MultiAnimationRenderTarget {
                 if tinted {
                     self.updateTintColor()
                 }
-            case let .ton(tinted):
-                self.updateTon(tinted: tinted)
-                if tinted {
-                    self.updateTintColor()
-                }
+            case .ton:
+                self.updateTon()
             case let .animation(name):
                 self.updateLocalAnimation(name: name, attemptSynchronousLoad: attemptSynchronousLoad)
             case .verification:
                 self.updateVerification()
                 self.updateTintColor()
-            case .dice:
-                if let file {
-                    self.updateDice(file: file, attemptSynchronousLoad: attemptSynchronousLoad)
-                }
             }
         } else if let file = file {
             self.updateFile(file: file, attemptSynchronousLoad: attemptSynchronousLoad)
@@ -590,7 +565,7 @@ public final class InlineStickerItemLayer: MultiAnimationRenderTarget {
                 }
             } else if let emoji = self.arguments?.emoji, let custom = emoji.custom {
                 switch custom {
-                case .stars(true), .ton(true), .verification:
+                case .stars(true), .verification:
                     customColor = self.dynamicColor
                 default:
                     break
@@ -622,10 +597,8 @@ public final class InlineStickerItemLayer: MultiAnimationRenderTarget {
         
         var shouldBePlaying = self.isInHierarchyValue && self.isVisibleForAnimations
         
-        if shouldBePlaying {
-            if let loopCount = self.overrideLoopCount ?? arguments.loopCount, self.currentLoopCount >= loopCount {
-                shouldBePlaying = false
-            }
+        if shouldBePlaying, let loopCount = arguments.loopCount, self.currentLoopCount >= loopCount {
+            shouldBePlaying = false
         }
         
         if self.shouldBeAnimating != shouldBePlaying {
@@ -633,7 +606,6 @@ public final class InlineStickerItemLayer: MultiAnimationRenderTarget {
             
             if !shouldBePlaying {
                 self.currentLoopCount = 0
-                self.overrideLoopCount = nil
             }
         }
     }
@@ -696,8 +668,8 @@ public final class InlineStickerItemLayer: MultiAnimationRenderTarget {
         self.contents = tinted ? tintedStarImage?.cgImage : starImage?.cgImage
     }
     
-    private func updateTon(tinted: Bool) {
-        self.contents = tinted ? tintedTonImage?.cgImage : tonImage?.cgImage
+    private func updateTon() {
+        self.contents = tonImage?.cgImage
     }
     
     private func updateVerification() {
@@ -724,44 +696,6 @@ public final class InlineStickerItemLayer: MultiAnimationRenderTarget {
                 strongSelf.loadAnimation()
             })
         }
-    }
-    
-    private func updateDice(file: TelegramMediaFile, attemptSynchronousLoad: Bool) {
-        guard let arguments = self.arguments else {
-            return
-        }
-        let _ = (arguments.context.postbox.mediaBox.resourceData(file.resource)
-        |> filter { resource in
-            return resource.complete
-        }
-        |> map { resource -> UIImage? in
-            guard var data = try? Data(contentsOf: URL(fileURLWithPath: resource.path)) else {
-                return nil
-            }
-            if let unpackedData = TGGUnzipData(data, 5 * 1024 * 1024) {
-                data = unpackedData
-            }
-            guard let instance = LottieInstance(data: data, fitzModifier: .none, colorReplacements: nil, cacheKey: "") else {
-                return nil
-            }
-            let size = CGSize(width: 128.0, height: 128.0)
-            if let diceContext = DrawingContext(size: size, scale: 1.0, opaque: false, clear: true) {
-                instance.renderFrame(with: instance.frameCount - 1, into: diceContext.bytes.assumingMemoryBound(to: UInt8.self), width: Int32(diceContext.scaledSize.width), height: Int32(diceContext.scaledSize.height), bytesPerRow: Int32(diceContext.bytesPerRow))
-                if let diceImage = diceContext.generateImage() {
-                    let drawingContext = DrawingContext(size: size, scale: 1.0, opaque: false, clear: true)
-                    drawingContext?.withFlippedContext { context in
-                        if let cgImage = diceImage.cgImage {
-                            context.draw(cgImage, in: CGRect(origin: CGPoint(x: -30.0, y: 5.0), size: CGSize(width: 180.0, height: 180.0)))
-                        }
-                    }
-                    return drawingContext?.generateImage()
-                }
-            }
-            return nil
-        }
-        |> deliverOnMainQueue).start(next: { image in
-            self.contents = image?.cgImage
-        })
     }
     
     private func loadLocalAnimation() {
@@ -844,12 +778,6 @@ public final class InlineStickerItemLayer: MultiAnimationRenderTarget {
                 }
             })
         }
-    }
-    
-    public func playOnce() {
-        self.currentLoopCount = 0
-        self.overrideLoopCount = 1
-        self.updatePlayback()
     }
     
     public func reloadAnimation() {
@@ -937,7 +865,6 @@ public final class InlineStickerItemLayer: MultiAnimationRenderTarget {
         
         if didLoop {
             self.currentLoopCount += 1
-            self.overrideLoopCount = nil
             if let loopCount = arguments.loopCount, self.currentLoopCount >= loopCount {
                 self.updatePlayback()
             }
@@ -1094,17 +1021,7 @@ private let tonImage: UIImage? = {
     generateImage(CGSize(width: 32.0, height: 32.0), contextGenerator: { size, context in
         context.clear(CGRect(origin: .zero, size: size))
         
-        if let image = generateTintedImage(image: UIImage(bundleImageName: "Ads/TonBig"), color: UIColor(rgb: 0x0088ff)), let cgImage = image.cgImage {
-            context.draw(cgImage, in: CGRect(origin: .zero, size: size).insetBy(dx: 4.0, dy: 4.0), byTiling: false)
-        }
-    })?.withRenderingMode(.alwaysTemplate)
-}()
-
-private let tintedTonImage: UIImage? = {
-    generateImage(CGSize(width: 32.0, height: 32.0), contextGenerator: { size, context in
-        context.clear(CGRect(origin: .zero, size: size))
-        
-        if let image = generateTintedImage(image: UIImage(bundleImageName: "Ads/TonBig"), color: .white), let cgImage = image.cgImage {
+        if let image = generateTintedImage(image: UIImage(bundleImageName: "Ads/TonBig"), color: UIColor(rgb: 0x007aff)), let cgImage = image.cgImage {
             context.draw(cgImage, in: CGRect(origin: .zero, size: size).insetBy(dx: 4.0, dy: 4.0), byTiling: false)
         }
     })?.withRenderingMode(.alwaysTemplate)

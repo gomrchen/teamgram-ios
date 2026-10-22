@@ -5,9 +5,7 @@ import AsyncDisplayKit
 import SwiftSignalKit
 import TelegramCore
 import TelegramPresentationData
-import PresentationDataUtils
 import ProgressNavigationButtonNode
-import AccountContext
 
 public final class AuthorizationSequenceCodeEntryController: ViewController {
     private var controllerNode: AuthorizationSequenceCodeEntryControllerNode {
@@ -16,7 +14,6 @@ public final class AuthorizationSequenceCodeEntryController: ViewController {
     
     private var validLayout: ContainerViewLayout?
     
-    private let sharedContext: SharedAccountContext
     private let strings: PresentationStrings
     private let theme: PresentationTheme
     
@@ -48,8 +45,7 @@ public final class AuthorizationSequenceCodeEntryController: ViewController {
         return self.data?.6 ?? false
     }
     
-    public init(sharedContext: SharedAccountContext, presentationData: PresentationData, back: @escaping () -> Void) {
-        self.sharedContext = sharedContext
+    public init(presentationData: PresentationData, back: @escaping () -> Void) {
         self.strings = presentationData.strings
         self.theme = presentationData.theme
         
@@ -65,14 +61,11 @@ public final class AuthorizationSequenceCodeEntryController: ViewController {
             return false
         }
         self.navigationBar?.backPressed = { [weak self] in
-            guard let self else {
-                return
-            }
             let text: String
             let proceed: String
             let stop: String
             
-            if let (_, _, type, _, _, _, _) = self.data, case .email = type {
+            if let (_, _, type, _, _, _, _) = self?.data, case .email = type {
                 text = presentationData.strings.Login_CancelEmailVerification
                 proceed = presentationData.strings.Login_CancelEmailVerificationContinue
                 stop = presentationData.strings.Login_CancelEmailVerificationStop
@@ -82,7 +75,7 @@ public final class AuthorizationSequenceCodeEntryController: ViewController {
                 stop = presentationData.strings.Login_CancelPhoneVerificationStop
             }
             
-            self.present(textAlertController(sharedContext: self.sharedContext, title: nil, text: text, actions: [TextAlertAction(type: .genericAction, title: proceed, action: {
+            self?.present(standardTextAlertController(theme: AlertControllerTheme(presentationData: presentationData), title: nil, text: text, actions: [TextAlertAction(type: .genericAction, title: proceed, action: {
             }), TextAlertAction(type: .defaultAction, title: stop, action: {
                 back()
             })]), in: .window(.root))

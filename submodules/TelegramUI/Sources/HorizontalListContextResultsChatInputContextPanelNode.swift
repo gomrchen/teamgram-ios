@@ -18,7 +18,6 @@ import PremiumUI
 import ChatControllerInteraction
 import ChatContextResultPeekContent
 import ChatInputContextPanelNode
-import BatchVideoRendering
 
 private struct ChatContextResultStableId: Hashable {
     let result: ChatContextResult
@@ -49,8 +48,8 @@ private struct HorizontalListContextResultsChatInputContextPanelEntry: Comparabl
         return lhs.index < rhs.index
     }
     
-    func item(context: AccountContext, batchVideoContext: QueueLocalObject<BatchVideoRenderingContext>, resultSelected: @escaping (ChatContextResult, ASDisplayNode, CGRect) -> Bool) -> ListViewItem {
-        return HorizontalListContextResultsChatInputPanelItem(context: context, theme: self.theme, result: self.result, batchVideoContext: batchVideoContext, resultSelected: resultSelected)
+    func item(context: AccountContext, resultSelected: @escaping (ChatContextResult, ASDisplayNode, CGRect) -> Bool) -> ListViewItem {
+        return HorizontalListContextResultsChatInputPanelItem(context: context, theme: self.theme, result: self.result, resultSelected: resultSelected)
     }
 }
 
@@ -72,18 +71,19 @@ private final class HorizontalListContextResultsOpaqueState {
     }
 }
 
-private func preparedTransition(from fromEntries: [HorizontalListContextResultsChatInputContextPanelEntry], to toEntries: [HorizontalListContextResultsChatInputContextPanelEntry], hasMore: Bool, context: AccountContext, batchVideoContext: QueueLocalObject<BatchVideoRenderingContext>, resultSelected: @escaping (ChatContextResult, ASDisplayNode, CGRect) -> Bool) -> HorizontalListContextResultsChatInputContextPanelTransition {
+private func preparedTransition(from fromEntries: [HorizontalListContextResultsChatInputContextPanelEntry], to toEntries: [HorizontalListContextResultsChatInputContextPanelEntry], hasMore: Bool, context: AccountContext, resultSelected: @escaping (ChatContextResult, ASDisplayNode, CGRect) -> Bool) -> HorizontalListContextResultsChatInputContextPanelTransition {
     let (deleteIndices, indicesAndItems, updateIndices) = mergeListsStableWithUpdates(leftList: fromEntries, rightList: toEntries)
     
     let deletions = deleteIndices.map { ListViewDeleteItem(index: $0, directionHint: nil) }
-    let insertions = indicesAndItems.map { ListViewInsertItem(index: $0.0, previousIndex: $0.2, item: $0.1.item(context: context, batchVideoContext: batchVideoContext, resultSelected: resultSelected), directionHint: nil) }
-    let updates = updateIndices.map { ListViewUpdateItem(index: $0.0, previousIndex: $0.2, item: $0.1.item(context: context, batchVideoContext: batchVideoContext, resultSelected: resultSelected), directionHint: nil) }
+    let insertions = indicesAndItems.map { ListViewInsertItem(index: $0.0, previousIndex: $0.2, item: $0.1.item(context: context, resultSelected: resultSelected), directionHint: nil) }
+    let updates = updateIndices.map { ListViewUpdateItem(index: $0.0, previousIndex: $0.2, item: $0.1.item(context: context, resultSelected: resultSelected), directionHint: nil) }
     
     return HorizontalListContextResultsChatInputContextPanelTransition(deletions: deletions, insertions: insertions, updates: updates, entryCount: toEntries.count, hasMore: hasMore)
 }
 
 final class HorizontalListContextResultsChatInputContextPanelNode: ChatInputContextPanelNode {
     private let listView: ListView
+    private let separatorNode: ASDisplayNode
     private var currentExternalResults: ChatContextResultCollection?
     private var currentProcessedResults: ChatContextResultCollection?
     private var currentEntries: [HorizontalListContextResultsChatInputContextPanelEntry]?
@@ -93,9 +93,12 @@ final class HorizontalListContextResultsChatInputContextPanelNode: ChatInputCont
     private var enqueuedTransitions: [(HorizontalListContextResultsChatInputContextPanelTransition, Bool)] = []
     private var hasValidLayout = false
     
-    private let batchVideoContext: QueueLocalObject<BatchVideoRenderingContext>
-    
     override init(context: AccountContext, theme: PresentationTheme, strings: PresentationStrings, fontSize: PresentationFontSize, chatPresentationContext: ChatPresentationContext) {
+        self.separatorNode = ASDisplayNode()
+        self.separatorNode.isLayerBacked = true
+        self.separatorNode.backgroundColor = theme.list.itemPlainSeparatorColor
+        self.separatorNode.isHidden = true
+        
         self.listView = ListView()
         self.listView.isOpaque = true
         self.listView.backgroundColor = theme.list.plainBackgroundColor
@@ -105,16 +108,13 @@ final class HorizontalListContextResultsChatInputContextPanelNode: ChatInputCont
             return strings.VoiceOver_ScrollStatus(row, count).string
         }
         
-        self.batchVideoContext = QueueLocalObject(queue: .mainQueue(), generate: {
-            return BatchVideoRenderingContext(context: context)
-        })
-        
         super.init(context: context, theme: theme, strings: strings, fontSize: fontSize, chatPresentationContext: chatPresentationContext)
         
         self.isOpaque = false
         self.clipsToBounds = true
         
         self.addSubnode(self.listView)
+        self.addSubnode(self.separatorNode)
         
         self.listView.displayedItemRangeChanged = { [weak self] displayedRange, opaqueTransactionState in
             if let strongSelf = self, let state = opaqueTransactionState as? HorizontalListContextResultsOpaqueState {
@@ -136,7 +136,7 @@ final class HorizontalListContextResultsChatInputContextPanelNode: ChatInputCont
         
         self.listView.view.disablesInteractiveTransitionGestureRecognizer = true
         self.listView.view.disablesInteractiveKeyboardGestureRecognizer = true
-        self.view.addGestureRecognizer(PeekControllerGestureRecognizer(contentAtPoint: { [weak self] point -> Signal<(UIView, CGRect, PeekControllerContent)?, NoError>? in
+        self.view.addGestureRecognizer(PeekControllerGestureRecognizer(contentAtPoint: { [weak self] point in
             if let strongSelf = self {
                 let convertedPoint = strongSelf.listView.view.convert(point, from: strongSelf.view)
                 
@@ -183,7 +183,7 @@ final class HorizontalListContextResultsChatInputContextPanelNode: ChatInputCont
                                 let controller = PremiumIntroScreen(context: strongSelf.context, source: .stickers)
                                 strongSelf.interfaceInteraction?.getNavigationController()?.pushViewController(controller)
                             }))
-                        } else if let batchVideoContext = strongSelf.batchVideoContext.unsafeGet() {
+                        } else {
                             var menuItems: [ContextMenuItem] = []
                             if case let .internalReference(internalReference) = item.result, let file = internalReference.file, file.isAnimated {
                                 menuItems.append(.action(ContextMenuActionItem(text: strongSelf.strings.Preview_SaveGif, icon: { theme in
@@ -229,7 +229,7 @@ final class HorizontalListContextResultsChatInputContextPanelNode: ChatInputCont
                                 f(.default)
                                 let _ = item.resultSelected(item.result, itemNode, itemNode.bounds)
                             })))
-                            selectedItemNodeAndContent = (itemNode.view, itemNode.bounds, ChatContextResultPeekContent(context: item.context, contextResult: item.result, menu: menuItems, batchVideoContext: batchVideoContext))
+                            selectedItemNodeAndContent = (itemNode.view, itemNode.bounds, ChatContextResultPeekContent(account: item.context.account, contextResult: item.result, menu: menuItems))
                         }
                     }
                 }
@@ -239,7 +239,7 @@ final class HorizontalListContextResultsChatInputContextPanelNode: ChatInputCont
         }, present: { [weak self] content, sourceView, sourceRect in
             if let strongSelf = self {
                 let presentationData = strongSelf.context.sharedContext.currentPresentationData.with { $0 }
-                let controller = makePeekController(presentationData: presentationData, content: content, sourceView: {
+                let controller = PeekController(presentationData: presentationData, content: content, sourceView: {
                     return (sourceView, sourceRect)
                 })
                 strongSelf.interfaceInteraction?.presentGlobalOverlayController(controller, nil)
@@ -312,7 +312,7 @@ final class HorizontalListContextResultsChatInputContextPanelNode: ChatInputCont
         }
         
         let firstTime = self.currentEntries == nil
-        let transition = preparedTransition(from: self.currentEntries ?? [], to: entries, hasMore: results.nextOffset != nil, context: self.context, batchVideoContext: self.batchVideoContext, resultSelected: { [weak self] result, node, rect in
+        let transition = preparedTransition(from: self.currentEntries ?? [], to: entries, hasMore: results.nextOffset != nil, context: self.context, resultSelected: { [weak self] result, node, rect in
             if let strongSelf = self, let interfaceInteraction = strongSelf.interfaceInteraction {
                 return interfaceInteraction.sendContextResult(results, result, node, rect)
             } else {
@@ -351,10 +351,18 @@ final class HorizontalListContextResultsChatInputContextPanelNode: ChatInputCont
             
             self.listView.transaction(deleteIndices: transition.deletions, insertIndicesAndItems: transition.insertions, updateIndicesAndItems: transition.updates, options: options, updateSizeAndInsets: nil, updateOpaqueState: HorizontalListContextResultsOpaqueState(entryCount: transition.entryCount, hasMore: transition.hasMore), completion: { [weak self] _ in
                 if let strongSelf = self, firstTime {
-                    strongSelf.listView.isHidden = false
+                    let position = strongSelf.listView.position
+                    let separatorPosition = strongSelf.separatorNode.layer.position
                     
-                    strongSelf.layer.allowsGroupOpacity = true
-                    strongSelf.layer.animateAlpha(from: 0.0, to: 1.0, duration: 0.25)
+                    strongSelf.listView.isHidden = false
+                    strongSelf.separatorNode.isHidden = false
+                    
+                    strongSelf.listView.position = CGPoint(x: position.x, y: position.y + strongSelf.listView.bounds.size.width)
+                    strongSelf.separatorNode.position = CGPoint(x: separatorPosition.x, y: separatorPosition.y + strongSelf.listView.bounds.size.width)
+                    ContainedViewLayoutTransition.animated(duration: 0.3, curve: .spring).animateView {
+                        strongSelf.listView.position = position
+                        strongSelf.separatorNode.position = separatorPosition
+                    }
                 }
             })
         }
@@ -363,11 +371,12 @@ final class HorizontalListContextResultsChatInputContextPanelNode: ChatInputCont
     override func updateLayout(size: CGSize, leftInset: CGFloat, rightInset: CGFloat, bottomInset: CGFloat, transition: ContainedViewLayoutTransition, interfaceState: ChatPresentationInterfaceState) {
         let listHeight: CGFloat = 105.0
         
+        transition.updateFrame(node: self.separatorNode, frame: CGRect(origin: CGPoint(x: 0.0, y: size.height - listHeight), size: CGSize(width: size.width, height: UIScreenPixel)))
         self.listView.bounds = CGRect(x: 0.0, y: 0.0, width: listHeight, height: size.width)
         
         //transition.updateFrame(node: self.listView, frame: CGRect(x: 0.0, y: 0.0, width: size.width, height: size.height))
         
-        transition.updatePosition(node: self.listView, position: CGPoint(x: size.width / 2.0, y: size.height - bottomInset - 8.0 - listHeight / 2.0))
+        transition.updatePosition(node: self.listView, position: CGPoint(x: size.width / 2.0, y: size.height - listHeight / 2.0))
         
         var insets = UIEdgeInsets()
         insets.top = leftInset
@@ -387,18 +396,18 @@ final class HorizontalListContextResultsChatInputContextPanelNode: ChatInputCont
         
         if self.theme !== interfaceState.theme {
             self.theme = interfaceState.theme
-            self.listView.backgroundColor = self.theme.list.plainBackgroundColor
+            self.separatorNode.backgroundColor = theme.list.itemPlainSeparatorColor
+            self.listView.backgroundColor = theme.list.plainBackgroundColor
         }
     }
     
     override func animateOut(completion: @escaping () -> Void) {
-        /*let position = self.listView.layer.position
+        let position = self.listView.layer.position
         self.listView.layer.animatePosition(from: position, to: CGPoint(x: position.x, y: position.y + self.listView.bounds.size.width), duration: 0.3, timingFunction: kCAMediaTimingFunctionSpring, removeOnCompletion: false, completion: { _ in
             completion()
-        })*/
-        self.layer.animateAlpha(from: 1.0, to: 0.0, duration: 0.3, removeOnCompletion: false, completion: { _ in
-            completion()
         })
+        let separatorPosition = self.separatorNode.layer.position
+        self.separatorNode.layer.animatePosition(from: separatorPosition, to: CGPoint(x: separatorPosition.x, y: separatorPosition.y + listView.bounds.size.width), duration: 0.3, timingFunction: kCAMediaTimingFunctionSpring, removeOnCompletion: false)
     }
     
     override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {

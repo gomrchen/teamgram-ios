@@ -1,7 +1,6 @@
 import Foundation
 import UIKit
 import Display
-import SSignalKit
 import SwiftSignalKit
 import TelegramCore
 import AccountContext
@@ -21,9 +20,6 @@ import LegacyMediaPickerUI
 
 extension PeerInfoScreenImpl {
     func openAvatarForEditing(mode: PeerInfoAvatarEditingMode = .generic, fromGallery: Bool = false, completion: @escaping (UIImage?) -> Void = { _ in }, completedWithUploadingImage: @escaping (UIImage, Signal<PeerInfoAvatarUploadStatus, NoError>) -> UIView? = { _, _ in nil }) {
-        guard !self.presentAccountFrozenInfoIfNeeded() else {
-            return
-        }
         guard let data = self.controllerNode.data, let peer = data.peer, mode != .generic || canEditPeerInfo(context: self.context, peer: peer, chatLocation: self.chatLocation, threadData: data.threadData) else {
             return
         }
@@ -31,7 +27,7 @@ extension PeerInfoScreenImpl {
         
         let peerId = self.peerId
         var isForum = false
-        if let peer = peer as? TelegramChannel, peer.isForumOrMonoForum {
+        if let peer = peer as? TelegramChannel, peer.flags.contains(.isForum) {
             isForum = true
         }
         
@@ -103,14 +99,9 @@ extension PeerInfoScreenImpl {
             let parentController = (self.context.sharedContext.mainWindow?.viewController as? NavigationController)?.topViewController as? ViewController
             
             var dismissImpl: (() -> Void)?
-            let (mainController, pickerHolder) = self.context.sharedContext.makeAvatarMediaPickerScreen(context: self.context, getSourceRect: { return nil }, canDelete: hasDeleteButton, performDelete: { [weak self] in
+            let mainController = self.context.sharedContext.makeAvatarMediaPickerScreen(context: self.context, getSourceRect: { return nil }, canDelete: hasDeleteButton, performDelete: { [weak self] in
                 self?.openAvatarRemoval(mode: mode, peer: peer, item: item)
-            }, completion: { [weak self] result, transitionView, transitionRect, transitionImage, fromCamera, transitionOut, cancelled in
-                guard let self else {
-                    return
-                }
-                self.avatarPickerHolder = nil
-                
+            }, completion: { result, transitionView, transitionRect, transitionImage, fromCamera, transitionOut, cancelled in
                 var resultImage: UIImage?
                 let uploadStatusPromise = Promise<PeerInfoAvatarUploadStatus>(.progress(0.0))
                 
@@ -118,7 +109,7 @@ extension PeerInfoScreenImpl {
                 if let asset = result as? PHAsset {
                     subject = .single(.asset(asset))
                 } else if let image = result as? UIImage {
-                    subject = .single(.image(image: image, dimensions: PixelDimensions(image.size), additionalImage: nil, additionalImagePosition: .bottomRight, fromCamera: false))
+                    subject = .single(.image(image: image, dimensions: PixelDimensions(image.size), additionalImage: nil, additionalImagePosition: .bottomRight))
                 } else if let result = result as? Signal<CameraScreenImpl.Result, NoError> {
                     subject = result
                     |> map { value -> MediaEditorScreenImpl.Subject? in
@@ -126,9 +117,9 @@ extension PeerInfoScreenImpl {
                         case .pendingImage:
                             return nil
                         case let .image(image):
-                            return .image(image: image.image, dimensions: PixelDimensions(image.image.size), additionalImage: nil, additionalImagePosition: .topLeft, fromCamera: false)
+                            return .image(image: image.image, dimensions: PixelDimensions(image.image.size), additionalImage: nil, additionalImagePosition: .topLeft)
                         case let .video(video):
-                            return .video(videoPath: video.videoPath, thumbnail: video.coverImage, mirror: video.mirror, additionalVideoPath: nil, additionalThumbnail: nil, dimensions: video.dimensions, duration: video.duration, videoPositionChanges: [], additionalVideoPosition: .topLeft, fromCamera: false)
+                            return .video(videoPath: video.videoPath, thumbnail: video.coverImage, mirror: video.mirror, additionalVideoPath: nil, additionalThumbnail: nil, dimensions: video.dimensions, duration: video.duration, videoPositionChanges: [], additionalVideoPosition: .topLeft)
                         default:
                             return nil
                         }
@@ -141,7 +132,7 @@ extension PeerInfoScreenImpl {
                         peerType = .group
                     } else if case let .channel(channel) = peer {
                         if case .group = channel.info {
-                            peerType = channel.isForumOrMonoForum ? .forum : .group
+                            peerType = channel.flags.contains(.isForum) ? .forum : .group
                         } else {
                             peerType = .channel
                         }
@@ -160,6 +151,7 @@ extension PeerInfoScreenImpl {
                         commit()
                     }
                     parentController?.push(controller)
+                    //isFromEditor = true
                     return
                 }
                 
@@ -206,10 +198,7 @@ extension PeerInfoScreenImpl {
                             commit()
                         }
                     },
-                    completion: { [weak self] results, commit in
-                        guard let result = results.first else {
-                            return
-                        }
+                    completion: { [weak self] result, commit in
                         switch result.media {
                         case let .image(image, _):
                             resultImage = image
@@ -225,7 +214,7 @@ extension PeerInfoScreenImpl {
                             break
                         }
                         dismissImpl?()
-                    } as ([MediaEditorScreenImpl.Result], @escaping (@escaping () -> Void) -> Void) -> Void
+                    } as (MediaEditorScreenImpl.Result, @escaping (@escaping () -> Void) -> Void) -> Void
                 )
                 editorController.cancelled = { _ in
                     cancelled()
@@ -236,37 +225,31 @@ extension PeerInfoScreenImpl {
                     self.parentController?.pushViewController(editorController)
                 }
             }, dismissed: {
+                
             })
-            self.avatarPickerHolder = pickerHolder
-            if let mainController {
-                dismissImpl = { [weak self, weak mainController] in
-                    if let mainController, let navigationController = mainController.navigationController {
-                        var viewControllers = navigationController.viewControllers
-                        viewControllers = viewControllers.filter { c in
-                            return !(c is CameraScreen) && c !== mainController
-                        }
-                        navigationController.setViewControllers(viewControllers, animated: false)
+            dismissImpl = { [weak self, weak mainController] in
+                if let mainController, let navigationController = mainController.navigationController {
+                    var viewControllers = navigationController.viewControllers
+                    viewControllers = viewControllers.filter { c in
+                        return !(c is CameraScreen) && c !== mainController
                     }
-                    if let self, let navigationController = self.parentController, let mainController {
-                        var viewControllers = navigationController.viewControllers
-                        viewControllers = viewControllers.filter { c in
-                            return !(c is CameraScreen) && c !== mainController
-                        }
-                        navigationController.setViewControllers(viewControllers, animated: false)
-                    }
-                    
+                    navigationController.setViewControllers(viewControllers, animated: false)
                 }
-                if mainController is ActionSheetController {
-                    self.present(mainController, in: .window(.root))
-                } else {
-                    mainController.navigationPresentation = .flatModal
-                    mainController.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .all, compactSize: .portrait)
-                    if self.navigationController != nil {
-                        self.push(mainController)
-                    } else {
-                        self.parentController?.pushViewController(mainController)
+                if let self, let navigationController = self.parentController, let mainController {
+                    var viewControllers = navigationController.viewControllers
+                    viewControllers = viewControllers.filter { c in
+                        return !(c is CameraScreen) && c !== mainController
                     }
+                    navigationController.setViewControllers(viewControllers, animated: false)
                 }
+
+            }
+            mainController.navigationPresentation = .flatModal
+            mainController.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .all, compactSize: .portrait)
+            if self.navigationController != nil {
+                self.push(mainController)
+            } else {
+                self.parentController?.pushViewController(mainController)
             }
         })
     }
@@ -358,7 +341,7 @@ extension PeerInfoScreenImpl {
         
         let resource = LocalFileMediaResource(fileId: Int64.random(in: Int64.min ... Int64.max))
         self.context.account.postbox.mediaBox.storeResourceData(resource.id, data: data)
-        let representation = TelegramMediaImageRepresentation(dimensions: PixelDimensions(width: 640, height: 640), resource: resource, progressiveSizes: [], immediateThumbnailData: nil, hasVideo: false, isPersonal: mode == .custom)
+        let representation = TelegramMediaImageRepresentation(dimensions: PixelDimensions(width: 640, height: 640), resource: resource, progressiveSizes: [], immediateThumbnailData: nil, hasVideo: false, isPersonal: mode == .custom ? true : false)
         
         if [.suggest, .fallback].contains(mode) {
         } else {
@@ -373,10 +356,6 @@ extension PeerInfoScreenImpl {
         self.controllerNode.headerNode.ignoreCollapse = false
         
         return resource
-    }
-    
-    public func updateProfilePhoto(_ image: UIImage) {
-        self.updateProfilePhoto(image, mode: .generic, uploadStatus: nil)
     }
     
     public func updateProfilePhoto(_ image: UIImage, mode: PeerInfoAvatarEditingMode, uploadStatus: Promise<PeerInfoAvatarUploadStatus>?) {
@@ -467,7 +446,7 @@ extension PeerInfoScreenImpl {
                         case .accept:
                             (strongSelf.parentController?.topViewController as? ViewController)?.present(UndoOverlayController(presentationData: strongSelf.presentationData, content: .image(image: image, title: strongSelf.presentationData.strings.Conversation_SuggestedPhotoSuccess, text: strongSelf.presentationData.strings.Conversation_SuggestedPhotoSuccessText, round: true, undoText: nil), elevatedLayout: false, animateInAsReplacement: true, action: { [weak self] action in
                                 if case .info = action {
-                                    self?.parentController?.openSettings(edit: false)
+                                    self?.parentController?.openSettings()
                                 }
                                 return false
                             }), in: .current)
@@ -478,10 +457,6 @@ extension PeerInfoScreenImpl {
                 })
             }
         }))
-    }
-    
-    public func updateProfileVideo(_ image: UIImage, video: Any?, values: Any?, markup: UploadPeerPhotoMarkup?) {
-        self.updateProfileVideo(image, video: video as? MediaEditorScreenImpl.MediaResult.VideoResult, values: values as? MediaEditorValues, markup: markup, mode: .generic, uploadStatus: nil)
     }
         
     public func updateProfileVideo(_ image: UIImage, video: MediaEditorScreenImpl.MediaResult.VideoResult?, values: MediaEditorValues?, markup: UploadPeerPhotoMarkup?, mode: PeerInfoAvatarEditingMode, uploadStatus: Promise<PeerInfoAvatarUploadStatus>?) {
@@ -670,7 +645,7 @@ extension PeerInfoScreenImpl {
                         case .accept:
                             (strongSelf.parentController?.topViewController as? ViewController)?.present(UndoOverlayController(presentationData: strongSelf.presentationData, content: .image(image: image, title: strongSelf.presentationData.strings.Conversation_SuggestedVideoSuccess, text: strongSelf.presentationData.strings.Conversation_SuggestedVideoSuccessText, round: true, undoText: nil), elevatedLayout: false, animateInAsReplacement: true, action: { [weak self] action in
                                 if case .info = action {
-                                    self?.parentController?.openSettings(edit: false)
+                                    self?.parentController?.openSettings()
                                 }
                                 return false
                             }), in: .current)
@@ -882,7 +857,7 @@ extension PeerInfoScreenImpl {
                         case .accept:
                             (strongSelf.parentController?.topViewController as? ViewController)?.present(UndoOverlayController(presentationData: strongSelf.presentationData, content: .image(image: image, title: strongSelf.presentationData.strings.Conversation_SuggestedVideoSuccess, text: strongSelf.presentationData.strings.Conversation_SuggestedVideoSuccessText, round: true, undoText: nil), elevatedLayout: false, animateInAsReplacement: true, action: { [weak self] action in
                                 if case .info = action {
-                                    self?.parentController?.openSettings(edit: false)
+                                    self?.parentController?.openSettings()
                                 }
                                 return false
                             }), in: .current)

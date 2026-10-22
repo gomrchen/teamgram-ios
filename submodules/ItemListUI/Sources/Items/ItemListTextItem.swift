@@ -11,12 +11,13 @@ import AccountContext
 
 public enum ItemListTextItemText {
     case plain(String)
+    case large(String)
     case markdown(String)
     case custom(context: AccountContext, string: NSAttributedString)
     
     var text: String {
         switch self {
-        case let .plain(text), let .markdown(text):
+        case let .plain(text), let .large(text), let .markdown(text):
             return text
         case let .custom(_, string):
             return string.string
@@ -55,12 +56,12 @@ public class ItemListTextItem: ListViewItem, ItemListItem {
     let style: ItemListStyle
     let textSize: ItemListTextItemTextSize
     let textAlignment: ItemListTextItemTextAlignment
+    let trimBottomInset: Bool
     let additionalInsets: UIEdgeInsets
-    let additionalOuterInsets: UIEdgeInsets
     public let isAlwaysPlain: Bool = true
     public let tag: ItemListItemTag?
     
-    public init(presentationData: ItemListPresentationData, text: ItemListTextItemText, sectionId: ItemListSectionId, linkAction: ((ItemListTextItemLinkAction) -> Void)? = nil, style: ItemListStyle = .blocks, textSize: ItemListTextItemTextSize = .generic, textAlignment: ItemListTextItemTextAlignment = .natural, tag: ItemListItemTag? = nil, additionalInsets: UIEdgeInsets = .zero, additionalOuterInsets: UIEdgeInsets = .zero) {
+    public init(presentationData: ItemListPresentationData, text: ItemListTextItemText, sectionId: ItemListSectionId, linkAction: ((ItemListTextItemLinkAction) -> Void)? = nil, style: ItemListStyle = .blocks, textSize: ItemListTextItemTextSize = .generic, textAlignment: ItemListTextItemTextAlignment = .natural, tag: ItemListItemTag? = nil, trimBottomInset: Bool = false, additionalInsets: UIEdgeInsets = .zero) {
         self.presentationData = presentationData
         self.text = text
         self.sectionId = sectionId
@@ -68,8 +69,8 @@ public class ItemListTextItem: ListViewItem, ItemListItem {
         self.style = style
         self.textSize = textSize
         self.textAlignment = textAlignment
+        self.trimBottomInset = trimBottomInset
         self.additionalInsets = additionalInsets
-        self.additionalOuterInsets = additionalOuterInsets
         self.tag = tag
     }
     
@@ -132,7 +133,7 @@ public class ItemListTextItemNode: ListViewItemNode, ItemListItemNode {
         self.activateArea = AccessibilityAreaNode()
         self.activateArea.accessibilityTraits = .staticText
         
-        super.init(layerBacked: false)
+        super.init(layerBacked: false, dynamicBounce: false)
         
         self.addSubnode(self.textNode.textNode)
         self.addSubnode(self.activateArea)
@@ -165,7 +166,9 @@ public class ItemListTextItemNode: ListViewItemNode, ItemListItemNode {
             
             var titleFont = Font.regular(item.presentationData.fontSize.itemListBaseHeaderFontSize)
             var textColor: UIColor = item.presentationData.theme.list.freeTextColor
-            if case .larger = item.textSize {
+            if case .large = item.text {
+                titleFont = Font.semibold(floor(item.presentationData.fontSize.itemListBaseFontSize))
+            } else if case .larger = item.textSize {
                 titleFont = Font.regular(floor(item.presentationData.fontSize.itemListBaseFontSize / 17.0 * 15.0))
                 textColor = item.presentationData.theme.list.itemSecondaryTextColor
             }
@@ -181,6 +184,8 @@ public class ItemListTextItemNode: ListViewItemNode, ItemListItemNode {
             switch item.text {
             case let .plain(text):
                 attributedText = NSAttributedString(string: text, font: titleFont, textColor: item.presentationData.theme.list.freeTextColor)
+            case let .large(text):
+                attributedText = NSAttributedString(string: text, font: titleFont, textColor: item.presentationData.theme.list.itemPrimaryTextColor)
             case let .markdown(text):
                 let mutableAttributedText = parseMarkdownIntoAttributedString(text, attributes: MarkdownAttributes(body: MarkdownAttributeSet(font: titleFont, textColor: textColor), bold: MarkdownAttributeSet(font: titleBoldFont, textColor: textColor), link: MarkdownAttributeSet(font: titleFont, textColor: item.presentationData.theme.list.itemAccentColor), linkAttribute: { contents in
                     return (TelegramTextAttributes.URL, contents)
@@ -207,13 +212,22 @@ public class ItemListTextItemNode: ListViewItemNode, ItemListItemNode {
             let contentSize: CGSize
             
             var insets = itemListNeighborsGroupedInsets(neighbors, params)
-            insets.top += item.additionalOuterInsets.top
-            insets.bottom += item.additionalOuterInsets.bottom
+            switch item.text {
+            case .large, .custom:
+                insets.top = 14.0
+                bottomInset = -6.0
+            default:
+                break
+            }
             
             topInset += item.additionalInsets.top
             bottomInset += item.additionalInsets.bottom
             
             contentSize = CGSize(width: params.width, height: titleLayout.size.height + topInset + bottomInset)
+            
+            if item.trimBottomInset {
+                insets.bottom -= 44.0
+            }
             
             let layout = ListViewItemNodeLayout(contentSize: contentSize, insets: insets)
             

@@ -237,8 +237,7 @@ func chatMessageDisplaySendMessageOptions(selfController: ChatControllerImpl, no
                     canMakePaidContent: false,
                     currentPrice: nil,
                     hasTimers: false,
-                    sendPaidMessageStars: selfController.presentationInterfaceState.sendPaidMessageStars,
-                    isMonoforum: selfController.presentationInterfaceState.renderedPeer?.peer?.isMonoForum ?? false
+                    sendPaidMessageStars: selfController.presentationInterfaceState.sendPaidMessageStars
                 )),
                 hasEntityKeyboard: hasEntityKeyboard,
                 gesture: gesture,
@@ -267,7 +266,7 @@ func chatMessageDisplaySendMessageOptions(selfController: ChatControllerImpl, no
                                 return
                             }
                             selfController.updateChatPresentationInterfaceState(animated: true, interactive: false, saveInterfaceState: selfController.presentationInterfaceState.subject != .scheduledMessages, {
-                                $0.updatedInterfaceState { $0.withUpdatedReplyMessageSubject(nil).withUpdatedSendMessageEffect(nil).withUpdatedPostSuggestionState(nil).withUpdatedForwardMessageIds(nil).withUpdatedForwardOptionsState(nil).withUpdatedComposeInputState(ChatTextInputState(inputText: NSAttributedString(string: ""))) }
+                                $0.updatedInterfaceState { $0.withUpdatedReplyMessageSubject(nil).withUpdatedSendMessageEffect(nil).withUpdatedForwardMessageIds(nil).withUpdatedForwardOptionsState(nil).withUpdatedComposeInputState(ChatTextInputState(inputText: NSAttributedString(string: ""))) }
                             })
                             selfController.openScheduledMessages()
                         }

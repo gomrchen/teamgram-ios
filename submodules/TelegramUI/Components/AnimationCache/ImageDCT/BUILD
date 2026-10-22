@@ -16,8 +16,6 @@ objc_library(
     includes = [
         "PublicHeaders",
     ],
-    copts = [
-    ],
     sdk_frameworks = [
         "Foundation",
         "Accelerate",

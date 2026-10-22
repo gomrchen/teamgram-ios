@@ -81,7 +81,6 @@ public final class PrivateCallScreen: OverlayMaskContainerView, AVPictureInPictu
         public var isRemoteBatteryLow: Bool
         public var isEnergySavingEnabled: Bool
         public var isConferencePossible: Bool
-        public var enableVideoSharpening: Bool
         
         public init(
             strings: PresentationStrings,
@@ -96,8 +95,7 @@ public final class PrivateCallScreen: OverlayMaskContainerView, AVPictureInPictu
             remoteVideo: VideoSource?,
             isRemoteBatteryLow: Bool,
             isEnergySavingEnabled: Bool,
-            isConferencePossible: Bool,
-            enableVideoSharpening: Bool
+            isConferencePossible: Bool
         ) {
             self.strings = strings
             self.lifecycleState = lifecycleState
@@ -112,7 +110,6 @@ public final class PrivateCallScreen: OverlayMaskContainerView, AVPictureInPictu
             self.isRemoteBatteryLow = isRemoteBatteryLow
             self.isEnergySavingEnabled = isEnergySavingEnabled
             self.isConferencePossible = isConferencePossible
-            self.enableVideoSharpening = enableVideoSharpening
         }
         
         public static func ==(lhs: State, rhs: State) -> Bool {
@@ -153,9 +150,6 @@ public final class PrivateCallScreen: OverlayMaskContainerView, AVPictureInPictu
                 return false
             }
             if lhs.isConferencePossible != rhs.isConferencePossible {
-                return false
-            }
-            if lhs.enableVideoSharpening != rhs.enableVideoSharpening {
                 return false
             }
             return true
@@ -1000,7 +994,7 @@ public final class PrivateCallScreen: OverlayMaskContainerView, AVPictureInPictu
                 videoContainerView = current
             } else {
                 animateIn = true
-                videoContainerView = VideoContainerView(key: videoContainerKey, enableSharpening: params.state.enableVideoSharpening)
+                videoContainerView = VideoContainerView(key: videoContainerKey)
                 switch videoContainerKey {
                 case .foreground:
                     self.overlayContentsView.layer.addSublayer(videoContainerView.blurredContainerLayer)

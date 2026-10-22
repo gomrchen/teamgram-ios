@@ -30,11 +30,9 @@ struct ParsedDialogs {
 
 private func extractDialogsData(dialogs: Api.messages.Dialogs) -> (apiDialogs: [Api.Dialog], apiMessages: [Api.Message], apiChats: [Api.Chat], apiUsers: [Api.User], apiIsAtLowestBoundary: Bool) {
     switch dialogs {
-        case let .dialogs(dialogsData):
-            let (dialogs, messages, chats, users) = (dialogsData.dialogs, dialogsData.messages, dialogsData.chats, dialogsData.users)
+        case let .dialogs(dialogs, messages, chats, users):
             return (dialogs, messages, chats, users, true)
-        case let .dialogsSlice(dialogsSliceData):
-            let (_, dialogs, messages, chats, users) = (dialogsSliceData.count, dialogsSliceData.dialogs, dialogsSliceData.messages, dialogsSliceData.chats, dialogsSliceData.users)
+        case let .dialogsSlice(_, dialogs, messages, chats, users):
             return (dialogs, messages, chats, users, false)
         case .dialogsNotModified:
             assertionFailure()
@@ -44,8 +42,7 @@ private func extractDialogsData(dialogs: Api.messages.Dialogs) -> (apiDialogs: [
 
 private func extractDialogsData(peerDialogs: Api.messages.PeerDialogs) -> (apiDialogs: [Api.Dialog], apiMessages: [Api.Message], apiChats: [Api.Chat], apiUsers: [Api.User], apiIsAtLowestBoundary: Bool) {
     switch peerDialogs {
-        case let .peerDialogs(peerDialogsData):
-            let (dialogs, messages, chats, users) = (peerDialogsData.dialogs, peerDialogsData.messages, peerDialogsData.chats, peerDialogsData.users)
+        case let .peerDialogs(dialogs, messages, chats, users, _):
             return (dialogs, messages, chats, users, false)
     }
 }
@@ -80,8 +77,7 @@ private func parseDialogs(accountPeerId: PeerId, apiDialogs: [Api.Dialog], apiMe
         var apiChannelPts: Int32?
         let apiNotificationSettings: Api.PeerNotifySettings
         switch dialog {
-            case let .dialog(dialogData):
-                let (flags, peer, topMessage, readInboxMaxId, readOutboxMaxId, unreadCount, unreadMentionsCount, unreadReactionsCount, peerNotificationSettings, pts, ttlPeriod) = (dialogData.flags, dialogData.peer, dialogData.topMessage, dialogData.readInboxMaxId, dialogData.readOutboxMaxId, dialogData.unreadCount, dialogData.unreadMentionsCount, dialogData.unreadReactionsCount, dialogData.notifySettings, dialogData.pts, dialogData.ttlPeriod)
+            case let .dialog(flags, peer, topMessage, readInboxMaxId, readOutboxMaxId, unreadCount, unreadMentionsCount, unreadReactionsCount, peerNotificationSettings, pts, _, _, ttlPeriod):
                 if let peer = peers.get(peer.peerId) {
                     var isExluded = false
                     if let group = peer as? TelegramGroup {
@@ -113,14 +109,11 @@ private func parseDialogs(accountPeerId: PeerId, apiDialogs: [Api.Dialog], apiMe
                 }
                 let peerId: PeerId
                 switch apiPeer {
-                    case let .peerUser(peerUserData):
-                        let userId = peerUserData.userId
+                    case let .peerUser(userId):
                         peerId = PeerId(namespace: Namespaces.Peer.CloudUser, id: PeerId.Id._internalFromInt64Value(userId))
-                    case let .peerChat(peerChatData):
-                        let chatId = peerChatData.chatId
+                    case let .peerChat(chatId):
                         peerId = PeerId(namespace: Namespaces.Peer.CloudGroup, id: PeerId.Id._internalFromInt64Value(chatId))
-                    case let .peerChannel(peerChannelData):
-                        let channelId = peerChannelData.channelId
+                    case let .peerChannel(channelId):
                         peerId = PeerId(namespace: Namespaces.Peer.CloudChannel, id: PeerId.Id._internalFromInt64Value(channelId))
                 }
                 
@@ -140,11 +133,9 @@ private func parseDialogs(accountPeerId: PeerId, apiDialogs: [Api.Dialog], apiMe
                 }
                 
                 notificationSettings[peerId] = TelegramPeerNotificationSettings(apiSettings: apiNotificationSettings)
-            case let .dialogFolder(dialogFolderData):
-                let (folder, unreadMutedPeersCount, unreadMutedMessagesCount) = (dialogFolderData.folder, dialogFolderData.unreadMutedPeersCount, dialogFolderData.unreadMutedMessagesCount)
+            case let .dialogFolder(_, folder, _, _, unreadMutedPeersCount, _, unreadMutedMessagesCount, _):
                 switch folder {
-                    case let .folder(folderData):
-                        let id = folderData.id
+                    case let .folder(_, id, _, _):
                         referencedFolders[PeerGroupId(rawValue: id)] = PeerGroupUnreadCountersSummary(all: PeerGroupUnreadCounters(messageCount: unreadMutedMessagesCount, chatCount: unreadMutedPeersCount))
                 }
         }
@@ -154,7 +145,7 @@ private func parseDialogs(accountPeerId: PeerId, apiDialogs: [Api.Dialog], apiMe
     
     for message in apiMessages {
         var peerIsForum = false
-        if let peerId = message.peerId, let peer = peers.get(peerId), peer.isForumOrMonoForum {
+        if let peerId = message.peerId, let peer = peers.get(peerId), peer.isForum {
             peerIsForum = true
         }
         if let storeMessage = StoreMessage(apiMessage: message, accountPeerId: accountPeerId, peerIsForum: peerIsForum) {
@@ -213,7 +204,7 @@ struct FetchedChatList {
     var pinnedItemIds: [PeerId]?
     var folderSummaries: [PeerGroupId: PeerGroupUnreadCountersSummary]
     var peerGroupIds: [PeerId: PeerGroupId]
-    var threadInfos: [PeerAndBoundThreadId: StoreMessageHistoryThreadData]
+    var threadInfos: [MessageId: StoreMessageHistoryThreadData]
 }
 
 func fetchChatList(accountPeerId: PeerId, postbox: Postbox, network: Network, location: FetchChatListLocation, upperBound: MessageIndex, hash: Int64, limit: Int32) -> Signal<FetchedChatList?, NoError> {
@@ -250,7 +241,8 @@ func fetchChatList(accountPeerId: PeerId, postbox: Postbox, network: Network, lo
                         folderId = groupId.rawValue
                 }
                 additionalPinnedChats = network.request(Api.functions.messages.getPinnedDialogs(folderId: folderId))
-                |> retryRequestIfNotFrozen
+                |> retryRequest
+                |> map(Optional.init)
             } else {
                 additionalPinnedChats = .single(nil)
             }
@@ -407,7 +399,7 @@ func fetchChatList(accountPeerId: PeerId, postbox: Postbox, network: Network, lo
                     return resolveUnknownEmojiFiles(postbox: postbox, source: .network(network), messages: storeMessages, reactions: [], result: result)
                     |> mapToSignal { result in
                         if let result = result {
-                            return resolveForumThreads(accountPeerId: accountPeerId, postbox: postbox, source: .network(network), fetchedChatList: result)
+                            return resolveForumThreads(accountPeerId: accountPeerId, postbox: postbox, network: network, fetchedChatList: result)
                             |> map(Optional.init)
                         } else {
                             return .single(result)

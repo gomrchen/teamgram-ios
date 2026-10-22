@@ -23,8 +23,6 @@ import AudioToolbox
 import PremiumLockButtonSubtitleComponent
 import ListSectionComponent
 import ListItemSliderSelectorComponent
-import ListSwitchItemComponent
-import PresentationDataUtils
 
 final class PeerAllowedReactionsScreenComponent: Component {
     typealias EnvironmentType = ViewControllerComponentContainer.Environment
@@ -203,7 +201,7 @@ final class PeerAllowedReactionsScreenComponent: Component {
                     self.applySettings(standalone: true)
                 } else {
                     let presentationData = component.context.sharedContext.currentPresentationData.with { $0 }
-                    self.environment?.controller()?.present(textAlertController(context: component.context, title: presentationData.strings.ChannelReactions_UnsavedChangesAlertTitle, text: presentationData.strings.ChannelReactions_UnsavedChangesAlertText, actions: [
+                    self.environment?.controller()?.present(standardTextAlertController(theme: AlertControllerTheme(presentationData: presentationData), title: presentationData.strings.ChannelReactions_UnsavedChangesAlertTitle, text: presentationData.strings.ChannelReactions_UnsavedChangesAlertText, actions: [
                         TextAlertAction(type: .genericAction, title: presentationData.strings.ChannelReactions_UnsavedChangesAlertDiscard, action: { [weak self] in
                             guard let self else {
                                 return
@@ -307,7 +305,7 @@ final class PeerAllowedReactionsScreenComponent: Component {
                         self.displayPremiumScreen(reactionCount: customReactions.count)
                     case .generic:
                         let presentationData = component.context.sharedContext.currentPresentationData.with { $0 }
-                        self.environment?.controller()?.present(textAlertController(context: component.context, title: nil, text: presentationData.strings.Login_UnknownError, actions: [TextAlertAction(type: .defaultAction, title: presentationData.strings.Common_OK, action: {})]), in: .window(.root))
+                        self.environment?.controller()?.present(standardTextAlertController(theme: AlertControllerTheme(presentationData: presentationData), title: nil, text: presentationData.strings.Login_UnknownError, actions: [TextAlertAction(type: .defaultAction, title: presentationData.strings.Common_OK, action: {})]), in: .window(.root))
                     }
                 }
             }, completed: { [weak self] in
@@ -1260,7 +1258,6 @@ final class PeerAllowedReactionsScreenComponent: Component {
                     transition: transition,
                     component: AnyComponent(ListSectionComponent(
                         theme: environment.theme,
-                        style: .glass,
                         header: AnyComponent(MultilineTextComponent(
                             text: .plain(NSAttributedString(
                                 string: environment.strings.PeerInfo_AllowedReactions_MaxCountSectionTitle,
@@ -1295,8 +1292,7 @@ final class PeerAllowedReactionsScreenComponent: Component {
                                         self.allowedReactionCount = index
                                         self.state?.updated(transition: .immediate)
                                     }
-                                )),
-                                preferNative: true
+                                ))
                             )))
                         ],
                         displaySeparators: false
@@ -1352,7 +1348,6 @@ final class PeerAllowedReactionsScreenComponent: Component {
                         transition: transition,
                         component: AnyComponent(ListSectionComponent(
                             theme: environment.theme,
-                            style: .glass,
                             header: nil,
                             footer: AnyComponent(MultilineTextComponent(
                                 text: .plain(paidReactionsFooterText),
@@ -1537,12 +1532,10 @@ final class PeerAllowedReactionsScreenComponent: Component {
                 ))))
             }
             
-            let buttonInsets = ContainerViewLayout.concentricInsets(bottomInset: environment.safeInsets.bottom, innerDiameter: 52.0, sideInset: 30.0)
             let buttonSize = self.actionButton.update(
                 transition: transition,
                 component: AnyComponent(ButtonComponent(
                     background: ButtonComponent.Background(
-                        style: .glass,
                         color: environment.theme.list.itemCheckColors.fillColor,
                         foreground: environment.theme.list.itemCheckColors.foregroundColor,
                         pressedColor: environment.theme.list.itemCheckColors.fillColor.withMultipliedAlpha(0.8)
@@ -1561,7 +1554,7 @@ final class PeerAllowedReactionsScreenComponent: Component {
                     }
                 )),
                 environment: {},
-                containerSize: CGSize(width: availableSize.width - buttonInsets.left - buttonInsets.right, height: 52.0)
+                containerSize: CGSize(width: availableSize.width - sideInset * 2.0, height: 50.0)
             )
             contentHeight += buttonSize.height
             
@@ -1655,7 +1648,7 @@ final class PeerAllowedReactionsScreenComponent: Component {
                 buttonY = availableSize.height - bottomInset - environment.safeInsets.bottom - buttonSize.height
             }
             
-            let buttonFrame = CGRect(origin: CGPoint(x: buttonInsets.left, y: buttonY), size: buttonSize)
+            let buttonFrame = CGRect(origin: CGPoint(x: sideInset, y: buttonY), size: buttonSize)
             if let buttonView = self.actionButton.view {
                 if buttonView.superview == nil {
                     self.addSubview(buttonView)
@@ -1672,8 +1665,8 @@ final class PeerAllowedReactionsScreenComponent: Component {
                 self.scrollView.contentSize = contentSize
             }
             let scrollInsets = UIEdgeInsets(top: environment.navigationHeight, left: 0.0, bottom: environment.safeInsets.bottom, right: 0.0)
-            if self.scrollView.verticalScrollIndicatorInsets != scrollInsets {
-                self.scrollView.verticalScrollIndicatorInsets = scrollInsets
+            if self.scrollView.scrollIndicatorInsets != scrollInsets {
+                self.scrollView.scrollIndicatorInsets = scrollInsets
             }
             
             if self.recenterOnCaret {

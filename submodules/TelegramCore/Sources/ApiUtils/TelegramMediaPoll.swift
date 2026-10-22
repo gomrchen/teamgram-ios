@@ -6,13 +6,11 @@ import TelegramApi
 extension TelegramMediaPollOption {
     init(apiOption: Api.PollAnswer) {
         switch apiOption {
-        case let .pollAnswer(pollAnswerData):
-            let (text, option) = (pollAnswerData.text, pollAnswerData.option)
+        case let .pollAnswer(text, option):
             let answerText: String
             let answerEntities: [MessageTextEntity]
             switch text {
-            case let .textWithEntities(textWithEntitiesData):
-                let (text, entities) = (textWithEntitiesData.text, textWithEntitiesData.entities)
+            case let .textWithEntities(text, entities):
                 answerText = text
                 answerEntities = messageTextEntitiesFromApiEntities(entities)
             }
@@ -22,15 +20,14 @@ extension TelegramMediaPollOption {
     }
     
     var apiOption: Api.PollAnswer {
-        return .pollAnswer(.init(text: .textWithEntities(.init(text: self.text, entities: apiEntitiesFromMessageTextEntities(self.entities, associatedPeers: SimpleDictionary()))), option: Buffer(data: self.opaqueIdentifier)))
+        return .pollAnswer(text: .textWithEntities(text: self.text, entities: apiEntitiesFromMessageTextEntities(self.entities, associatedPeers: SimpleDictionary())), option: Buffer(data: self.opaqueIdentifier))
     }
 }
 
 extension TelegramMediaPollOptionVoters {
     init(apiVoters: Api.PollAnswerVoters) {
         switch apiVoters {
-            case let .pollAnswerVoters(pollAnswerVotersData):
-                let (flags, option, voters) = (pollAnswerVotersData.flags, pollAnswerVotersData.option, pollAnswerVotersData.voters)
+            case let .pollAnswerVoters(flags, option, voters):
                 self.init(selected: (flags & (1 << 0)) != 0, opaqueIdentifier: option.makeData(), count: voters, isCorrect: (flags & (1 << 1)) != 0)
         }
     }
@@ -39,8 +36,7 @@ extension TelegramMediaPollOptionVoters {
 extension TelegramMediaPollResults {
     init(apiResults: Api.PollResults) {
         switch apiResults {
-            case let .pollResults(pollResultsData):
-                let (results, totalVoters, recentVoters, solution, solutionEntities) = (pollResultsData.results, pollResultsData.totalVoters, pollResultsData.recentVoters, pollResultsData.solution, pollResultsData.solutionEntities)
+            case let .pollResults(_, results, totalVoters, recentVoters, solution, solutionEntities):
                 var parsedSolution: TelegramMediaPollResults.Solution?
                 if let solution = solution, let solutionEntities = solutionEntities, !solution.isEmpty {
                     parsedSolution = TelegramMediaPollResults.Solution(text: solution, entities: messageTextEntitiesFromApiEntities(solutionEntities))

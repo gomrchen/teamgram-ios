@@ -1,5 +1,4 @@
 import AsyncDisplayKit
-import UIKit
 import Display
 import TelegramCore
 import SwiftSignalKit
@@ -18,8 +17,106 @@ import SoftwareVideo
 import ChatControllerInteraction
 import PeerInfoVisualMediaPaneNode
 import PeerInfoPaneNode
-import BatchVideoRendering
-import GifVideoLayer
+
+private final class FrameSequenceThumbnailNode: ASDisplayNode {
+    private let context: AccountContext
+    private let file: FileMediaReference
+    private let imageNode: ASImageNode
+    
+    private var isPlaying: Bool = false
+    private var isPlayingInternal: Bool = false
+    
+    private var frames: [Int: UIImage] = [:]
+    
+    private var frameTimes: [Double] = []
+    private var sources: [UniversalSoftwareVideoSource] = []
+    private var disposables: [Int: Disposable] = [:]
+    
+    private var currentFrameIndex: Int = 0
+    private var timer: SwiftSignalKit.Timer?
+    
+    init(
+        context: AccountContext,
+        userLocation: MediaResourceUserLocation,
+        file: FileMediaReference
+    ) {
+        self.context = context
+        self.file = file
+        
+        self.imageNode = ASImageNode()
+        self.imageNode.isUserInteractionEnabled = false
+        self.imageNode.contentMode = .scaleAspectFill
+        self.imageNode.clipsToBounds = true
+        
+        if let duration = file.media.duration {
+            let frameCount = 5
+            let frameInterval: Double = Double(duration) / Double(frameCount)
+            for i in 0 ..< frameCount {
+                self.frameTimes.append(Double(i) * frameInterval)
+            }
+        }
+        
+        super.init()
+        
+        self.addSubnode(self.imageNode)
+        
+        for i in 0 ..< self.frameTimes.count {
+            let framePts = self.frameTimes[i]
+            let index = i
+            
+            let source = UniversalSoftwareVideoSource(
+                mediaBox: self.context.account.postbox.mediaBox,
+                source: .file(
+                    userLocation: userLocation,
+                    userContentType: .other,
+                    fileReference: self.file
+                ),
+                automaticallyFetchHeader: true
+            )
+            self.sources.append(source)
+            self.disposables[index] = (source.takeFrame(at: framePts)
+            |> deliverOnMainQueue).start(next: { [weak self] result in
+                guard let strongSelf = self else {
+                    return
+                }
+                if case let .image(image) = result {
+                    if let image = image {
+                        strongSelf.frames[index] = image
+                    }
+                }
+            })
+        }
+    }
+    
+    deinit {
+        for (_, disposable) in self.disposables {
+            disposable.dispose()
+        }
+        self.timer?.invalidate()
+    }
+    
+    func updateIsPlaying(_ isPlaying: Bool) {
+        if self.isPlaying == isPlaying {
+            return
+        }
+        self.isPlaying = isPlaying
+    }
+    
+    func updateLayout(size: CGSize) {
+        self.imageNode.frame = CGRect(origin: CGPoint(), size: size)
+    }
+    
+    func tick() {
+        let isPlayingInternal = self.isPlaying && self.frames.count == self.frameTimes.count
+        if isPlayingInternal {
+            self.currentFrameIndex = (self.currentFrameIndex + 1) % self.frames.count
+            
+            if self.currentFrameIndex < self.frames.count {
+                self.imageNode.image = self.frames[self.currentFrameIndex]
+            }
+        }
+    }
+}
 
 private let mediaBadgeBackgroundColor = UIColor(white: 0.0, alpha: 0.6)
 private let mediaBadgeTextColor = UIColor.white
@@ -45,10 +142,14 @@ private final class VisualMediaItemInteraction {
 
 private final class VisualMediaItemNode: ASDisplayNode {
     private let context: AccountContext
-    private let videoContext: BatchVideoRenderingContext
     private let interaction: VisualMediaItemInteraction
     
-    private var gifVideoLayer: GifVideoLayer?
+    private var videoLayerFrameManager: SoftwareVideoLayerFrameManager?
+    private var sampleBufferLayer: SampleBufferLayer?
+    private var displayLink: ConstantDisplayLinkAnimator?
+    private var displayLinkTimestamp: Double = 0.0
+    
+    private var frameSequenceThumbnailNode: FrameSequenceThumbnailNode?
     
     private let containerNode: ContextControllerSourceNode
     private let imageNode: TransformImageNode
@@ -65,10 +166,9 @@ private final class VisualMediaItemNode: ASDisplayNode {
     
     private var hasVisibility: Bool = false
     
-    init(context: AccountContext, interaction: VisualMediaItemInteraction, videoContext: BatchVideoRenderingContext) {
+    init(context: AccountContext, interaction: VisualMediaItemInteraction) {
         self.context = context
         self.interaction = interaction
-        self.videoContext = videoContext
         
         self.containerNode = ContextControllerSourceNode()
         self.imageNode = TransformImageNode()
@@ -195,16 +295,25 @@ private final class VisualMediaItemNode: ASDisplayNode {
         }
         
         if let file = media as? TelegramMediaFile, file.isAnimated, self.context.sharedContext.energyUsageSettings.autoplayGif {
-            if self.gifVideoLayer == nil {
-                let gifVideoLayer = GifVideoLayer(context: self.context, batchVideoContext: self.videoContext, userLocation: .peer(item.message.id.peerId), file: FileMediaReference.message(message: MessageReference(item.message), media: file), synchronousLoad: false)
-                self.gifVideoLayer = gifVideoLayer
-                self.imageNode.layer.addSublayer(gifVideoLayer)
+            if self.videoLayerFrameManager == nil {
+                let sampleBufferLayer: SampleBufferLayer
+                if let current = self.sampleBufferLayer {
+                    sampleBufferLayer = current
+                } else {
+                    sampleBufferLayer = takeSampleBufferLayer()
+                    self.sampleBufferLayer = sampleBufferLayer
+                    self.imageNode.layer.addSublayer(sampleBufferLayer.layer)
+                }
+                
+                self.videoLayerFrameManager = SoftwareVideoLayerFrameManager(account: self.context.account, userLocation: .peer(item.message.id.peerId), userContentType: .other, fileReference: FileMediaReference.message(message: MessageReference(item.message), media: file), layerHolder: sampleBufferLayer)
+                self.videoLayerFrameManager?.start()
             }
         } else {
-            if let gifVideoLayer = self.gifVideoLayer {
-                gifVideoLayer.removeFromSuperlayer()
-                self.gifVideoLayer = nil
+            if let sampleBufferLayer = self.sampleBufferLayer {
+                sampleBufferLayer.layer.removeFromSuperlayer()
+                self.sampleBufferLayer = nil
             }
+            self.videoLayerFrameManager = nil
         }
         
         if let media = media, (self.item?.1 == nil || !media.isEqual(to: self.item!.1!)) {
@@ -318,8 +427,8 @@ private final class VisualMediaItemNode: ASDisplayNode {
             
             self.containerNode.frame = imageFrame
             self.imageNode.frame = imageFrame
-            if let gifVideoLayer = self.gifVideoLayer {
-                gifVideoLayer.frame = imageFrame
+            if let sampleBufferLayer = self.sampleBufferLayer {
+                sampleBufferLayer.layer.frame = imageFrame
             }
             
             if let mediaDimensions = mediaDimensions {
@@ -333,9 +442,54 @@ private final class VisualMediaItemNode: ASDisplayNode {
     
     func updateIsVisible(_ isVisible: Bool) {
         self.hasVisibility = isVisible
-        if let gifVideoLayer = self.gifVideoLayer {
-            gifVideoLayer.shouldBeAnimating = self.hasVisibility && !self.isHidden
+        if let _ = self.videoLayerFrameManager {
+            let displayLink: ConstantDisplayLinkAnimator
+            if let current = self.displayLink {
+                displayLink = current
+            } else {
+                displayLink = ConstantDisplayLinkAnimator { [weak self] in
+                    guard let strongSelf = self else {
+                        return
+                    }
+                    strongSelf.videoLayerFrameManager?.tick(timestamp: strongSelf.displayLinkTimestamp)
+                    strongSelf.displayLinkTimestamp += 1.0 / 30.0
+                }
+                displayLink.frameInterval = 2
+                self.displayLink = displayLink
+            }
         }
+        self.displayLink?.isPaused = !self.hasVisibility || self.isHidden
+        
+        /*if isVisible {
+            if let item = self.item?.0, let file = self.item?.1 as? TelegramMediaFile, !file.isAnimated {
+                if self.frameSequenceThumbnailNode == nil {
+                    let frameSequenceThumbnailNode = FrameSequenceThumbnailNode(context: context, file: .message(message: MessageReference(item.message), media: file))
+                    self.frameSequenceThumbnailNode = frameSequenceThumbnailNode
+                    self.imageNode.addSubnode(frameSequenceThumbnailNode)
+                }
+                if let frameSequenceThumbnailNode = self.frameSequenceThumbnailNode {
+                    let size = self.bounds.size
+                    frameSequenceThumbnailNode.frame = CGRect(origin: CGPoint(), size: size)
+                    frameSequenceThumbnailNode.updateLayout(size: size)
+                }
+            } else {
+                if let frameSequenceThumbnailNode = self.frameSequenceThumbnailNode {
+                    self.frameSequenceThumbnailNode = nil
+                    frameSequenceThumbnailNode.removeFromSupernode()
+                }
+            }
+        } else {
+            if let frameSequenceThumbnailNode = self.frameSequenceThumbnailNode {
+                self.frameSequenceThumbnailNode = nil
+                frameSequenceThumbnailNode.removeFromSupernode()
+            }
+        }*/
+        
+        self.frameSequenceThumbnailNode?.updateIsPlaying(isVisible)
+    }
+    
+    func tick() {
+        self.frameSequenceThumbnailNode?.tick()
     }
     
     func updateSelectionState(animated: Bool) {
@@ -412,7 +566,7 @@ private final class VisualMediaItemNode: ASDisplayNode {
         } else {
             self.isHidden = false
         }
-        self.gifVideoLayer?.shouldBeAnimating = self.hasVisibility && !self.isHidden
+        self.displayLink?.isPaused = !self.hasVisibility || self.isHidden
     }
 }
 
@@ -500,7 +654,6 @@ private func tagMaskForType(_ type: PeerInfoGifPaneNode.ContentType) -> MessageT
 private enum ItemsLayout {
     final class Grid {
         let containerWidth: CGFloat
-        let topInset: CGFloat
         let itemCount: Int
         let itemSpacing: CGFloat
         let itemsInRow: Int
@@ -508,9 +661,8 @@ private enum ItemsLayout {
         let rowCount: Int
         let contentHeight: CGFloat
         
-        init(containerWidth: CGFloat, itemCount: Int, topInset: CGFloat, bottomInset: CGFloat) {
+        init(containerWidth: CGFloat, itemCount: Int, bottomInset: CGFloat) {
             self.containerWidth = containerWidth
-            self.topInset = topInset
             self.itemCount = itemCount
             self.itemSpacing = 1.0
             self.itemsInRow = max(3, min(6, Int(containerWidth / 140.0)))
@@ -518,13 +670,13 @@ private enum ItemsLayout {
             
             self.rowCount = itemCount / self.itemsInRow + (itemCount % self.itemsInRow == 0 ? 0 : 1)
             
-            self.contentHeight = topInset + CGFloat(self.rowCount + 1) * self.itemSpacing + CGFloat(rowCount) * itemSize + bottomInset
+            self.contentHeight = CGFloat(self.rowCount + 1) * self.itemSpacing + CGFloat(rowCount) * itemSize + bottomInset
         }
         
         func visibleRange(rect: CGRect) -> (Int, Int) {
-            var minVisibleRow = Int(floor((rect.minY - self.topInset - self.itemSpacing) / (self.itemSize + self.itemSpacing)))
+            var minVisibleRow = Int(floor((rect.minY - self.itemSpacing) / (self.itemSize + self.itemSpacing)))
             minVisibleRow = max(0, minVisibleRow)
-            var maxVisibleRow = Int(ceil((rect.maxY - self.topInset - self.itemSpacing) / (self.itemSize + itemSpacing)))
+            var maxVisibleRow = Int(ceil((rect.maxY - self.itemSpacing) / (self.itemSize + itemSpacing)))
             maxVisibleRow = min(self.rowCount - 1, maxVisibleRow)
             
             let minVisibleIndex = minVisibleRow * itemsInRow
@@ -536,7 +688,7 @@ private enum ItemsLayout {
         func frame(forItemAt index: Int, sideInset: CGFloat) -> CGRect {
             let rowIndex = index / Int(self.itemsInRow)
             let columnIndex = index % Int(self.itemsInRow)
-            let itemOrigin = CGPoint(x: sideInset + CGFloat(columnIndex) * (self.itemSize + self.itemSpacing), y: self.topInset + self.itemSpacing + CGFloat(rowIndex) * (self.itemSize + self.itemSpacing))
+            let itemOrigin = CGPoint(x: sideInset + CGFloat(columnIndex) * (self.itemSize + self.itemSpacing), y: self.itemSpacing + CGFloat(rowIndex) * (self.itemSize + self.itemSpacing))
             return CGRect(origin: itemOrigin, size: CGSize(width: columnIndex == self.itemsInRow ? (self.containerWidth - itemOrigin.x) : self.itemSize, height: self.itemSize))
         }
     }
@@ -622,8 +774,6 @@ final class PeerInfoGifPaneNode: ASDisplayNode, PeerInfoPaneNode, ASScrollViewDe
     private let chatControllerInteraction: ChatControllerInteraction
     private let contentType: ContentType
     
-    private let videoContext: BatchVideoRenderingContext
-    
     weak var parentController: ViewController?
     
     private let scrollNode: ASScrollNode
@@ -656,6 +806,8 @@ final class PeerInfoGifPaneNode: ASDisplayNode, PeerInfoPaneNode, ASScrollViewDe
     private var isFirstHistoryView: Bool = true
     
     private var decelerationAnimator: ConstantDisplayLinkAnimator?
+    
+    private var animationTimer: SwiftSignalKit.Timer?
 
     private let statusPromise = Promise<PeerInfoStatusData?>(nil)
     var status: Signal<PeerInfoStatusData?, NoError> {
@@ -678,8 +830,6 @@ final class PeerInfoGifPaneNode: ASDisplayNode, PeerInfoPaneNode, ASScrollViewDe
         self.scrollNode = ASScrollNode()
         self.floatingHeaderNode = FloatingHeaderNode()
         self.floatingHeaderNode.alpha = 0.0
-        
-        self.videoContext = BatchVideoRenderingContext(context: self.context)
         
         super.init()
         
@@ -725,6 +875,17 @@ final class PeerInfoGifPaneNode: ASDisplayNode, PeerInfoPaneNode, ASScrollViewDe
                 itemNode.updateHiddenMedia()
             }
         })
+        
+        let animationTimer = SwiftSignalKit.Timer(timeout: 0.3, repeat: true, completion: { [weak self] in
+            guard let strongSelf = self else {
+                return
+            }
+            for (_, itemNode) in strongSelf.visibleMediaItems {
+                itemNode.tick()
+            }
+        }, queue: .mainQueue())
+        self.animationTimer = animationTimer
+        animationTimer.start()
 
         self.statusPromise.set(context.engine.data.subscribe(
             TelegramEngine.EngineData.Item.Messages.MessageCount(peerId: peerId, threadId: chatLocation.threadId, tag: tagMaskForType(self.contentType))
@@ -749,6 +910,7 @@ final class PeerInfoGifPaneNode: ASDisplayNode, PeerInfoPaneNode, ASScrollViewDe
     deinit {
         self.listDisposable.dispose()
         self.hiddenMediaDisposable?.dispose()
+        self.animationTimer?.invalidate()
     }
     
     func ensureMessageIsVisible(id: MessageId) {
@@ -908,7 +1070,7 @@ final class PeerInfoGifPaneNode: ASDisplayNode, PeerInfoPaneNode, ASScrollViewDe
         let previousParams = self.currentParams
         self.currentParams = (size, topInset, sideInset, bottomInset, deviceMetrics, visibleHeight, isScrollingLockedAtTop, expandProgress, navigationHeight, presentationData)
         
-        transition.updateFrame(node: self.scrollNode, frame: CGRect(origin: CGPoint(x: 0.0, y: 0.0), size: CGSize(width: size.width, height: size.height)))
+        transition.updateFrame(node: self.scrollNode, frame: CGRect(origin: CGPoint(x: 0.0, y: topInset), size: CGSize(width: size.width, height: size.height - topInset)))
         
         let availableWidth = size.width - sideInset * 2.0
         
@@ -918,7 +1080,7 @@ final class PeerInfoGifPaneNode: ASDisplayNode, PeerInfoPaneNode, ASScrollViewDe
         } else {
             switch self.contentType {
             case .photoOrVideo, .gifs:
-                itemsLayout = .grid(ItemsLayout.Grid(containerWidth: availableWidth, itemCount: self.mediaItems.count, topInset: topInset, bottomInset: bottomInset))
+                itemsLayout = .grid(ItemsLayout.Grid(containerWidth: availableWidth, itemCount: self.mediaItems.count, bottomInset: bottomInset))
             }
             self.itemsLayout = itemsLayout
         }
@@ -1002,7 +1164,7 @@ final class PeerInfoGifPaneNode: ASDisplayNode, PeerInfoPaneNode, ASScrollViewDe
                 if let current = self.visibleMediaItems[stableId] {
                     itemNode = current
                 } else {
-                    itemNode = VisualMediaItemNode(context: self.context, interaction: self.itemInteraction, videoContext: self.videoContext)
+                    itemNode = VisualMediaItemNode(context: self.context, interaction: self.itemInteraction)
                     self.visibleMediaItems[stableId] = itemNode
                     self.scrollNode.addSubnode(itemNode)
                 }

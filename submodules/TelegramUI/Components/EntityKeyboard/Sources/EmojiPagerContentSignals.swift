@@ -65,8 +65,7 @@ public extension EmojiPagerContentComponent {
         hasRecent: Bool = true,
         forceHasPremium: Bool = false,
         premiumIfSavedMessages: Bool = true,
-        hideBackground: Bool = false,
-        maskEdge: EmojiPagerContentComponent.MaskEdgeMode = .none
+        hideBackground: Bool = false
     ) -> Signal<EmojiPagerContentComponent, NoError> {
         let premiumConfiguration = PremiumConfiguration.with(appConfiguration: context.currentAppConfiguration.with { $0 })
         let isPremiumDisabled = premiumConfiguration.isPremiumDisabled
@@ -288,9 +287,7 @@ public extension EmojiPagerContentComponent {
                         if item.file.isAnimatedSticker {
                             type = .lottie
                         } else if item.file.isVideoEmoji || item.file.isVideoSticker {
-                            type = .video(isVP9: true)
-                        } else if item.file.isVideo {
-                            type = .video(isVP9: false)
+                            type = .video
                         } else {
                             type = .still
                         }
@@ -1393,9 +1390,7 @@ public extension EmojiPagerContentComponent {
                                     if item.file.isAnimatedSticker {
                                         type = .lottie
                                     } else if item.file.isVideoEmoji || item.file.isVideoSticker {
-                                        type = .video(isVP9: true)
-                                    } else if item.file.isVideo {
-                                        type = .video(isVP9: false)
+                                        type = .video
                                     } else {
                                         type = .still
                                     }
@@ -1482,9 +1477,7 @@ public extension EmojiPagerContentComponent {
                                     if item.file.isAnimatedSticker {
                                         type = .lottie
                                     } else if item.file.isVideoEmoji || item.file.isVideoSticker {
-                                        type = .video(isVP9: true)
-                                    } else if item.file.isVideo {
-                                        type = .video(isVP9: false)
+                                        type = .video
                                     } else {
                                         type = .still
                                     }
@@ -1597,7 +1590,6 @@ public extension EmojiPagerContentComponent {
                 searchState: .empty(hasResults: false),
                 warpContentsOnEdges: warpContentsOnEdges,
                 hideBackground: hideBackground,
-                maskEdge: maskEdge,
                 displaySearchWithPlaceholder: displaySearchWithPlaceholder,
                 searchCategories: searchCategories,
                 searchInitiallyHidden: searchInitiallyHidden,
@@ -1634,8 +1626,7 @@ public extension EmojiPagerContentComponent {
         hasAdd: Bool = false,
         searchIsPlaceholderOnly: Bool = true,
         subject: StickersSubject = .chatStickers,
-        hideBackground: Bool = false,
-        maskEdge: EmojiPagerContentComponent.MaskEdgeMode = .none
+        hideBackground: Bool = false
     ) -> Signal<EmojiPagerContentComponent, NoError> {
         let premiumConfiguration = PremiumConfiguration.with(appConfiguration: context.currentAppConfiguration.with { $0 })
         let isPremiumDisabled = premiumConfiguration.isPremiumDisabled
@@ -1783,9 +1774,7 @@ public extension EmojiPagerContentComponent {
                         if item.file.isAnimatedSticker {
                             type = .lottie
                         } else if item.file.isVideoEmoji || item.file.isVideoSticker {
-                            type = .video(isVP9: true)
-                        } else if item.file.isVideo {
-                            type = .video(isVP9: false)
+                            type = .video
                         } else {
                             type = .still
                         }
@@ -2022,9 +2011,7 @@ public extension EmojiPagerContentComponent {
                                 if item.file.isAnimatedSticker {
                                     type = .lottie
                                 } else if item.file.isVideoEmoji || item.file.isVideoSticker {
-                                    type = .video(isVP9: true)
-                                } else if item.file.isVideo {
-                                    type = .video(isVP9: false)
+                                    type = .video
                                 } else {
                                     type = .still
                                 }
@@ -2103,9 +2090,7 @@ public extension EmojiPagerContentComponent {
                             if item.file.isAnimatedSticker {
                                 type = .lottie
                             } else if item.file.isVideoEmoji || item.file.isVideoSticker {
-                                type = .video(isVP9: true)
-                            } else if item.file.isVideo {
-                                type = .video(isVP9: false)
+                                type = .video
                             } else {
                                 type = .still
                             }
@@ -2181,7 +2166,6 @@ public extension EmojiPagerContentComponent {
                 searchState: .empty(hasResults: false),
                 warpContentsOnEdges: warpContentsOnEdges,
                 hideBackground: hideBackground,
-                maskEdge: maskEdge,
                 displaySearchWithPlaceholder: hasSearch ? strings.StickersSearch_SearchStickersPlaceholder : nil,
                 searchCategories: searchCategories,
                 searchInitiallyHidden: true,
@@ -2201,8 +2185,7 @@ public extension EmojiPagerContentComponent {
         animationCache: AnimationCache,
         animationRenderer: MultiAnimationRenderer,
         hasSearch: Bool,
-        hideBackground: Bool = false,
-        maskEdge: EmojiPagerContentComponent.MaskEdgeMode = .none
+        hideBackground: Bool = false
     ) -> Signal<EmojiPagerContentComponent, NoError> {
         let premiumConfiguration = PremiumConfiguration.with(appConfiguration: context.currentAppConfiguration.with { $0 })
         let isPremiumDisabled = premiumConfiguration.isPremiumDisabled
@@ -2251,7 +2234,7 @@ public extension EmojiPagerContentComponent {
                             continue
                         }
                         
-                        let itemFile = item.effectSticker
+                        let itemFile: TelegramMediaFile = item.effectSticker
                         
                         var tintMode: Item.TintMode = .none
                         if itemFile.isCustomTemplateEmoji {
@@ -2275,11 +2258,11 @@ public extension EmojiPagerContentComponent {
                             }
                         }
                         
-                        let animationData = EntityKeyboardAnimationData(file: itemFile, partialReference: .none)
+                        let animationData = EntityKeyboardAnimationData(file: TelegramMediaFile.Accessor(itemFile), partialReference: .none)
                         let resultItem = EmojiPagerContentComponent.Item(
                             animationData: animationData,
                             content: .animation(animationData),
-                            itemFile: itemFile,
+                            itemFile: TelegramMediaFile.Accessor(itemFile),
                             subgroupId: nil,
                             icon: icon,
                             tintMode: tintMode
@@ -2335,7 +2318,6 @@ public extension EmojiPagerContentComponent {
                 searchState: .empty(hasResults: false),
                 warpContentsOnEdges: warpContentsOnEdges,
                 hideBackground: hideBackground,
-                maskEdge: maskEdge,
                 displaySearchWithPlaceholder: hasSearch ? strings.StickersSearch_SearchStickersPlaceholder : nil,
                 searchCategories: searchCategories,
                 searchInitiallyHidden: true,

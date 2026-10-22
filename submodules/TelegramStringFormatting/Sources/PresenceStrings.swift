@@ -1,7 +1,6 @@
 import Foundation
 import TelegramCore
 import TelegramPresentationData
-import TextFormat
 
 public func stringForTimestamp(day: Int32, month: Int32, year: Int32, dateTimeFormat: PresentationDateTimeFormat) -> String {
     let separator = dateTimeFormat.dateSeparator
@@ -671,15 +670,4 @@ public func stringForIntervalSinceUpdateAction(strings: PresentationStrings, val
     } else {
         return strings.Chat_NonContactUser_UpdatedDays(Int32(round(Float(value) / (24 * 60 * 60))))
     }
-}
-
-public func stringForGiftUpgradeTimestamp(strings: PresentationStrings, dateTimeFormat: PresentationDateTimeFormat, timestamp: Int32) -> String {
-    var t: time_t = time_t(timestamp)
-    var timeinfo: tm = tm()
-    localtime_r(&t, &timeinfo)
-
-    let time = stringForShortTimestamp(hours: timeinfo.tm_hour, minutes: timeinfo.tm_min, dateTimeFormat: dateTimeFormat)
-    let date = strings.Date_ChatDateHeader(monthAtIndex(Int(timeinfo.tm_mon), strings: strings), "\(timeinfo.tm_mday)").string
-    
-    return "\(time), \(date)"
 }

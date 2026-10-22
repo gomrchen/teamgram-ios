@@ -51,8 +51,7 @@ internal func _internal_updateIsPremiumRequiredToContact(account: Account, peerI
                                 flags.insert(.premiumRequired)
                                 sendPaidMessageStars = nil
                                 requirements[peerId] = .premium
-                            case let .requirementToContactPaidMessages(requirementToContactPaidMessagesData):
-                                let starsAmount = requirementToContactPaidMessagesData.starsAmount
+                            case let .requirementToContactPaidMessages(starsAmount):
                                 flags.remove(.premiumRequired)
                                 sendPaidMessageStars = StarsAmount(value: starsAmount, nanos: 0)
                                 requirements[peerId] = .stars(StarsAmount(value: starsAmount, nanos: 0))

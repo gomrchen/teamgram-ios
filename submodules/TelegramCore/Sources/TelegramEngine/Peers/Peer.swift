@@ -112,6 +112,7 @@ public enum EnginePeer: Equatable {
             public static let canBlock = Flags(rawValue: 1 << 3)
             public static let canAddContact = Flags(rawValue: 1 << 4)
             public static let addExceptionWhenAddingContact = Flags(rawValue: 1 << 5)
+            public static let canReportIrrelevantGeoLocation = Flags(rawValue: 1 << 6)
             public static let autoArchived = Flags(rawValue: 1 << 7)
             public static let suggestAddMembers = Flags(rawValue: 1 << 8)
 
@@ -531,7 +532,7 @@ public extension EnginePeer {
         return false
     }
     
-    var nameColor: PeerColor? {
+    var nameColor: PeerNameColor? {
         return self._asPeer().nameColor
     }
     
@@ -541,10 +542,6 @@ public extension EnginePeer {
     
     var profileColor: PeerNameColor? {
         return self._asPeer().profileColor
-    }
-    
-    var effectiveProfileColor: PeerNameColor? {
-        return self._asPeer().effectiveProfileColor
     }
     
     var emojiStatus: PeerEmojiStatus? {
@@ -633,14 +630,6 @@ public final class EngineRenderedPeer: Equatable {
             }
         } else {
             return nil
-        }
-    }
-    
-    public var chatOrMonoforumMainPeer: EnginePeer? {
-        if case let .channel(channel) = self.peer, channel.flags.contains(.isMonoforum), let linkedMonoforumId = channel.linkedMonoforumId {
-            return self.peers[linkedMonoforumId]
-        } else {
-            return self.chatMainPeer
         }
     }
 }

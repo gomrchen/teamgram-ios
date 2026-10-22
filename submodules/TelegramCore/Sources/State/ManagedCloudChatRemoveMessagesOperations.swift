@@ -205,8 +205,7 @@ private func removeMessages(postbox: Postbox, network: Network, stateManager: Ac
                 |> mapToSignal { result -> Signal<Void, NoError> in
                     if let result = result {
                         switch result {
-                        case let .affectedMessages(affectedMessagesData):
-                            let (pts, ptsCount) = (affectedMessagesData.pts, affectedMessagesData.ptsCount)
+                        case let .affectedMessages(pts, ptsCount):
                             stateManager.addUpdateGroups([.updateChannelPts(channelId: peer.id.id._internalGetInt64Value(), pts: pts, ptsCount: ptsCount)])
                         }
                     }
@@ -241,14 +240,13 @@ private func removeMessages(postbox: Postbox, network: Network, stateManager: Ac
                 |> mapToSignal { result -> Signal<Void, NoError> in
                     if let result = result {
                         switch result {
-                        case let .affectedMessages(affectedMessagesData):
-                            let (pts, ptsCount) = (affectedMessagesData.pts, affectedMessagesData.ptsCount)
+                        case let .affectedMessages(pts, ptsCount):
                             stateManager.addUpdateGroups([.updatePts(pts: pts, ptsCount: ptsCount)])
                         }
                     }
                     return .complete()
             }
-
+            
             signal = signal
             |> then(partSignal)
         }
@@ -398,8 +396,7 @@ private func requestClearHistory(postbox: Postbox, network: Network, stateManage
     |> mapToSignal { result -> Signal<Void, Bool> in
         if let result = result {
             switch result {
-                case let .affectedHistory(affectedHistoryData):
-                    let (pts, ptsCount, offset) = (affectedHistoryData.pts, affectedHistoryData.ptsCount, affectedHistoryData.offset)
+                case let .affectedHistory(pts, ptsCount, offset):
                     stateManager.addUpdateGroups([.updatePts(pts: pts, ptsCount: ptsCount)])
                     if offset == 0 {
                         return .fail(true)
@@ -456,7 +453,7 @@ private func _internal_clearHistory(transaction: Transaction, postbox: Postbox, 
                     flags |= 1 << 3
                     updatedMaxId = 0
                 }
-                let signal = network.request(Api.functions.messages.deleteSavedHistory(flags: flags, parentPeer: nil, peer: inputSubPeer, maxId: updatedMaxId, minDate: operation.minTimestamp, maxDate: operation.maxTimestamp))
+                let signal = network.request(Api.functions.messages.deleteSavedHistory(flags: flags, peer: inputSubPeer, maxId: updatedMaxId, minDate: operation.minTimestamp, maxDate: operation.maxTimestamp))
                 |> map { result -> Api.messages.AffectedHistory? in
                     return result
                 }
@@ -466,8 +463,7 @@ private func _internal_clearHistory(transaction: Transaction, postbox: Postbox, 
                 |> mapToSignal { result -> Signal<Void, Bool> in
                     if let result = result {
                         switch result {
-                        case let .affectedHistory(affectedHistoryData):
-                            let (pts, ptsCount, offset) = (affectedHistoryData.pts, affectedHistoryData.ptsCount, affectedHistoryData.offset)
+                        case let .affectedHistory(pts, ptsCount, offset):
                             stateManager.addUpdateGroups([.updatePts(pts: pts, ptsCount: ptsCount)])
                             if offset == 0 {
                                 return .fail(true)
@@ -483,27 +479,6 @@ private func _internal_clearHistory(transaction: Transaction, postbox: Postbox, 
                 |> `catch` { _ -> Signal<Void, NoError> in
                     return .complete()
                 }
-            } else if let threadId = operation.threadId {
-                guard let inputPeer = apiInputPeer(peer) else {
-                    return .complete()
-                }
-                return network.request(Api.functions.messages.deleteTopicHistory(peer: inputPeer, topMsgId: Int32(clamping: threadId)))
-                |> map(Optional.init)
-                |> `catch` { _ -> Signal<Api.messages.AffectedHistory?, NoError> in
-                    return .single(nil)
-                }
-                |> mapToSignal { result -> Signal<Void, NoError> in
-                    if let result = result {
-                        switch result {
-                        case let .affectedHistory(affectedHistoryData):
-                            let (pts, ptsCount) = (affectedHistoryData.pts, affectedHistoryData.ptsCount)
-                            stateManager.addUpdateGroups([.updatePts(pts: pts, ptsCount: ptsCount)])
-                            return .complete()
-                        }
-                    } else {
-                        return .complete()
-                    }
-                }
             } else {
                 return requestClearHistory(postbox: postbox, network: network, stateManager: stateManager, inputPeer: inputPeer, maxId: operation.topMessageId.id, justClear: true, minTimestamp: operation.minTimestamp, maxTimestamp: operation.maxTimestamp, type: operation.type)
             }
@@ -515,66 +490,15 @@ private func _internal_clearHistory(transaction: Transaction, postbox: Postbox, 
             return .complete()
         } else {
             if let threadId = operation.threadId {
-                if peer.isMonoForum {
-                    guard let inputPeer = apiInputPeer(peer) else {
-                        return .complete()
+                return network.request(Api.functions.channels.deleteTopicHistory(channel: inputChannel, topMsgId: Int32(clamping: threadId)))
+                |> map(Optional.init)
+                |> `catch` { _ -> Signal<Api.messages.AffectedHistory?, NoError> in
+                    return .single(nil)
+                }
+                |> mapToSignal { result -> Signal<Void, NoError> in
+                    if let _ = result {
                     }
-                    guard let inputSubPeer = transaction.getPeer(PeerId(threadId)).flatMap(apiInputPeer) else {
-                        return .complete()
-                    }
-                    
-                    var flags: Int32 = 0
-                    var updatedMaxId = operation.topMessageId.id
-                    if operation.minTimestamp != nil {
-                        flags |= 1 << 2
-                        updatedMaxId = 0
-                    }
-                    if operation.maxTimestamp != nil {
-                        flags |= 1 << 3
-                        updatedMaxId = 0
-                    }
-                    flags |= 1 << 0
-                    let signal = network.request(Api.functions.messages.deleteSavedHistory(flags: flags, parentPeer: inputPeer, peer: inputSubPeer, maxId: updatedMaxId, minDate: operation.minTimestamp, maxDate: operation.maxTimestamp))
-                    |> map { result -> Api.messages.AffectedHistory? in
-                        return result
-                    }
-                    |> `catch` { _ -> Signal<Api.messages.AffectedHistory?, Bool> in
-                        return .single(nil)
-                    }
-                    |> mapToSignal { result -> Signal<Void, Bool> in
-                        if let result = result {
-                            switch result {
-                            case let .affectedHistory(affectedHistoryData):
-                                let (pts, ptsCount, offset) = (affectedHistoryData.pts, affectedHistoryData.ptsCount, affectedHistoryData.offset)
-                                stateManager.addUpdateGroups([.updatePts(pts: pts, ptsCount: ptsCount)])
-                                if offset == 0 {
-                                    return .fail(true)
-                                } else {
-                                    return .complete()
-                                }
-                            }
-                        } else {
-                            return .fail(true)
-                        }
-                    }
-                    return (signal |> restart)
-                    |> `catch` { _ -> Signal<Void, NoError> in
-                        return .complete()
-                    }
-                } else {
-                    guard let inputPeer = apiInputPeer(peer) else {
-                        return .complete()
-                    }
-                    return network.request(Api.functions.messages.deleteTopicHistory(peer: inputPeer, topMsgId: Int32(clamping: threadId)))
-                    |> map(Optional.init)
-                    |> `catch` { _ -> Signal<Api.messages.AffectedHistory?, NoError> in
-                        return .single(nil)
-                    }
-                    |> mapToSignal { result -> Signal<Void, NoError> in
-                        if let _ = result {
-                        }
-                        return .complete()
-                    }
+                    return .complete()
                 }
             } else {
                 var flags: Int32 = 0

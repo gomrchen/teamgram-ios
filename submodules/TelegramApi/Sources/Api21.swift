@@ -1,168 +1,140 @@
 public extension Api {
     enum PrivacyRule: TypeConstructorDescription {
-        public class Cons_privacyValueAllowChatParticipants: TypeConstructorDescription {
-            public var chats: [Int64]
-            public init(chats: [Int64]) {
-                self.chats = chats
-            }
-            public func descriptionFields() -> (String, [(String, Any)]) {
-                return ("privacyValueAllowChatParticipants", [("chats", self.chats as Any)])
-            }
-        }
-        public class Cons_privacyValueAllowUsers: TypeConstructorDescription {
-            public var users: [Int64]
-            public init(users: [Int64]) {
-                self.users = users
-            }
-            public func descriptionFields() -> (String, [(String, Any)]) {
-                return ("privacyValueAllowUsers", [("users", self.users as Any)])
-            }
-        }
-        public class Cons_privacyValueDisallowChatParticipants: TypeConstructorDescription {
-            public var chats: [Int64]
-            public init(chats: [Int64]) {
-                self.chats = chats
-            }
-            public func descriptionFields() -> (String, [(String, Any)]) {
-                return ("privacyValueDisallowChatParticipants", [("chats", self.chats as Any)])
-            }
-        }
-        public class Cons_privacyValueDisallowUsers: TypeConstructorDescription {
-            public var users: [Int64]
-            public init(users: [Int64]) {
-                self.users = users
-            }
-            public func descriptionFields() -> (String, [(String, Any)]) {
-                return ("privacyValueDisallowUsers", [("users", self.users as Any)])
-            }
-        }
         case privacyValueAllowAll
         case privacyValueAllowBots
-        case privacyValueAllowChatParticipants(Cons_privacyValueAllowChatParticipants)
+        case privacyValueAllowChatParticipants(chats: [Int64])
         case privacyValueAllowCloseFriends
         case privacyValueAllowContacts
         case privacyValueAllowPremium
-        case privacyValueAllowUsers(Cons_privacyValueAllowUsers)
+        case privacyValueAllowUsers(users: [Int64])
         case privacyValueDisallowAll
         case privacyValueDisallowBots
-        case privacyValueDisallowChatParticipants(Cons_privacyValueDisallowChatParticipants)
+        case privacyValueDisallowChatParticipants(chats: [Int64])
         case privacyValueDisallowContacts
-        case privacyValueDisallowUsers(Cons_privacyValueDisallowUsers)
-
-        public func serialize(_ buffer: Buffer, _ boxed: Swift.Bool) {
-            switch self {
-            case .privacyValueAllowAll:
-                if boxed {
-                    buffer.appendInt32(1698855810)
-                }
-                break
-            case .privacyValueAllowBots:
-                if boxed {
-                    buffer.appendInt32(558242653)
-                }
-                break
-            case .privacyValueAllowChatParticipants(let _data):
-                if boxed {
-                    buffer.appendInt32(1796427406)
-                }
-                buffer.appendInt32(481674261)
-                buffer.appendInt32(Int32(_data.chats.count))
-                for item in _data.chats {
-                    serializeInt64(item, buffer: buffer, boxed: false)
-                }
-                break
-            case .privacyValueAllowCloseFriends:
-                if boxed {
-                    buffer.appendInt32(-135735141)
-                }
-                break
-            case .privacyValueAllowContacts:
-                if boxed {
-                    buffer.appendInt32(-123988)
-                }
-                break
-            case .privacyValueAllowPremium:
-                if boxed {
-                    buffer.appendInt32(-320241333)
-                }
-                break
-            case .privacyValueAllowUsers(let _data):
-                if boxed {
-                    buffer.appendInt32(-1198497870)
-                }
-                buffer.appendInt32(481674261)
-                buffer.appendInt32(Int32(_data.users.count))
-                for item in _data.users {
-                    serializeInt64(item, buffer: buffer, boxed: false)
-                }
-                break
-            case .privacyValueDisallowAll:
-                if boxed {
-                    buffer.appendInt32(-1955338397)
-                }
-                break
-            case .privacyValueDisallowBots:
-                if boxed {
-                    buffer.appendInt32(-156895185)
-                }
-                break
-            case .privacyValueDisallowChatParticipants(let _data):
-                if boxed {
-                    buffer.appendInt32(1103656293)
-                }
-                buffer.appendInt32(481674261)
-                buffer.appendInt32(Int32(_data.chats.count))
-                for item in _data.chats {
-                    serializeInt64(item, buffer: buffer, boxed: false)
-                }
-                break
-            case .privacyValueDisallowContacts:
-                if boxed {
-                    buffer.appendInt32(-125240806)
-                }
-                break
-            case .privacyValueDisallowUsers(let _data):
-                if boxed {
-                    buffer.appendInt32(-463335103)
-                }
-                buffer.appendInt32(481674261)
-                buffer.appendInt32(Int32(_data.users.count))
-                for item in _data.users {
-                    serializeInt64(item, buffer: buffer, boxed: false)
-                }
-                break
-            }
-        }
-
-        public func descriptionFields() -> (String, [(String, Any)]) {
-            switch self {
-            case .privacyValueAllowAll:
+        case privacyValueDisallowUsers(users: [Int64])
+    
+    public func serialize(_ buffer: Buffer, _ boxed: Swift.Bool) {
+    switch self {
+                case .privacyValueAllowAll:
+                    if boxed {
+                        buffer.appendInt32(1698855810)
+                    }
+                    
+                    break
+                case .privacyValueAllowBots:
+                    if boxed {
+                        buffer.appendInt32(558242653)
+                    }
+                    
+                    break
+                case .privacyValueAllowChatParticipants(let chats):
+                    if boxed {
+                        buffer.appendInt32(1796427406)
+                    }
+                    buffer.appendInt32(481674261)
+                    buffer.appendInt32(Int32(chats.count))
+                    for item in chats {
+                        serializeInt64(item, buffer: buffer, boxed: false)
+                    }
+                    break
+                case .privacyValueAllowCloseFriends:
+                    if boxed {
+                        buffer.appendInt32(-135735141)
+                    }
+                    
+                    break
+                case .privacyValueAllowContacts:
+                    if boxed {
+                        buffer.appendInt32(-123988)
+                    }
+                    
+                    break
+                case .privacyValueAllowPremium:
+                    if boxed {
+                        buffer.appendInt32(-320241333)
+                    }
+                    
+                    break
+                case .privacyValueAllowUsers(let users):
+                    if boxed {
+                        buffer.appendInt32(-1198497870)
+                    }
+                    buffer.appendInt32(481674261)
+                    buffer.appendInt32(Int32(users.count))
+                    for item in users {
+                        serializeInt64(item, buffer: buffer, boxed: false)
+                    }
+                    break
+                case .privacyValueDisallowAll:
+                    if boxed {
+                        buffer.appendInt32(-1955338397)
+                    }
+                    
+                    break
+                case .privacyValueDisallowBots:
+                    if boxed {
+                        buffer.appendInt32(-156895185)
+                    }
+                    
+                    break
+                case .privacyValueDisallowChatParticipants(let chats):
+                    if boxed {
+                        buffer.appendInt32(1103656293)
+                    }
+                    buffer.appendInt32(481674261)
+                    buffer.appendInt32(Int32(chats.count))
+                    for item in chats {
+                        serializeInt64(item, buffer: buffer, boxed: false)
+                    }
+                    break
+                case .privacyValueDisallowContacts:
+                    if boxed {
+                        buffer.appendInt32(-125240806)
+                    }
+                    
+                    break
+                case .privacyValueDisallowUsers(let users):
+                    if boxed {
+                        buffer.appendInt32(-463335103)
+                    }
+                    buffer.appendInt32(481674261)
+                    buffer.appendInt32(Int32(users.count))
+                    for item in users {
+                        serializeInt64(item, buffer: buffer, boxed: false)
+                    }
+                    break
+    }
+    }
+    
+    public func descriptionFields() -> (String, [(String, Any)]) {
+        switch self {
+                case .privacyValueAllowAll:
                 return ("privacyValueAllowAll", [])
-            case .privacyValueAllowBots:
+                case .privacyValueAllowBots:
                 return ("privacyValueAllowBots", [])
-            case .privacyValueAllowChatParticipants(let _data):
-                return ("privacyValueAllowChatParticipants", [("chats", _data.chats as Any)])
-            case .privacyValueAllowCloseFriends:
+                case .privacyValueAllowChatParticipants(let chats):
+                return ("privacyValueAllowChatParticipants", [("chats", chats as Any)])
+                case .privacyValueAllowCloseFriends:
                 return ("privacyValueAllowCloseFriends", [])
-            case .privacyValueAllowContacts:
+                case .privacyValueAllowContacts:
                 return ("privacyValueAllowContacts", [])
-            case .privacyValueAllowPremium:
+                case .privacyValueAllowPremium:
                 return ("privacyValueAllowPremium", [])
-            case .privacyValueAllowUsers(let _data):
-                return ("privacyValueAllowUsers", [("users", _data.users as Any)])
-            case .privacyValueDisallowAll:
+                case .privacyValueAllowUsers(let users):
+                return ("privacyValueAllowUsers", [("users", users as Any)])
+                case .privacyValueDisallowAll:
                 return ("privacyValueDisallowAll", [])
-            case .privacyValueDisallowBots:
+                case .privacyValueDisallowBots:
                 return ("privacyValueDisallowBots", [])
-            case .privacyValueDisallowChatParticipants(let _data):
-                return ("privacyValueDisallowChatParticipants", [("chats", _data.chats as Any)])
-            case .privacyValueDisallowContacts:
+                case .privacyValueDisallowChatParticipants(let chats):
+                return ("privacyValueDisallowChatParticipants", [("chats", chats as Any)])
+                case .privacyValueDisallowContacts:
                 return ("privacyValueDisallowContacts", [])
-            case .privacyValueDisallowUsers(let _data):
-                return ("privacyValueDisallowUsers", [("users", _data.users as Any)])
-            }
-        }
-
+                case .privacyValueDisallowUsers(let users):
+                return ("privacyValueDisallowUsers", [("users", users as Any)])
+    }
+    }
+    
         public static func parse_privacyValueAllowAll(_ reader: BufferReader) -> PrivacyRule? {
             return Api.PrivacyRule.privacyValueAllowAll
         }
@@ -176,7 +148,7 @@ public extension Api {
             }
             let _c1 = _1 != nil
             if _c1 {
-                return Api.PrivacyRule.privacyValueAllowChatParticipants(Cons_privacyValueAllowChatParticipants(chats: _1!))
+                return Api.PrivacyRule.privacyValueAllowChatParticipants(chats: _1!)
             }
             else {
                 return nil
@@ -198,7 +170,7 @@ public extension Api {
             }
             let _c1 = _1 != nil
             if _c1 {
-                return Api.PrivacyRule.privacyValueAllowUsers(Cons_privacyValueAllowUsers(users: _1!))
+                return Api.PrivacyRule.privacyValueAllowUsers(users: _1!)
             }
             else {
                 return nil
@@ -217,7 +189,7 @@ public extension Api {
             }
             let _c1 = _1 != nil
             if _c1 {
-                return Api.PrivacyRule.privacyValueDisallowChatParticipants(Cons_privacyValueDisallowChatParticipants(chats: _1!))
+                return Api.PrivacyRule.privacyValueDisallowChatParticipants(chats: _1!)
             }
             else {
                 return nil
@@ -233,169 +205,47 @@ public extension Api {
             }
             let _c1 = _1 != nil
             if _c1 {
-                return Api.PrivacyRule.privacyValueDisallowUsers(Cons_privacyValueDisallowUsers(users: _1!))
+                return Api.PrivacyRule.privacyValueDisallowUsers(users: _1!)
             }
             else {
                 return nil
             }
         }
-    }
-}
-public extension Api {
-    enum ProfileTab: TypeConstructorDescription {
-        case profileTabFiles
-        case profileTabGifs
-        case profileTabGifts
-        case profileTabLinks
-        case profileTabMedia
-        case profileTabMusic
-        case profileTabPosts
-        case profileTabVoice
-
-        public func serialize(_ buffer: Buffer, _ boxed: Swift.Bool) {
-            switch self {
-            case .profileTabFiles:
-                if boxed {
-                    buffer.appendInt32(-1422681088)
-                }
-                break
-            case .profileTabGifs:
-                if boxed {
-                    buffer.appendInt32(-1564412267)
-                }
-                break
-            case .profileTabGifts:
-                if boxed {
-                    buffer.appendInt32(1296815210)
-                }
-                break
-            case .profileTabLinks:
-                if boxed {
-                    buffer.appendInt32(-748329831)
-                }
-                break
-            case .profileTabMedia:
-                if boxed {
-                    buffer.appendInt32(1925597525)
-                }
-                break
-            case .profileTabMusic:
-                if boxed {
-                    buffer.appendInt32(-1624780178)
-                }
-                break
-            case .profileTabPosts:
-                if boxed {
-                    buffer.appendInt32(-1181952362)
-                }
-                break
-            case .profileTabVoice:
-                if boxed {
-                    buffer.appendInt32(-461960914)
-                }
-                break
-            }
-        }
-
-        public func descriptionFields() -> (String, [(String, Any)]) {
-            switch self {
-            case .profileTabFiles:
-                return ("profileTabFiles", [])
-            case .profileTabGifs:
-                return ("profileTabGifs", [])
-            case .profileTabGifts:
-                return ("profileTabGifts", [])
-            case .profileTabLinks:
-                return ("profileTabLinks", [])
-            case .profileTabMedia:
-                return ("profileTabMedia", [])
-            case .profileTabMusic:
-                return ("profileTabMusic", [])
-            case .profileTabPosts:
-                return ("profileTabPosts", [])
-            case .profileTabVoice:
-                return ("profileTabVoice", [])
-            }
-        }
-
-        public static func parse_profileTabFiles(_ reader: BufferReader) -> ProfileTab? {
-            return Api.ProfileTab.profileTabFiles
-        }
-        public static func parse_profileTabGifs(_ reader: BufferReader) -> ProfileTab? {
-            return Api.ProfileTab.profileTabGifs
-        }
-        public static func parse_profileTabGifts(_ reader: BufferReader) -> ProfileTab? {
-            return Api.ProfileTab.profileTabGifts
-        }
-        public static func parse_profileTabLinks(_ reader: BufferReader) -> ProfileTab? {
-            return Api.ProfileTab.profileTabLinks
-        }
-        public static func parse_profileTabMedia(_ reader: BufferReader) -> ProfileTab? {
-            return Api.ProfileTab.profileTabMedia
-        }
-        public static func parse_profileTabMusic(_ reader: BufferReader) -> ProfileTab? {
-            return Api.ProfileTab.profileTabMusic
-        }
-        public static func parse_profileTabPosts(_ reader: BufferReader) -> ProfileTab? {
-            return Api.ProfileTab.profileTabPosts
-        }
-        public static func parse_profileTabVoice(_ reader: BufferReader) -> ProfileTab? {
-            return Api.ProfileTab.profileTabVoice
-        }
+    
     }
 }
 public extension Api {
     indirect enum PublicForward: TypeConstructorDescription {
-        public class Cons_publicForwardMessage: TypeConstructorDescription {
-            public var message: Api.Message
-            public init(message: Api.Message) {
-                self.message = message
-            }
-            public func descriptionFields() -> (String, [(String, Any)]) {
-                return ("publicForwardMessage", [("message", self.message as Any)])
-            }
-        }
-        public class Cons_publicForwardStory: TypeConstructorDescription {
-            public var peer: Api.Peer
-            public var story: Api.StoryItem
-            public init(peer: Api.Peer, story: Api.StoryItem) {
-                self.peer = peer
-                self.story = story
-            }
-            public func descriptionFields() -> (String, [(String, Any)]) {
-                return ("publicForwardStory", [("peer", self.peer as Any), ("story", self.story as Any)])
-            }
-        }
-        case publicForwardMessage(Cons_publicForwardMessage)
-        case publicForwardStory(Cons_publicForwardStory)
-
-        public func serialize(_ buffer: Buffer, _ boxed: Swift.Bool) {
-            switch self {
-            case .publicForwardMessage(let _data):
-                if boxed {
-                    buffer.appendInt32(32685898)
-                }
-                _data.message.serialize(buffer, true)
-                break
-            case .publicForwardStory(let _data):
-                if boxed {
-                    buffer.appendInt32(-302797360)
-                }
-                _data.peer.serialize(buffer, true)
-                _data.story.serialize(buffer, true)
-                break
-            }
-        }
-
-        public func descriptionFields() -> (String, [(String, Any)]) {
-            switch self {
-            case .publicForwardMessage(let _data):
-                return ("publicForwardMessage", [("message", _data.message as Any)])
-            case .publicForwardStory(let _data):
-                return ("publicForwardStory", [("peer", _data.peer as Any), ("story", _data.story as Any)])
-            }
-        }
-
+        case publicForwardMessage(message: Api.Message)
+        case publicForwardStory(peer: Api.Peer, story: Api.StoryItem)
+    
+    public func serialize(_ buffer: Buffer, _ boxed: Swift.Bool) {
+    switch self {
+                case .publicForwardMessage(let message):
+                    if boxed {
+                        buffer.appendInt32(32685898)
+                    }
+                    message.serialize(buffer, true)
+                    break
+                case .publicForwardStory(let peer, let story):
+                    if boxed {
+                        buffer.appendInt32(-302797360)
+                    }
+                    peer.serialize(buffer, true)
+                    story.serialize(buffer, true)
+                    break
+    }
+    }
+    
+    public func descriptionFields() -> (String, [(String, Any)]) {
+        switch self {
+                case .publicForwardMessage(let message):
+                return ("publicForwardMessage", [("message", message as Any)])
+                case .publicForwardStory(let peer, let story):
+                return ("publicForwardStory", [("peer", peer as Any), ("story", story as Any)])
+    }
+    }
+    
         public static func parse_publicForwardMessage(_ reader: BufferReader) -> PublicForward? {
             var _1: Api.Message?
             if let signature = reader.readInt32() {
@@ -403,7 +253,7 @@ public extension Api {
             }
             let _c1 = _1 != nil
             if _c1 {
-                return Api.PublicForward.publicForwardMessage(Cons_publicForwardMessage(message: _1!))
+                return Api.PublicForward.publicForwardMessage(message: _1!)
             }
             else {
                 return nil
@@ -421,54 +271,40 @@ public extension Api {
             let _c1 = _1 != nil
             let _c2 = _2 != nil
             if _c1 && _c2 {
-                return Api.PublicForward.publicForwardStory(Cons_publicForwardStory(peer: _1!, story: _2!))
+                return Api.PublicForward.publicForwardStory(peer: _1!, story: _2!)
             }
             else {
                 return nil
             }
         }
+    
     }
 }
 public extension Api {
     enum QuickReply: TypeConstructorDescription {
-        public class Cons_quickReply: TypeConstructorDescription {
-            public var shortcutId: Int32
-            public var shortcut: String
-            public var topMessage: Int32
-            public var count: Int32
-            public init(shortcutId: Int32, shortcut: String, topMessage: Int32, count: Int32) {
-                self.shortcutId = shortcutId
-                self.shortcut = shortcut
-                self.topMessage = topMessage
-                self.count = count
-            }
-            public func descriptionFields() -> (String, [(String, Any)]) {
-                return ("quickReply", [("shortcutId", self.shortcutId as Any), ("shortcut", self.shortcut as Any), ("topMessage", self.topMessage as Any), ("count", self.count as Any)])
-            }
-        }
-        case quickReply(Cons_quickReply)
-
-        public func serialize(_ buffer: Buffer, _ boxed: Swift.Bool) {
-            switch self {
-            case .quickReply(let _data):
-                if boxed {
-                    buffer.appendInt32(110563371)
-                }
-                serializeInt32(_data.shortcutId, buffer: buffer, boxed: false)
-                serializeString(_data.shortcut, buffer: buffer, boxed: false)
-                serializeInt32(_data.topMessage, buffer: buffer, boxed: false)
-                serializeInt32(_data.count, buffer: buffer, boxed: false)
-                break
-            }
-        }
-
-        public func descriptionFields() -> (String, [(String, Any)]) {
-            switch self {
-            case .quickReply(let _data):
-                return ("quickReply", [("shortcutId", _data.shortcutId as Any), ("shortcut", _data.shortcut as Any), ("topMessage", _data.topMessage as Any), ("count", _data.count as Any)])
-            }
-        }
-
+        case quickReply(shortcutId: Int32, shortcut: String, topMessage: Int32, count: Int32)
+    
+    public func serialize(_ buffer: Buffer, _ boxed: Swift.Bool) {
+    switch self {
+                case .quickReply(let shortcutId, let shortcut, let topMessage, let count):
+                    if boxed {
+                        buffer.appendInt32(110563371)
+                    }
+                    serializeInt32(shortcutId, buffer: buffer, boxed: false)
+                    serializeString(shortcut, buffer: buffer, boxed: false)
+                    serializeInt32(topMessage, buffer: buffer, boxed: false)
+                    serializeInt32(count, buffer: buffer, boxed: false)
+                    break
+    }
+    }
+    
+    public func descriptionFields() -> (String, [(String, Any)]) {
+        switch self {
+                case .quickReply(let shortcutId, let shortcut, let topMessage, let count):
+                return ("quickReply", [("shortcutId", shortcutId as Any), ("shortcut", shortcut as Any), ("topMessage", topMessage as Any), ("count", count as Any)])
+    }
+    }
+    
         public static func parse_quickReply(_ reader: BufferReader) -> QuickReply? {
             var _1: Int32?
             _1 = reader.readInt32()
@@ -483,85 +319,70 @@ public extension Api {
             let _c3 = _3 != nil
             let _c4 = _4 != nil
             if _c1 && _c2 && _c3 && _c4 {
-                return Api.QuickReply.quickReply(Cons_quickReply(shortcutId: _1!, shortcut: _2!, topMessage: _3!, count: _4!))
+                return Api.QuickReply.quickReply(shortcutId: _1!, shortcut: _2!, topMessage: _3!, count: _4!)
             }
             else {
                 return nil
             }
         }
+    
     }
 }
 public extension Api {
     enum Reaction: TypeConstructorDescription {
-        public class Cons_reactionCustomEmoji: TypeConstructorDescription {
-            public var documentId: Int64
-            public init(documentId: Int64) {
-                self.documentId = documentId
-            }
-            public func descriptionFields() -> (String, [(String, Any)]) {
-                return ("reactionCustomEmoji", [("documentId", self.documentId as Any)])
-            }
-        }
-        public class Cons_reactionEmoji: TypeConstructorDescription {
-            public var emoticon: String
-            public init(emoticon: String) {
-                self.emoticon = emoticon
-            }
-            public func descriptionFields() -> (String, [(String, Any)]) {
-                return ("reactionEmoji", [("emoticon", self.emoticon as Any)])
-            }
-        }
-        case reactionCustomEmoji(Cons_reactionCustomEmoji)
-        case reactionEmoji(Cons_reactionEmoji)
+        case reactionCustomEmoji(documentId: Int64)
+        case reactionEmoji(emoticon: String)
         case reactionEmpty
         case reactionPaid
-
-        public func serialize(_ buffer: Buffer, _ boxed: Swift.Bool) {
-            switch self {
-            case .reactionCustomEmoji(let _data):
-                if boxed {
-                    buffer.appendInt32(-1992950669)
-                }
-                serializeInt64(_data.documentId, buffer: buffer, boxed: false)
-                break
-            case .reactionEmoji(let _data):
-                if boxed {
-                    buffer.appendInt32(455247544)
-                }
-                serializeString(_data.emoticon, buffer: buffer, boxed: false)
-                break
-            case .reactionEmpty:
-                if boxed {
-                    buffer.appendInt32(2046153753)
-                }
-                break
-            case .reactionPaid:
-                if boxed {
-                    buffer.appendInt32(1379771627)
-                }
-                break
-            }
-        }
-
-        public func descriptionFields() -> (String, [(String, Any)]) {
-            switch self {
-            case .reactionCustomEmoji(let _data):
-                return ("reactionCustomEmoji", [("documentId", _data.documentId as Any)])
-            case .reactionEmoji(let _data):
-                return ("reactionEmoji", [("emoticon", _data.emoticon as Any)])
-            case .reactionEmpty:
+    
+    public func serialize(_ buffer: Buffer, _ boxed: Swift.Bool) {
+    switch self {
+                case .reactionCustomEmoji(let documentId):
+                    if boxed {
+                        buffer.appendInt32(-1992950669)
+                    }
+                    serializeInt64(documentId, buffer: buffer, boxed: false)
+                    break
+                case .reactionEmoji(let emoticon):
+                    if boxed {
+                        buffer.appendInt32(455247544)
+                    }
+                    serializeString(emoticon, buffer: buffer, boxed: false)
+                    break
+                case .reactionEmpty:
+                    if boxed {
+                        buffer.appendInt32(2046153753)
+                    }
+                    
+                    break
+                case .reactionPaid:
+                    if boxed {
+                        buffer.appendInt32(1379771627)
+                    }
+                    
+                    break
+    }
+    }
+    
+    public func descriptionFields() -> (String, [(String, Any)]) {
+        switch self {
+                case .reactionCustomEmoji(let documentId):
+                return ("reactionCustomEmoji", [("documentId", documentId as Any)])
+                case .reactionEmoji(let emoticon):
+                return ("reactionEmoji", [("emoticon", emoticon as Any)])
+                case .reactionEmpty:
                 return ("reactionEmpty", [])
-            case .reactionPaid:
+                case .reactionPaid:
                 return ("reactionPaid", [])
-            }
-        }
-
+    }
+    }
+    
         public static func parse_reactionCustomEmoji(_ reader: BufferReader) -> Reaction? {
             var _1: Int64?
             _1 = reader.readInt64()
             let _c1 = _1 != nil
             if _c1 {
-                return Api.Reaction.reactionCustomEmoji(Cons_reactionCustomEmoji(documentId: _1!))
+                return Api.Reaction.reactionCustomEmoji(documentId: _1!)
             }
             else {
                 return nil
@@ -572,7 +393,7 @@ public extension Api {
             _1 = parseString(reader)
             let _c1 = _1 != nil
             if _c1 {
-                return Api.Reaction.reactionEmoji(Cons_reactionEmoji(emoticon: _1!))
+                return Api.Reaction.reactionEmoji(emoticon: _1!)
             }
             else {
                 return nil
@@ -584,57 +405,39 @@ public extension Api {
         public static func parse_reactionPaid(_ reader: BufferReader) -> Reaction? {
             return Api.Reaction.reactionPaid
         }
+    
     }
 }
 public extension Api {
     enum ReactionCount: TypeConstructorDescription {
-        public class Cons_reactionCount: TypeConstructorDescription {
-            public var flags: Int32
-            public var chosenOrder: Int32?
-            public var reaction: Api.Reaction
-            public var count: Int32
-            public init(flags: Int32, chosenOrder: Int32?, reaction: Api.Reaction, count: Int32) {
-                self.flags = flags
-                self.chosenOrder = chosenOrder
-                self.reaction = reaction
-                self.count = count
-            }
-            public func descriptionFields() -> (String, [(String, Any)]) {
-                return ("reactionCount", [("flags", self.flags as Any), ("chosenOrder", self.chosenOrder as Any), ("reaction", self.reaction as Any), ("count", self.count as Any)])
-            }
-        }
-        case reactionCount(Cons_reactionCount)
-
-        public func serialize(_ buffer: Buffer, _ boxed: Swift.Bool) {
-            switch self {
-            case .reactionCount(let _data):
-                if boxed {
-                    buffer.appendInt32(-1546531968)
-                }
-                serializeInt32(_data.flags, buffer: buffer, boxed: false)
-                if Int(_data.flags) & Int(1 << 0) != 0 {
-                    serializeInt32(_data.chosenOrder!, buffer: buffer, boxed: false)
-                }
-                _data.reaction.serialize(buffer, true)
-                serializeInt32(_data.count, buffer: buffer, boxed: false)
-                break
-            }
-        }
-
-        public func descriptionFields() -> (String, [(String, Any)]) {
-            switch self {
-            case .reactionCount(let _data):
-                return ("reactionCount", [("flags", _data.flags as Any), ("chosenOrder", _data.chosenOrder as Any), ("reaction", _data.reaction as Any), ("count", _data.count as Any)])
-            }
-        }
-
+        case reactionCount(flags: Int32, chosenOrder: Int32?, reaction: Api.Reaction, count: Int32)
+    
+    public func serialize(_ buffer: Buffer, _ boxed: Swift.Bool) {
+    switch self {
+                case .reactionCount(let flags, let chosenOrder, let reaction, let count):
+                    if boxed {
+                        buffer.appendInt32(-1546531968)
+                    }
+                    serializeInt32(flags, buffer: buffer, boxed: false)
+                    if Int(flags) & Int(1 << 0) != 0 {serializeInt32(chosenOrder!, buffer: buffer, boxed: false)}
+                    reaction.serialize(buffer, true)
+                    serializeInt32(count, buffer: buffer, boxed: false)
+                    break
+    }
+    }
+    
+    public func descriptionFields() -> (String, [(String, Any)]) {
+        switch self {
+                case .reactionCount(let flags, let chosenOrder, let reaction, let count):
+                return ("reactionCount", [("flags", flags as Any), ("chosenOrder", chosenOrder as Any), ("reaction", reaction as Any), ("count", count as Any)])
+    }
+    }
+    
         public static func parse_reactionCount(_ reader: BufferReader) -> ReactionCount? {
             var _1: Int32?
             _1 = reader.readInt32()
             var _2: Int32?
-            if Int(_1!) & Int(1 << 0) != 0 {
-                _2 = reader.readInt32()
-            }
+            if Int(_1!) & Int(1 << 0) != 0 {_2 = reader.readInt32() }
             var _3: Api.Reaction?
             if let signature = reader.readInt32() {
                 _3 = Api.parse(reader, signature: signature) as? Api.Reaction
@@ -646,113 +449,92 @@ public extension Api {
             let _c3 = _3 != nil
             let _c4 = _4 != nil
             if _c1 && _c2 && _c3 && _c4 {
-                return Api.ReactionCount.reactionCount(Cons_reactionCount(flags: _1!, chosenOrder: _2, reaction: _3!, count: _4!))
+                return Api.ReactionCount.reactionCount(flags: _1!, chosenOrder: _2, reaction: _3!, count: _4!)
             }
             else {
                 return nil
             }
         }
+    
     }
 }
 public extension Api {
     enum ReactionNotificationsFrom: TypeConstructorDescription {
         case reactionNotificationsFromAll
         case reactionNotificationsFromContacts
-
-        public func serialize(_ buffer: Buffer, _ boxed: Swift.Bool) {
-            switch self {
-            case .reactionNotificationsFromAll:
-                if boxed {
-                    buffer.appendInt32(1268654752)
-                }
-                break
-            case .reactionNotificationsFromContacts:
-                if boxed {
-                    buffer.appendInt32(-1161583078)
-                }
-                break
-            }
-        }
-
-        public func descriptionFields() -> (String, [(String, Any)]) {
-            switch self {
-            case .reactionNotificationsFromAll:
+    
+    public func serialize(_ buffer: Buffer, _ boxed: Swift.Bool) {
+    switch self {
+                case .reactionNotificationsFromAll:
+                    if boxed {
+                        buffer.appendInt32(1268654752)
+                    }
+                    
+                    break
+                case .reactionNotificationsFromContacts:
+                    if boxed {
+                        buffer.appendInt32(-1161583078)
+                    }
+                    
+                    break
+    }
+    }
+    
+    public func descriptionFields() -> (String, [(String, Any)]) {
+        switch self {
+                case .reactionNotificationsFromAll:
                 return ("reactionNotificationsFromAll", [])
-            case .reactionNotificationsFromContacts:
+                case .reactionNotificationsFromContacts:
                 return ("reactionNotificationsFromContacts", [])
-            }
-        }
-
+    }
+    }
+    
         public static func parse_reactionNotificationsFromAll(_ reader: BufferReader) -> ReactionNotificationsFrom? {
             return Api.ReactionNotificationsFrom.reactionNotificationsFromAll
         }
         public static func parse_reactionNotificationsFromContacts(_ reader: BufferReader) -> ReactionNotificationsFrom? {
             return Api.ReactionNotificationsFrom.reactionNotificationsFromContacts
         }
+    
     }
 }
 public extension Api {
     enum ReactionsNotifySettings: TypeConstructorDescription {
-        public class Cons_reactionsNotifySettings: TypeConstructorDescription {
-            public var flags: Int32
-            public var messagesNotifyFrom: Api.ReactionNotificationsFrom?
-            public var storiesNotifyFrom: Api.ReactionNotificationsFrom?
-            public var sound: Api.NotificationSound
-            public var showPreviews: Api.Bool
-            public init(flags: Int32, messagesNotifyFrom: Api.ReactionNotificationsFrom?, storiesNotifyFrom: Api.ReactionNotificationsFrom?, sound: Api.NotificationSound, showPreviews: Api.Bool) {
-                self.flags = flags
-                self.messagesNotifyFrom = messagesNotifyFrom
-                self.storiesNotifyFrom = storiesNotifyFrom
-                self.sound = sound
-                self.showPreviews = showPreviews
-            }
-            public func descriptionFields() -> (String, [(String, Any)]) {
-                return ("reactionsNotifySettings", [("flags", self.flags as Any), ("messagesNotifyFrom", self.messagesNotifyFrom as Any), ("storiesNotifyFrom", self.storiesNotifyFrom as Any), ("sound", self.sound as Any), ("showPreviews", self.showPreviews as Any)])
-            }
-        }
-        case reactionsNotifySettings(Cons_reactionsNotifySettings)
-
-        public func serialize(_ buffer: Buffer, _ boxed: Swift.Bool) {
-            switch self {
-            case .reactionsNotifySettings(let _data):
-                if boxed {
-                    buffer.appendInt32(1457736048)
-                }
-                serializeInt32(_data.flags, buffer: buffer, boxed: false)
-                if Int(_data.flags) & Int(1 << 0) != 0 {
-                    _data.messagesNotifyFrom!.serialize(buffer, true)
-                }
-                if Int(_data.flags) & Int(1 << 1) != 0 {
-                    _data.storiesNotifyFrom!.serialize(buffer, true)
-                }
-                _data.sound.serialize(buffer, true)
-                _data.showPreviews.serialize(buffer, true)
-                break
-            }
-        }
-
-        public func descriptionFields() -> (String, [(String, Any)]) {
-            switch self {
-            case .reactionsNotifySettings(let _data):
-                return ("reactionsNotifySettings", [("flags", _data.flags as Any), ("messagesNotifyFrom", _data.messagesNotifyFrom as Any), ("storiesNotifyFrom", _data.storiesNotifyFrom as Any), ("sound", _data.sound as Any), ("showPreviews", _data.showPreviews as Any)])
-            }
-        }
-
+        case reactionsNotifySettings(flags: Int32, messagesNotifyFrom: Api.ReactionNotificationsFrom?, storiesNotifyFrom: Api.ReactionNotificationsFrom?, sound: Api.NotificationSound, showPreviews: Api.Bool)
+    
+    public func serialize(_ buffer: Buffer, _ boxed: Swift.Bool) {
+    switch self {
+                case .reactionsNotifySettings(let flags, let messagesNotifyFrom, let storiesNotifyFrom, let sound, let showPreviews):
+                    if boxed {
+                        buffer.appendInt32(1457736048)
+                    }
+                    serializeInt32(flags, buffer: buffer, boxed: false)
+                    if Int(flags) & Int(1 << 0) != 0 {messagesNotifyFrom!.serialize(buffer, true)}
+                    if Int(flags) & Int(1 << 1) != 0 {storiesNotifyFrom!.serialize(buffer, true)}
+                    sound.serialize(buffer, true)
+                    showPreviews.serialize(buffer, true)
+                    break
+    }
+    }
+    
+    public func descriptionFields() -> (String, [(String, Any)]) {
+        switch self {
+                case .reactionsNotifySettings(let flags, let messagesNotifyFrom, let storiesNotifyFrom, let sound, let showPreviews):
+                return ("reactionsNotifySettings", [("flags", flags as Any), ("messagesNotifyFrom", messagesNotifyFrom as Any), ("storiesNotifyFrom", storiesNotifyFrom as Any), ("sound", sound as Any), ("showPreviews", showPreviews as Any)])
+    }
+    }
+    
         public static func parse_reactionsNotifySettings(_ reader: BufferReader) -> ReactionsNotifySettings? {
             var _1: Int32?
             _1 = reader.readInt32()
             var _2: Api.ReactionNotificationsFrom?
-            if Int(_1!) & Int(1 << 0) != 0 {
-                if let signature = reader.readInt32() {
-                    _2 = Api.parse(reader, signature: signature) as? Api.ReactionNotificationsFrom
-                }
-            }
+            if Int(_1!) & Int(1 << 0) != 0 {if let signature = reader.readInt32() {
+                _2 = Api.parse(reader, signature: signature) as? Api.ReactionNotificationsFrom
+            } }
             var _3: Api.ReactionNotificationsFrom?
-            if Int(_1!) & Int(1 << 1) != 0 {
-                if let signature = reader.readInt32() {
-                    _3 = Api.parse(reader, signature: signature) as? Api.ReactionNotificationsFrom
-                }
-            }
+            if Int(_1!) & Int(1 << 1) != 0 {if let signature = reader.readInt32() {
+                _3 = Api.parse(reader, signature: signature) as? Api.ReactionNotificationsFrom
+            } }
             var _4: Api.NotificationSound?
             if let signature = reader.readInt32() {
                 _4 = Api.parse(reader, signature: signature) as? Api.NotificationSound
@@ -767,48 +549,38 @@ public extension Api {
             let _c4 = _4 != nil
             let _c5 = _5 != nil
             if _c1 && _c2 && _c3 && _c4 && _c5 {
-                return Api.ReactionsNotifySettings.reactionsNotifySettings(Cons_reactionsNotifySettings(flags: _1!, messagesNotifyFrom: _2, storiesNotifyFrom: _3, sound: _4!, showPreviews: _5!))
+                return Api.ReactionsNotifySettings.reactionsNotifySettings(flags: _1!, messagesNotifyFrom: _2, storiesNotifyFrom: _3, sound: _4!, showPreviews: _5!)
             }
             else {
                 return nil
             }
         }
+    
     }
 }
 public extension Api {
     enum ReadParticipantDate: TypeConstructorDescription {
-        public class Cons_readParticipantDate: TypeConstructorDescription {
-            public var userId: Int64
-            public var date: Int32
-            public init(userId: Int64, date: Int32) {
-                self.userId = userId
-                self.date = date
-            }
-            public func descriptionFields() -> (String, [(String, Any)]) {
-                return ("readParticipantDate", [("userId", self.userId as Any), ("date", self.date as Any)])
-            }
-        }
-        case readParticipantDate(Cons_readParticipantDate)
-
-        public func serialize(_ buffer: Buffer, _ boxed: Swift.Bool) {
-            switch self {
-            case .readParticipantDate(let _data):
-                if boxed {
-                    buffer.appendInt32(1246753138)
-                }
-                serializeInt64(_data.userId, buffer: buffer, boxed: false)
-                serializeInt32(_data.date, buffer: buffer, boxed: false)
-                break
-            }
-        }
-
-        public func descriptionFields() -> (String, [(String, Any)]) {
-            switch self {
-            case .readParticipantDate(let _data):
-                return ("readParticipantDate", [("userId", _data.userId as Any), ("date", _data.date as Any)])
-            }
-        }
-
+        case readParticipantDate(userId: Int64, date: Int32)
+    
+    public func serialize(_ buffer: Buffer, _ boxed: Swift.Bool) {
+    switch self {
+                case .readParticipantDate(let userId, let date):
+                    if boxed {
+                        buffer.appendInt32(1246753138)
+                    }
+                    serializeInt64(userId, buffer: buffer, boxed: false)
+                    serializeInt32(date, buffer: buffer, boxed: false)
+                    break
+    }
+    }
+    
+    public func descriptionFields() -> (String, [(String, Any)]) {
+        switch self {
+                case .readParticipantDate(let userId, let date):
+                return ("readParticipantDate", [("userId", userId as Any), ("date", date as Any)])
+    }
+    }
+    
         public static func parse_readParticipantDate(_ reader: BufferReader) -> ReadParticipantDate? {
             var _1: Int64?
             _1 = reader.readInt64()
@@ -817,11 +589,308 @@ public extension Api {
             let _c1 = _1 != nil
             let _c2 = _2 != nil
             if _c1 && _c2 {
-                return Api.ReadParticipantDate.readParticipantDate(Cons_readParticipantDate(userId: _1!, date: _2!))
+                return Api.ReadParticipantDate.readParticipantDate(userId: _1!, date: _2!)
             }
             else {
                 return nil
             }
         }
+    
+    }
+}
+public extension Api {
+    enum ReceivedNotifyMessage: TypeConstructorDescription {
+        case receivedNotifyMessage(id: Int32, flags: Int32)
+    
+    public func serialize(_ buffer: Buffer, _ boxed: Swift.Bool) {
+    switch self {
+                case .receivedNotifyMessage(let id, let flags):
+                    if boxed {
+                        buffer.appendInt32(-1551583367)
+                    }
+                    serializeInt32(id, buffer: buffer, boxed: false)
+                    serializeInt32(flags, buffer: buffer, boxed: false)
+                    break
+    }
+    }
+    
+    public func descriptionFields() -> (String, [(String, Any)]) {
+        switch self {
+                case .receivedNotifyMessage(let id, let flags):
+                return ("receivedNotifyMessage", [("id", id as Any), ("flags", flags as Any)])
+    }
+    }
+    
+        public static func parse_receivedNotifyMessage(_ reader: BufferReader) -> ReceivedNotifyMessage? {
+            var _1: Int32?
+            _1 = reader.readInt32()
+            var _2: Int32?
+            _2 = reader.readInt32()
+            let _c1 = _1 != nil
+            let _c2 = _2 != nil
+            if _c1 && _c2 {
+                return Api.ReceivedNotifyMessage.receivedNotifyMessage(id: _1!, flags: _2!)
+            }
+            else {
+                return nil
+            }
+        }
+    
+    }
+}
+public extension Api {
+    indirect enum RecentMeUrl: TypeConstructorDescription {
+        case recentMeUrlChat(url: String, chatId: Int64)
+        case recentMeUrlChatInvite(url: String, chatInvite: Api.ChatInvite)
+        case recentMeUrlStickerSet(url: String, set: Api.StickerSetCovered)
+        case recentMeUrlUnknown(url: String)
+        case recentMeUrlUser(url: String, userId: Int64)
+    
+    public func serialize(_ buffer: Buffer, _ boxed: Swift.Bool) {
+    switch self {
+                case .recentMeUrlChat(let url, let chatId):
+                    if boxed {
+                        buffer.appendInt32(-1294306862)
+                    }
+                    serializeString(url, buffer: buffer, boxed: false)
+                    serializeInt64(chatId, buffer: buffer, boxed: false)
+                    break
+                case .recentMeUrlChatInvite(let url, let chatInvite):
+                    if boxed {
+                        buffer.appendInt32(-347535331)
+                    }
+                    serializeString(url, buffer: buffer, boxed: false)
+                    chatInvite.serialize(buffer, true)
+                    break
+                case .recentMeUrlStickerSet(let url, let set):
+                    if boxed {
+                        buffer.appendInt32(-1140172836)
+                    }
+                    serializeString(url, buffer: buffer, boxed: false)
+                    set.serialize(buffer, true)
+                    break
+                case .recentMeUrlUnknown(let url):
+                    if boxed {
+                        buffer.appendInt32(1189204285)
+                    }
+                    serializeString(url, buffer: buffer, boxed: false)
+                    break
+                case .recentMeUrlUser(let url, let userId):
+                    if boxed {
+                        buffer.appendInt32(-1188296222)
+                    }
+                    serializeString(url, buffer: buffer, boxed: false)
+                    serializeInt64(userId, buffer: buffer, boxed: false)
+                    break
+    }
+    }
+    
+    public func descriptionFields() -> (String, [(String, Any)]) {
+        switch self {
+                case .recentMeUrlChat(let url, let chatId):
+                return ("recentMeUrlChat", [("url", url as Any), ("chatId", chatId as Any)])
+                case .recentMeUrlChatInvite(let url, let chatInvite):
+                return ("recentMeUrlChatInvite", [("url", url as Any), ("chatInvite", chatInvite as Any)])
+                case .recentMeUrlStickerSet(let url, let set):
+                return ("recentMeUrlStickerSet", [("url", url as Any), ("set", set as Any)])
+                case .recentMeUrlUnknown(let url):
+                return ("recentMeUrlUnknown", [("url", url as Any)])
+                case .recentMeUrlUser(let url, let userId):
+                return ("recentMeUrlUser", [("url", url as Any), ("userId", userId as Any)])
+    }
+    }
+    
+        public static func parse_recentMeUrlChat(_ reader: BufferReader) -> RecentMeUrl? {
+            var _1: String?
+            _1 = parseString(reader)
+            var _2: Int64?
+            _2 = reader.readInt64()
+            let _c1 = _1 != nil
+            let _c2 = _2 != nil
+            if _c1 && _c2 {
+                return Api.RecentMeUrl.recentMeUrlChat(url: _1!, chatId: _2!)
+            }
+            else {
+                return nil
+            }
+        }
+        public static func parse_recentMeUrlChatInvite(_ reader: BufferReader) -> RecentMeUrl? {
+            var _1: String?
+            _1 = parseString(reader)
+            var _2: Api.ChatInvite?
+            if let signature = reader.readInt32() {
+                _2 = Api.parse(reader, signature: signature) as? Api.ChatInvite
+            }
+            let _c1 = _1 != nil
+            let _c2 = _2 != nil
+            if _c1 && _c2 {
+                return Api.RecentMeUrl.recentMeUrlChatInvite(url: _1!, chatInvite: _2!)
+            }
+            else {
+                return nil
+            }
+        }
+        public static func parse_recentMeUrlStickerSet(_ reader: BufferReader) -> RecentMeUrl? {
+            var _1: String?
+            _1 = parseString(reader)
+            var _2: Api.StickerSetCovered?
+            if let signature = reader.readInt32() {
+                _2 = Api.parse(reader, signature: signature) as? Api.StickerSetCovered
+            }
+            let _c1 = _1 != nil
+            let _c2 = _2 != nil
+            if _c1 && _c2 {
+                return Api.RecentMeUrl.recentMeUrlStickerSet(url: _1!, set: _2!)
+            }
+            else {
+                return nil
+            }
+        }
+        public static func parse_recentMeUrlUnknown(_ reader: BufferReader) -> RecentMeUrl? {
+            var _1: String?
+            _1 = parseString(reader)
+            let _c1 = _1 != nil
+            if _c1 {
+                return Api.RecentMeUrl.recentMeUrlUnknown(url: _1!)
+            }
+            else {
+                return nil
+            }
+        }
+        public static func parse_recentMeUrlUser(_ reader: BufferReader) -> RecentMeUrl? {
+            var _1: String?
+            _1 = parseString(reader)
+            var _2: Int64?
+            _2 = reader.readInt64()
+            let _c1 = _1 != nil
+            let _c2 = _2 != nil
+            if _c1 && _c2 {
+                return Api.RecentMeUrl.recentMeUrlUser(url: _1!, userId: _2!)
+            }
+            else {
+                return nil
+            }
+        }
+    
+    }
+}
+public extension Api {
+    enum ReplyMarkup: TypeConstructorDescription {
+        case replyInlineMarkup(rows: [Api.KeyboardButtonRow])
+        case replyKeyboardForceReply(flags: Int32, placeholder: String?)
+        case replyKeyboardHide(flags: Int32)
+        case replyKeyboardMarkup(flags: Int32, rows: [Api.KeyboardButtonRow], placeholder: String?)
+    
+    public func serialize(_ buffer: Buffer, _ boxed: Swift.Bool) {
+    switch self {
+                case .replyInlineMarkup(let rows):
+                    if boxed {
+                        buffer.appendInt32(1218642516)
+                    }
+                    buffer.appendInt32(481674261)
+                    buffer.appendInt32(Int32(rows.count))
+                    for item in rows {
+                        item.serialize(buffer, true)
+                    }
+                    break
+                case .replyKeyboardForceReply(let flags, let placeholder):
+                    if boxed {
+                        buffer.appendInt32(-2035021048)
+                    }
+                    serializeInt32(flags, buffer: buffer, boxed: false)
+                    if Int(flags) & Int(1 << 3) != 0 {serializeString(placeholder!, buffer: buffer, boxed: false)}
+                    break
+                case .replyKeyboardHide(let flags):
+                    if boxed {
+                        buffer.appendInt32(-1606526075)
+                    }
+                    serializeInt32(flags, buffer: buffer, boxed: false)
+                    break
+                case .replyKeyboardMarkup(let flags, let rows, let placeholder):
+                    if boxed {
+                        buffer.appendInt32(-2049074735)
+                    }
+                    serializeInt32(flags, buffer: buffer, boxed: false)
+                    buffer.appendInt32(481674261)
+                    buffer.appendInt32(Int32(rows.count))
+                    for item in rows {
+                        item.serialize(buffer, true)
+                    }
+                    if Int(flags) & Int(1 << 3) != 0 {serializeString(placeholder!, buffer: buffer, boxed: false)}
+                    break
+    }
+    }
+    
+    public func descriptionFields() -> (String, [(String, Any)]) {
+        switch self {
+                case .replyInlineMarkup(let rows):
+                return ("replyInlineMarkup", [("rows", rows as Any)])
+                case .replyKeyboardForceReply(let flags, let placeholder):
+                return ("replyKeyboardForceReply", [("flags", flags as Any), ("placeholder", placeholder as Any)])
+                case .replyKeyboardHide(let flags):
+                return ("replyKeyboardHide", [("flags", flags as Any)])
+                case .replyKeyboardMarkup(let flags, let rows, let placeholder):
+                return ("replyKeyboardMarkup", [("flags", flags as Any), ("rows", rows as Any), ("placeholder", placeholder as Any)])
+    }
+    }
+    
+        public static func parse_replyInlineMarkup(_ reader: BufferReader) -> ReplyMarkup? {
+            var _1: [Api.KeyboardButtonRow]?
+            if let _ = reader.readInt32() {
+                _1 = Api.parseVector(reader, elementSignature: 0, elementType: Api.KeyboardButtonRow.self)
+            }
+            let _c1 = _1 != nil
+            if _c1 {
+                return Api.ReplyMarkup.replyInlineMarkup(rows: _1!)
+            }
+            else {
+                return nil
+            }
+        }
+        public static func parse_replyKeyboardForceReply(_ reader: BufferReader) -> ReplyMarkup? {
+            var _1: Int32?
+            _1 = reader.readInt32()
+            var _2: String?
+            if Int(_1!) & Int(1 << 3) != 0 {_2 = parseString(reader) }
+            let _c1 = _1 != nil
+            let _c2 = (Int(_1!) & Int(1 << 3) == 0) || _2 != nil
+            if _c1 && _c2 {
+                return Api.ReplyMarkup.replyKeyboardForceReply(flags: _1!, placeholder: _2)
+            }
+            else {
+                return nil
+            }
+        }
+        public static func parse_replyKeyboardHide(_ reader: BufferReader) -> ReplyMarkup? {
+            var _1: Int32?
+            _1 = reader.readInt32()
+            let _c1 = _1 != nil
+            if _c1 {
+                return Api.ReplyMarkup.replyKeyboardHide(flags: _1!)
+            }
+            else {
+                return nil
+            }
+        }
+        public static func parse_replyKeyboardMarkup(_ reader: BufferReader) -> ReplyMarkup? {
+            var _1: Int32?
+            _1 = reader.readInt32()
+            var _2: [Api.KeyboardButtonRow]?
+            if let _ = reader.readInt32() {
+                _2 = Api.parseVector(reader, elementSignature: 0, elementType: Api.KeyboardButtonRow.self)
+            }
+            var _3: String?
+            if Int(_1!) & Int(1 << 3) != 0 {_3 = parseString(reader) }
+            let _c1 = _1 != nil
+            let _c2 = _2 != nil
+            let _c3 = (Int(_1!) & Int(1 << 3) == 0) || _3 != nil
+            if _c1 && _c2 && _c3 {
+                return Api.ReplyMarkup.replyKeyboardMarkup(flags: _1!, rows: _2!, placeholder: _3)
+            }
+            else {
+                return nil
+            }
+        }
+    
     }
 }

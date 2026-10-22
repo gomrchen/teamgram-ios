@@ -11,7 +11,6 @@ import TelegramPresentationData
 public enum ChatScheduleTimeControllerMode {
     case scheduledMessages(sendWhenOnlineAvailable: Bool)
     case reminders
-    case suggestPost(needsTime: Bool, isAdmin: Bool, funds: (amount: CurrencyAmount, commissionPermille: Int)?)
 }
 
 public enum ChatScheduleTimeControllerStyle {
@@ -27,6 +26,7 @@ public final class ChatScheduleTimeController: ViewController {
     private var animatedIn = false
     
     private let context: AccountContext
+    private let peerId: PeerId
     private let mode: ChatScheduleTimeControllerMode
     private let style: ChatScheduleTimeControllerStyle
     private let currentTime: Int32?
@@ -39,8 +39,9 @@ public final class ChatScheduleTimeController: ViewController {
     
     public var dismissed: () -> Void = {}
     
-    public init(context: AccountContext, updatedPresentationData: (initial: PresentationData, signal: Signal<PresentationData, NoError>)? = nil, mode: ChatScheduleTimeControllerMode, style: ChatScheduleTimeControllerStyle, currentTime: Int32? = nil, minimalTime: Int32? = nil, dismissByTapOutside: Bool = true, completion: @escaping (Int32) -> Void) {
+    public init(context: AccountContext, updatedPresentationData: (initial: PresentationData, signal: Signal<PresentationData, NoError>)? = nil, peerId: PeerId, mode: ChatScheduleTimeControllerMode, style: ChatScheduleTimeControllerStyle, currentTime: Int32? = nil, minimalTime: Int32? = nil, dismissByTapOutside: Bool = true, completion: @escaping (Int32) -> Void) {
         self.context = context
+        self.peerId = peerId
         self.mode = mode
         self.style = style
         self.currentTime = currentTime != scheduleWhenOnlineTimestamp ? currentTime : nil
@@ -81,11 +82,7 @@ public final class ChatScheduleTimeController: ViewController {
             guard let strongSelf = self else {
                 return
             }
-            if time == 0 {
-                strongSelf.completion(time)
-            } else {
-                strongSelf.completion(time == scheduleWhenOnlineTimestamp ? time : time + 5)
-            }
+            strongSelf.completion(time == scheduleWhenOnlineTimestamp ? time : time + 5)
             strongSelf.dismiss()
         }
         self.controllerNode.dismiss = { [weak self] in

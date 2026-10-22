@@ -1,40 +1,41 @@
 ---
-name: "\U0001F41E Bug Report"
-about: "Report a bug if something isn't working as expected in Telegram Messenger for iOS."
+name: "🐞 缺陷报告"
+about: "报告 Teamgram iOS 客户端中未按预期工作的问题。"
 title: ""
 labels: bug
 assignees: ""
 ---
 
-<!-- Thanks for reporting issues of Telegram Messenger for iOS! 
-This is a bug report template. Please, be as descriptive as possible. Issues lacking detail, or for any other reason than to report a bug, may be closed without action.
+<!-- 感谢提交缺陷报告！请尽量详细描述。信息不足的问题可能被直接关闭。
 
-First, complete the checklist by replacing the empty checkboxes [] with checked ones [x]. -->
+提交前请将 [] 改为 [x] 完成清单。 -->
 
-### Checklist
-- [ ] I am reporting an issue in existing functionality that does not work as intended
-- [ ] I've searched for existing [GitHub issues](https://github.com/telegrammessenger/Telegram-iOS/issues)
+### 检查清单
+- [ ] 我报告的是现有功能异常，而非功能需求
+- [ ] 我已搜索是否已有相关 Issue
 
-### Description
-Describe the issue that you are experiencing
+### 问题描述
+请描述你遇到的问题
 
-### Expected Behavior
-Tell us what should happen
+### 期望行为
+应该发生什么
 
-### Actual Behavior
-Tell us what happens instead
+### 实际行为
+实际发生了什么
 
-### Steps to Reproduce
+### 复现步骤
 1. 
 2. 
 3. 
 
-### Screenshots and Videos 
-Remove, if not applicable
+### 截图或录屏
+如适用请附上
 
-### Environment
-**Device:** `iPhone/iPad X`
+### 环境
+**设备：** `iPhone / iPad 型号`
 
-**iOS version**: `13.X`
+**iOS 版本：** `例如 17.x`
 
-**App version:** `7.X`
+**App 版本：** `例如 11.x`
+
+**Teamgram 服务端：** `是否自建 / IP / 是否最新`

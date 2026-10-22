@@ -112,8 +112,12 @@ public func uploadSecureIdFile(context: SecureIdAccessContext, postbox: Postbox,
             switch result {
                 case let .progress(value):
                     return .single(.progress(value))
-                case let .inputFile(.inputFile(fileData)):
-                    return .single(.result(UploadedSecureIdFile(id: fileData.id, parts: fileData.parts, md5Checksum: fileData.md5Checksum, fileHash: encryptedData.hash, encryptedSecret: encryptedData.encryptedSecret), encryptedData.data))
+                case let .inputFile(file):
+                    if case let .inputFile(id, parts, _, md5Checksum) = file {
+                        return .single(.result(UploadedSecureIdFile(id: id, parts: parts, md5Checksum: md5Checksum, fileHash: encryptedData.hash, encryptedSecret: encryptedData.encryptedSecret), encryptedData.data))
+                    } else {
+                        return .fail(.generic)
+                    }
                 default:
                     return .fail(.generic)
             }

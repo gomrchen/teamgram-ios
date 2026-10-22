@@ -178,8 +178,6 @@ private final class StickerSelectionComponent: Component {
                     }
                     return false
                 },
-                editGif: { _, _ in
-                },
                 updateChoosingSticker: { _ in },
                 switchToTextInput: {},
                 dismissTextInput: {},
@@ -285,7 +283,6 @@ private final class StickerSelectionComponent: Component {
                     defaultToEmojiTab: defaultToEmoji,
                     externalTopPanelContainer: self.panelHostView,
                     externalBottomPanelContainer: nil,
-                    externalTintMaskContainer: nil,
                     displayTopPanelBackground: .blur,
                     topPanelExtensionUpdated: { _, _ in
                     },
@@ -827,7 +824,7 @@ public class StickerPickerScreen: ViewController {
                     })))
                 }
                 
-                let contextController = makeContextController(presentationData: presentationData, source: .controller(ContextControllerContentSourceImpl(controller: gallery, sourceView: sourceView, sourceRect: sourceRect)), items: .single(ContextController.Items(content: .list(items))), gesture: gesture)
+                let contextController = ContextController(presentationData: presentationData, source: .controller(ContextControllerContentSourceImpl(controller: gallery, sourceView: sourceView, sourceRect: sourceRect)), items: .single(ContextController.Items(content: .list(items))), gesture: gesture)
                 controller.presentInGlobalOverlay(contextController)
             })
         }

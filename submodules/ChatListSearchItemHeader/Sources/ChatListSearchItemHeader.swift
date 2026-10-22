@@ -4,9 +4,6 @@ import AsyncDisplayKit
 import Display
 import TelegramPresentationData
 import ListSectionHeaderNode
-import EdgeEffect
-import ComponentFlow
-import ComponentDisplayAdapters
 
 public enum ChatListSearchItemHeaderType {
     case localPeers
@@ -207,7 +204,6 @@ private enum ChatListSearchItemHeaderId: Hashable {
 
 public final class ChatListSearchItemHeader: ListViewItemHeader {
     public let id: ListViewItemNode.HeaderId
-    public let stackingId: ListViewItemNode.HeaderId? = nil
     public let type: ChatListSearchItemHeaderType
     public let stickDirection: ListViewItemHeaderStickDirection = .top
     public let stickOverInsets: Bool = true
@@ -217,7 +213,6 @@ public final class ChatListSearchItemHeader: ListViewItemHeader {
     public let action: ((ASDisplayNode) -> Void)?
     
     public let height: CGFloat = 28.0
-    public let isSticky: Bool = false
     
     public init(type: ChatListSearchItemHeaderType, theme: PresentationTheme, strings: PresentationStrings, actionTitle: String? = nil, action: ((ASDisplayNode) -> Void)? = nil) {
         self.type = type
@@ -254,7 +249,6 @@ public final class ChatListSearchItemHeaderNode: ListViewItemHeaderNode {
     
     private var validLayout: (size: CGSize, leftInset: CGFloat, rightInset: CGFloat)?
     
-    private var edgeEffectView: EdgeEffectView?
     private let sectionHeaderNode: ListSectionHeaderNode
     
     public init(type: ChatListSearchItemHeaderType, theme: PresentationTheme, strings: PresentationStrings, actionTitle: String?, action: ((ASDisplayNode) -> Void)?) {
@@ -267,8 +261,6 @@ public final class ChatListSearchItemHeaderNode: ListViewItemHeaderNode {
         self.sectionHeaderNode = ListSectionHeaderNode(theme: theme)
         
         super.init()
-        
-        //self.contributesToEdgeEffect = true
         
         self.sectionHeaderNode.title = type.title(strings: strings).uppercased()
         self.sectionHeaderNode.action = actionTitle
@@ -295,7 +287,7 @@ public final class ChatListSearchItemHeaderNode: ListViewItemHeaderNode {
         }
     }
     
-    override public func updateLayout(size: CGSize, leftInset: CGFloat, rightInset: CGFloat, transition: ContainedViewLayoutTransition) {
+    override public func updateLayout(size: CGSize, leftInset: CGFloat, rightInset: CGFloat) {
         self.validLayout = (size, leftInset, rightInset)
         self.sectionHeaderNode.frame = CGRect(origin: CGPoint(), size: size)
         self.sectionHeaderNode.updateLayout(size: size, leftInset: leftInset, rightInset: rightInset)

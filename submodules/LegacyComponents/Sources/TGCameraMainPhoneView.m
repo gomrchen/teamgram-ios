@@ -1,9 +1,9 @@
-#import <LegacyComponents/TGCameraMainPhoneView.h>
+#import "TGCameraMainPhoneView.h"
 
 #import <SSignalKit/SSignalKit.h>
 #import "LegacyComponentsInternal.h"
-#import <LegacyComponents/TGImageUtils.h>
-#import <LegacyComponents/TGFont.h>
+#import "TGImageUtils.h"
+#import "TGFont.h"
 
 #import <LegacyComponents/UIControl+HitTestEdgeInsets.h>
 
@@ -11,17 +11,17 @@
 #import <LegacyComponents/TGCameraInterfaceAssets.h>
 #import <LegacyComponents/TGTimerTarget.h>
 
-#import <LegacyComponents/TGModernButton.h>
-#import <LegacyComponents/TGCameraShutterButton.h>
-#import <LegacyComponents/TGCameraModeControl.h>
-#import <LegacyComponents/TGCameraFlashControl.h>
-#import <LegacyComponents/TGCameraFlashActiveView.h>
-#import <LegacyComponents/TGCameraFlipButton.h>
-#import <LegacyComponents/TGCameraTimeCodeView.h>
-#import <LegacyComponents/TGCameraZoomView.h>
+#import "TGModernButton.h"
+#import "TGCameraShutterButton.h"
+#import "TGCameraModeControl.h"
+#import "TGCameraFlashControl.h"
+#import "TGCameraFlashActiveView.h"
+#import "TGCameraFlipButton.h"
+#import "TGCameraTimeCodeView.h"
+#import "TGCameraZoomView.h"
 #import "TGCameraToastView.h"
 
-#import <LegacyComponents/TGMenuView.h>
+#import "TGMenuView.h"
 
 #import "TGMediaPickerPhotoCounterButton.h"
 #import "TGMediaPickerPhotoStripView.h"
@@ -101,7 +101,7 @@
 @synthesize cancelPressed;
 @synthesize actionHandle = _actionHandle;
 
-- (instancetype)initWithFrame:(CGRect)frame avatar:(bool)avatar videoModeByDefault:(bool)videoModeByDefault camera:(PGCamera *)camera
+- (instancetype)initWithFrame:(CGRect)frame avatar:(bool)avatar videoModeByDefault:(bool)videoModeByDefault hasUltrawideCamera:(bool)hasUltrawideCamera hasTelephotoCamera:(bool)hasTelephotoCamera camera:(PGCamera *)camera
 {
     self = [super initWithFrame:frame];
     if (self != nil)
@@ -245,13 +245,7 @@
         _topPanelBackgroundView.backgroundColor = [TGCameraInterfaceAssets transparentPanelBackgroundColor];
         [_topPanelView addSubview:_topPanelBackgroundView];
         
-        bool hasMultipleCameras = camera.zoomLevels.count > 1;
-        CGFloat minZoomLevel = 1.0f;
-        if (camera.zoomLevels.firstObject != nil) {
-            minZoomLevel = camera.zoomLevels.firstObject.doubleValue;
-        }
-        
-        _zoomModeView = [[TGCameraZoomModeView alloc] initWithFrame:CGRectMake(floor((frame.size.width - 172.0) / 2.0), frame.size.height - _bottomPanelHeight - _bottomPanelOffset - 18 - 43, 172, 43) zoomLevels: camera.zoomLevels minZoomLevel:minZoomLevel maxZoomLevel:8.0];
+        _zoomModeView = [[TGCameraZoomModeView alloc] initWithFrame:CGRectMake(floor((frame.size.width - 129.0) / 2.0), frame.size.height - _bottomPanelHeight - _bottomPanelOffset - 18 - 43, 129, 43) hasUltrawideCamera:hasUltrawideCamera hasTelephotoCamera:hasTelephotoCamera minZoomLevel:hasUltrawideCamera ? 0.5 : 1.0 maxZoomLevel:8.0];
         _zoomModeView.zoomChanged = ^(CGFloat zoomLevel, bool done, bool animated) {
             __strong TGCameraMainPhoneView *strongSelf = weakSelf;
             if (strongSelf == nil)
@@ -284,15 +278,28 @@
                 strongSelf.zoomChanged(zoomLevel, animated);
         };
         [_zoomModeView setZoomLevel:1.0];
-        if (hasMultipleCameras) {
+        if (hasTelephotoCamera || hasUltrawideCamera) {
             [self addSubview:_zoomModeView];
         }
-                
+        
+        _zoomWheelView = [[TGCameraZoomWheelView alloc] initWithFrame:CGRectMake(0.0, frame.size.height - _bottomPanelHeight - _bottomPanelOffset - 132, frame.size.width, 132) hasUltrawideCamera:hasUltrawideCamera hasTelephotoCamera:hasTelephotoCamera];
+        [_zoomWheelView setHidden:true animated:false];
+        [_zoomWheelView setZoomLevel:1.0];
+        _zoomWheelView.panGesture = ^(UIPanGestureRecognizer *gestureRecognizer) {
+            __strong TGCameraMainPhoneView *strongSelf = weakSelf;
+            if (strongSelf == nil)
+                return;
+            [strongSelf->_zoomModeView panGesture:gestureRecognizer];
+        };
+        if (hasTelephotoCamera || hasUltrawideCamera) {
+            [self addSubview:_zoomWheelView];
+        }
+        
         _zoomView = [[TGCameraZoomView alloc] initWithFrame:CGRectMake(10, frame.size.height - _bottomPanelHeight - _bottomPanelOffset - 18, frame.size.width - 20, 1.5f)];
         _zoomView.activityChanged = ^(bool active)
         {
         };
-        if (!hasMultipleCameras) {
+        if (!hasTelephotoCamera && !hasUltrawideCamera) {
             [self addSubview:_zoomView];
         }
         
@@ -382,7 +389,7 @@
             if (strongSelf == nil)
                 return;
             
-            __unused bool change = true;
+            bool change = true;
             if (strongSelf.cameraShouldLeaveMode != nil)
                 change = strongSelf.cameraShouldLeaveMode(previousMode);
             
@@ -657,7 +664,7 @@
         
         [UIView animateWithDuration:0.2 delay:0.0 options:7 << 16 animations:^{
             CGFloat offset = hidden ? 19 : 18 + 43;
-            _zoomModeView.frame = CGRectMake(floor((self.bounds.size.width - 172.0) / 2.0), self.bounds.size.height - _bottomPanelHeight - _bottomPanelOffset - offset, 172, 43);
+            _zoomModeView.frame = CGRectMake(floor((self.bounds.size.width - 129.0) / 2.0), self.bounds.size.height - _bottomPanelHeight - _bottomPanelOffset - offset, 129, 43);
         } completion:nil];
         
         [UIView animateWithDuration:0.25 animations:^

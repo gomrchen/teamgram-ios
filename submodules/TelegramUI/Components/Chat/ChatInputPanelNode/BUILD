@@ -16,7 +16,6 @@ swift_library(
         "//submodules/TelegramCore",
         "//submodules/AccountContext",
         "//submodules/ChatPresentationInterfaceState",
-        "//submodules/TelegramUI/Components/ChatControllerInteraction",
     ],
     visibility = [
         "//visibility:public",

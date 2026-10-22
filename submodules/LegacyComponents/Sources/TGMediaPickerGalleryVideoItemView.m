@@ -1,10 +1,9 @@
-#import <LegacyComponents/LegacyComponents.h>
-#import <LegacyComponents/TGMediaPickerGalleryVideoItemView.h>
+#import "TGMediaPickerGalleryVideoItemView.h"
 
 #import "LegacyComponentsInternal.h"
-#import <LegacyComponents/TGFont.h>
-#import <LegacyComponents/TGImageUtils.h>
-#import <LegacyComponents/TGStringUtils.h>
+#import "TGFont.h"
+#import "TGImageUtils.h"
+#import "TGStringUtils.h"
 
 #import <AVFoundation/AVFoundation.h>
 #import <MediaPlayer/MediaPlayer.h>
@@ -18,10 +17,10 @@
 #import <LegacyComponents/TGPhotoEditorInterfaceAssets.h>
 #import <LegacyComponents/TGPhotoEditorAnimation.h>
 
-#import <LegacyComponents/TGMediaPickerGalleryItem.h>
-#import <LegacyComponents/TGMediaPickerGalleryVideoItem.h>
+#import "TGMediaPickerGalleryItem.h"
+#import "TGMediaPickerGalleryVideoItem.h"
 
-#import <LegacyComponents/TGCameraCapturedVideo.h>
+#import "TGCameraCapturedVideo.h"
 
 #import <LegacyComponents/TGVideoEditAdjustments.h>
 #import <LegacyComponents/TGPaintingData.h>
@@ -284,7 +283,7 @@
     if (_volumeOverlayFixView != nil)
         return;
     
-    UIWindow *keyWindow = self.window;
+    UIWindow *keyWindow = self.window; //[UIApplication sharedApplication].keyWindow;
     UIView *rootView = keyWindow.rootViewController.view;
     
     if (iosMajorVersion() < 13) {
@@ -427,6 +426,10 @@
     
     if (itemChanged) {
         [self _playerCleanup];
+     
+        if (!item.asFile) {
+            [_facesDisposable setDisposable:[[TGPaintFaceDetector detectFacesInItem:item.editableMediaItem editingContext:item.editingContext] startStrictWithNext:nil file:__FILE_NAME__ line:__LINE__]];
+        }
     }
     
     _scrubberView.allowsTrimming = false;
@@ -1008,7 +1011,7 @@
         CGSize originalSize = _videoDimensions;
         CGRect cropRect = CGRectMake(0, 0, _videoDimensions.width, _videoDimensions.height);
         UIImageOrientation cropOrientation = UIImageOrientationUp;
-        __unused bool cropMirrored = false;
+        bool cropMirrored = false;
         if (adjustments != nil)
         {
             cropRect = adjustments.cropRect;
@@ -1540,7 +1543,7 @@
     }
 }
 
-- (void)toggleSendAsGif:(bool)showTooltip
+- (void)toggleSendAsGif
 {
     TGVideoEditAdjustments *adjustments = (TGVideoEditAdjustments *)[self.item.editingContext adjustmentsForItem:self.item.editableMediaItem];
     CGSize videoFrameSize = _videoDimensions;
@@ -1567,26 +1570,24 @@
     
     if (sendAsGif)
     {
-        if (showTooltip) {
-            if (UIInterfaceOrientationIsPortrait([[LegacyComponentsGlobals provider] applicationStatusBarOrientation]))
-            {
-                UIView *parentView = [self.delegate itemViewDidRequestInterfaceView:self];
-                
-                _tooltipContainerView = [[TGMenuContainerView alloc] initWithFrame:CGRectMake(0.0f, 0.0f, parentView.frame.size.width, parentView.frame.size.height)];
-                [parentView addSubview:_tooltipContainerView];
-                
-                NSMutableArray *actions = [[NSMutableArray alloc] init];
-                NSString *text = [self itemIsLivePhoto] ? TGLocalized(@"MediaPicker.LivePhotoDescription") : TGLocalized(@"MediaPicker.VideoMuteDescription");
-                [actions addObject:@{@"title":text}];
-                _tooltipContainerView.menuView.forceArrowOnTop = false;
-                _tooltipContainerView.menuView.multiline = true;
-                [_tooltipContainerView.menuView setButtonsAndActions:actions watcherHandle:nil];
-                _tooltipContainerView.menuView.buttonHighlightDisabled = true;
-                [_tooltipContainerView.menuView sizeToFit];
-                
-                CGRect iconViewFrame = CGRectMake(12, self.frame.size.height - 192.0 - _safeAreaInset.bottom, 40, 40);
-                [_tooltipContainerView showMenuFromRect:iconViewFrame animated:false];
-            }
+        if (UIInterfaceOrientationIsPortrait([[LegacyComponentsGlobals provider] applicationStatusBarOrientation]))
+        {
+            UIView *parentView = [self.delegate itemViewDidRequestInterfaceView:self];
+            
+            _tooltipContainerView = [[TGMenuContainerView alloc] initWithFrame:CGRectMake(0.0f, 0.0f, parentView.frame.size.width, parentView.frame.size.height)];
+            [parentView addSubview:_tooltipContainerView];
+            
+            NSMutableArray *actions = [[NSMutableArray alloc] init];
+            NSString *text = [self itemIsLivePhoto] ? TGLocalized(@"MediaPicker.LivePhotoDescription") : TGLocalized(@"MediaPicker.VideoMuteDescription");
+            [actions addObject:@{@"title":text}];
+            _tooltipContainerView.menuView.forceArrowOnTop = false;
+            _tooltipContainerView.menuView.multiline = true;
+            [_tooltipContainerView.menuView setButtonsAndActions:actions watcherHandle:nil];
+            _tooltipContainerView.menuView.buttonHighlightDisabled = true;
+            [_tooltipContainerView.menuView sizeToFit];
+        
+            CGRect iconViewFrame = CGRectMake(12, self.frame.size.height - 192.0 - _safeAreaInset.bottom, 40, 40);
+            [_tooltipContainerView showMenuFromRect:iconViewFrame animated:false];
         }
         
         if (!self.isPlaying)

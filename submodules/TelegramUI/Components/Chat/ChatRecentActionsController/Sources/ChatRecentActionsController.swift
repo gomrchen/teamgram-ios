@@ -49,13 +49,13 @@ public final class ChatRecentActionsController: TelegramBaseController {
         
         self.titleView = CounterControllerTitleView(theme: self.presentationData.theme)
         
-        super.init(context: context, navigationBarPresentationData: NavigationBarPresentationData(presentationData: self.presentationData))
+        super.init(context: context, navigationBarPresentationData: NavigationBarPresentationData(presentationData: self.presentationData), mediaAccessoryPanelVisibility: .specific(size: .compact), locationBroadcastPanelSource: .none, groupCallPanelSource: .none)
         
         self.automaticallyControlPresentationContextLayout = false
         
         self.statusBar.statusBarStyle = self.presentationData.theme.rootController.statusBarStyle.style
         
-        self.panelInteraction = ChatPanelInterfaceInteraction(setupReplyMessage: { _, _, _ in
+        self.panelInteraction = ChatPanelInterfaceInteraction(setupReplyMessage: { _, _ in
         }, setupEditMessage: { _, _ in
         }, beginMessageSelection: { _, _ in
         }, cancelMessageSelection: { _ in
@@ -72,7 +72,6 @@ public final class ChatRecentActionsController: TelegramBaseController {
         }, presentForwardOptions: { _ in
         }, presentReplyOptions: { _ in
         }, presentLinkOptions: { _ in
-        }, presentSuggestPostOptions: {
         }, shareSelectedMessages: {
         }, updateTextInputStateAndMode: { _ in
         }, updateInputModeAndDismissedButtonKeyboardMessageId: { _ in
@@ -110,7 +109,6 @@ public final class ChatRecentActionsController: TelegramBaseController {
         }, setupMessageAutoremoveTimeout: {
         }, sendSticker: { _, _, _, _, _, _ in
             return false
-        }, editSticker: { _ in
         }, unblockPeer: {
         }, pinMessage: { _, _ in
         }, unpinMessage: { _, _, _ in
@@ -136,7 +134,7 @@ public final class ChatRecentActionsController: TelegramBaseController {
         }, updateInputLanguage: { _ in
         }, unarchiveChat: {
         }, openLinkEditing: {  
-        }, openDateEditing: {   
+        }, reportPeerIrrelevantGeoLocation: {
         }, displaySlowmodeTooltip: { _, _ in
         }, displaySendMessageOptions: { _, _ in
         }, openScheduledMessages: {
@@ -149,7 +147,6 @@ public final class ChatRecentActionsController: TelegramBaseController {
         }, joinGroupCall: { _ in
         }, presentInviteMembers: {
         }, presentGigagroupHelp: {
-        }, openMonoforum: {
         }, editMessageMedia: { _, _ in
         }, updateShowCommands: { _ in
         }, updateShowSendAsPeers: { _ in
@@ -167,22 +164,12 @@ public final class ChatRecentActionsController: TelegramBaseController {
         }, addDoNotTranslateLanguage: { _ in
         }, hideTranslationPanel: {
         }, openPremiumGift: {
-        }, openSuggestPost: { _, _ in
         }, openPremiumRequiredForMessaging: {
         }, openStarsPurchase: { _ in
         }, openMessagePayment: {
         }, openBoostToUnrestrict: {
-        }, updateRecordingTrimRange: { _, _, _, _ in
-        }, dismissAllTooltips: {
-        }, editTodoMessage: { _, _, _ in
-        }, dismissUrlPreview: {
-        }, dismissForwardMessages: {
-        }, dismissSuggestPost: {
-        }, displayUndo: { _ in
-        }, sendEmoji: { _, _, _ in
+        }, updateVideoTrimRange: { _, _, _, _ in
         }, updateHistoryFilter: { _ in
-        }, updateChatLocationThread: { _, _ in
-        }, toggleChatSidebarMode: {
         }, updateDisplayHistoryFilterAsList: { _ in
         }, requestLayout: { _ in
         }, chatController: {
@@ -196,43 +183,31 @@ public final class ChatRecentActionsController: TelegramBaseController {
         
         self.titleView.title = CounterControllerTitle(title: EnginePeer(peer).compactDisplayTitle, counter: self.presentationData.strings.Channel_AdminLog_TitleAllEvents)
         
-        let chatTheme = self.context.account.postbox.peerView(id: peer.id)
-        |> map { view -> ChatTheme? in
+        let themeEmoticon = self.context.account.postbox.peerView(id: peer.id)
+        |> map { view -> String? in
             let cachedData = view.cachedData
             if let cachedData = cachedData as? CachedUserData {
-                return cachedData.chatTheme
+                return cachedData.themeEmoticon
             } else if let cachedData = cachedData as? CachedGroupData {
-                return cachedData.chatTheme
+                return cachedData.themeEmoticon
             } else if let cachedData = cachedData as? CachedChannelData {
-                return cachedData.chatTheme
+                return cachedData.themeEmoticon
             } else {
                 return nil
             }
         }
         |> distinctUntilChanged
         
-        self.presentationDataDisposable = combineLatest(
-            queue: Queue.mainQueue(),
-            context.sharedContext.presentationData,
-            context.engine.themes.getChatThemes(accountManager: context.sharedContext.accountManager, onlyCached: true),
-            chatTheme
-        ).startStrict(next: { [weak self] presentationData, chatThemes, chatTheme in
+        self.presentationDataDisposable = combineLatest(queue: Queue.mainQueue(), context.sharedContext.presentationData, context.engine.themes.getChatThemes(accountManager: context.sharedContext.accountManager, onlyCached: true), themeEmoticon).startStrict(next: { [weak self] presentationData, chatThemes, themeEmoticon in
             if let strongSelf = self {
                 let previousTheme = strongSelf.presentationData.theme
                 let previousStrings = strongSelf.presentationData.strings
                 
                 var presentationData = presentationData
-                if let chatTheme {
-                    switch chatTheme {
-                    case let .emoticon(emoticon):
-                        if let theme = chatThemes.first(where: { $0.emoticon == emoticon }), let theme = makePresentationTheme(cloudTheme: theme, dark: presentationData.theme.overallDarkAppearance) {
-                            presentationData = presentationData.withUpdated(theme: theme)
-                            presentationData = presentationData.withUpdated(chatWallpaper: theme.chat.defaultWallpaper)
-                        }
-                    case let .gift(gift, wallpaper):
-                        let _ = gift
-                        let _ = wallpaper
-                        //TODO:release
+                if let themeEmoticon = themeEmoticon, let theme = chatThemes.first(where: { $0.emoticon == themeEmoticon }) {
+                    if let theme = makePresentationTheme(cloudTheme: theme, dark: presentationData.theme.overallDarkAppearance) {
+                        presentationData = presentationData.withUpdated(theme: theme)
+                        presentationData = presentationData.withUpdated(chatWallpaper: theme.chat.defaultWallpaper)
                     }
                 }
                 
@@ -265,7 +240,7 @@ public final class ChatRecentActionsController: TelegramBaseController {
         self.navigationItem.setRightBarButton(rightButton.buttonItem, animated: false)
         
         self.statusBar.statusBarStyle = self.presentationData.theme.rootController.statusBarStyle.style
-        self.navigationBar?.updatePresentationData(NavigationBarPresentationData(presentationData: self.presentationData), transition: .immediate)
+        self.navigationBar?.updatePresentationData(NavigationBarPresentationData(presentationData: self.presentationData))
         
         self.controllerNode.updatePresentationData(self.presentationData)
     }

@@ -118,7 +118,7 @@ public final class ChatBotInfoItemNode: ListViewItemNode {
         self.textNode = TextNode()
         self.titleNode = TextNode()
         
-        super.init(layerBacked: false, rotated: true)
+        super.init(layerBacked: false, dynamicBounce: true, rotated: true)
         
         self.transform = CATransform3DMakeRotation(CGFloat.pi, 0.0, 0.0, 1.0)
         
@@ -175,7 +175,7 @@ public final class ChatBotInfoItemNode: ListViewItemNode {
                     break
                 case .ignore:
                     return .fail
-                case .url, .phone, .peerMention, .textMention, .botCommand, .hashtag, .instantPage, .wallpaper, .theme, .call, .conferenceCall, .openMessage, .timecode, .bankCard, .tooltip, .openPollResults, .copy, .largeEmoji, .customEmoji, .date, .custom:
+                case .url, .phone, .peerMention, .textMention, .botCommand, .hashtag, .instantPage, .wallpaper, .theme, .call, .openMessage, .timecode, .bankCard, .tooltip, .openPollResults, .copy, .largeEmoji, .customEmoji, .custom:
                     return .waitForSingleTap
                 }
             }

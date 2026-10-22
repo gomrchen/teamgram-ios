@@ -126,9 +126,7 @@ public final class ChatSendContactMessageContextPreview: UIView, ChatSendMessage
                 accountPeer: nil,
                 isCentered: false,
                 isPreview: true,
-                isStandalone: true,
-                rank: nil,
-                rankRole: nil
+                isStandalone: true
             )
             items.append(item)
         }
@@ -281,9 +279,7 @@ public final class ChatSendAudioMessageContextPreview: UIView, ChatSendMessageCo
             accountPeer: nil,
             isCentered: false,
             isPreview: true,
-            isStandalone: true,
-            rank: nil,
-            rankRole: nil
+            isStandalone: true
         )
         let items = [item]
         
@@ -425,16 +421,14 @@ public final class ChatSendGroupMediaMessageContextPreview: UIView, ChatSendMess
         }, clickThroughMessage: { _, _ in
         }, toggleMessagesSelection: { _, _ in }, sendCurrentMessage: { _, _ in }, sendMessage: { _ in }, sendSticker: { _, _, _, _, _, _, _, _, _ in return false }, sendEmoji: { _, _, _ in }, sendGif: { _, _, _, _, _ in return false }, sendBotContextResultAsGif: { _, _, _, _, _, _ in
             return false
-        }, editGif: { _, _ in
-        }, requestMessageActionCallback: { _, _, _, _, _ in }, requestMessageActionUrlAuth: { _, _ in }, activateSwitchInline: { _, _, _ in }, openUrl: { _ in }, shareCurrentLocation: {}, shareAccountContact: {}, sendBotCommand: { _, _ in }, openInstantPage: { _, _ in  }, openWallpaper: { _ in  }, openTheme: { _ in  }, openHashtag: { _, _ in }, updateInputState: { _ in }, updateInputMode: { _ in }, openMessageShareMenu: { _ in
+        }, requestMessageActionCallback: { _, _, _, _ in }, requestMessageActionUrlAuth: { _, _ in }, activateSwitchInline: { _, _, _ in }, openUrl: { _ in }, shareCurrentLocation: {}, shareAccountContact: {}, sendBotCommand: { _, _ in }, openInstantPage: { _, _ in  }, openWallpaper: { _ in  }, openTheme: { _ in  }, openHashtag: { _, _ in }, updateInputState: { _ in }, updateInputMode: { _ in }, openMessageShareMenu: { _ in
         }, presentController: { _, _ in
         }, presentControllerInCurrent: { _, _ in
         }, navigationController: {
             return nil
         }, chatControllerNode: {
             return nil
-        }, presentGlobalOverlayController: { _, _ in }, callPeer: { _, _ in }, openConferenceCall: { _ in
-        }, longTap: { _, _ in }, todoItemLongTap: { _, _ in }, openCheckoutOrReceipt: { _, _ in }, openSearch: { }, setupReply: { _ in
+        }, presentGlobalOverlayController: { _, _ in }, callPeer: { _, _ in }, longTap: { _, _ in }, openCheckoutOrReceipt: { _, _ in }, openSearch: { }, setupReply: { _ in
         }, canSetupReply: { _ in
             return .none
         }, canSendMessages: {
@@ -505,12 +499,7 @@ public final class ChatSendGroupMediaMessageContextPreview: UIView, ChatSendMess
         }, attemptedNavigationToPrivateQuote: { _ in
         }, forceUpdateWarpContents: {
         }, playShakeAnimation: {
-        }, displayQuickShare: { _, _ ,_ in
-        }, updateChatLocationThread: { _, _ in
-        }, requestToggleTodoMessageItem: { _, _, _ in
-        }, displayTodoToggleUnavailable: { _ in
-        }, openStarsPurchase: { _ in
-        }, openRankInfo: { _, _, _ in }, automaticMediaDownloadSettings: MediaAutoDownloadSettings.defaultSettings,
+        }, automaticMediaDownloadSettings: MediaAutoDownloadSettings.defaultSettings,
         pollActionState: ChatInterfacePollActionState(), stickerSettings: ChatInterfaceStickerSettings(), presentationContext: ChatPresentationContext(context: self.context, backgroundNode: self.wallpaperBackgroundNode))
         
         let associatedData = ChatMessageItemAssociatedData(
@@ -522,12 +511,11 @@ public final class ChatSendGroupMediaMessageContextPreview: UIView, ChatSendMess
             availableMessageEffects: nil,
             savedMessageTags: nil,
             defaultReaction: nil,
-            areStarReactionsEnabled: false,
             isPremium: false,
             accountPeer: nil
         )
         
-        let entryAttributes = ChatMessageEntryAttributes(rank: nil, isContact: false, contentTypeHint: .generic, updatingMedia: nil, isPlaying: false, isCentered: false, authorStoryStats: nil, displayContinueThreadFooter: false)
+        let entryAttributes = ChatMessageEntryAttributes(rank: nil, isContact: false, contentTypeHint: .generic, updatingMedia: nil, isPlaying: false, isCentered: false, authorStoryStats: nil)
         
         let items = self.messages.map { message -> ChatMessageBubbleContentItem in
             return ChatMessageBubbleContentItem(

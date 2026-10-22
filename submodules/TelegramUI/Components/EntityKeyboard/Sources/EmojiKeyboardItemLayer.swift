@@ -10,7 +10,6 @@ import AccountContext
 import TelegramPresentationData
 import EmojiTextAttachmentView
 import EmojiStatusComponent
-import CoreVideo
 
 final class EmojiKeyboardCloneItemLayer: SimpleLayer {
 }
@@ -34,7 +33,7 @@ public final class EmojiKeyboardItemLayer: MultiAnimationRenderTarget {
         case locked
         case featured
         case text(String)
-        case customFile(TelegramMediaFile.Accessor)
+        case customFile(TelegramMediaFile)
     }
     
     public let item: EmojiPagerContentComponent.Item
@@ -80,20 +79,7 @@ public final class EmojiKeyboardItemLayer: MultiAnimationRenderTarget {
     }
     
     override public var contents: Any? {
-        get {
-            return super.contents
-        } set(value) {
-            #if targetEnvironment(simulator)
-            if let value, CFGetTypeID(value as CFTypeRef) == CVPixelBufferGetTypeID() {
-                let pixelBuffer = value as! CVPixelBuffer
-                super.contents = CVPixelBufferGetIOSurface(pixelBuffer)
-            } else {
-                super.contents = value
-            }
-            #else
-            super.contents = value
-            #endif
-            
+        didSet {
             self.onContentsUpdate()
             if let cloneLayer = self.cloneLayer {
                 cloneLayer.contents = self.contents
@@ -191,9 +177,7 @@ public final class EmojiKeyboardItemLayer: MultiAnimationRenderTarget {
         
         switch content {
         case let .animation(animationData):
-            guard let animationDataResource = animationData.resource._parse() else {
-                return
-            }
+            let animationDataResource = animationData.resource._parse()
             
             let loadAnimation: () -> Void = { [weak self] in
                 guard let strongSelf = self else {
@@ -419,13 +403,13 @@ public final class EmojiKeyboardItemLayer: MultiAnimationRenderTarget {
                         
                         context.setFillColor(color.withMultipliedAlpha(0.2).cgColor)
                         
-                        context.addPath(UIBezierPath(roundedRect: CGRect(origin: .zero, size: size), cornerRadius: 30.0).cgPath)
+                        context.addPath(UIBezierPath(roundedRect: CGRect(origin: .zero, size: size), cornerRadius: 21.0).cgPath)
                         context.fillPath()
                         context.setFillColor(color.cgColor)
                         
-                        let plusSize = CGSize(width: 4.0, height: 27.0)
-                        context.addPath(UIBezierPath(roundedRect: CGRect(x: floorToScreenPixels((size.width - plusSize.width) / 2.0), y: floorToScreenPixels((size.height - plusSize.height) / 2.0), width: plusSize.width, height: plusSize.height).offsetBy(dx: 0.0, dy: -18.0), cornerRadius: plusSize.width / 2.0).cgPath)
-                        context.addPath(UIBezierPath(roundedRect: CGRect(x: floorToScreenPixels((size.width - plusSize.height) / 2.0), y: floorToScreenPixels((size.height - plusSize.width) / 2.0), width: plusSize.height, height: plusSize.width).offsetBy(dx: 0.0, dy: -18.0), cornerRadius: plusSize.width / 2.0).cgPath)
+                        let plusSize = CGSize(width: 3.5, height: 28.0)
+                        context.addPath(UIBezierPath(roundedRect: CGRect(x: floorToScreenPixels((size.width - plusSize.width) / 2.0), y: floorToScreenPixels((size.height - plusSize.height) / 2.0), width: plusSize.width, height: plusSize.height).offsetBy(dx: 0.0, dy: -17.0), cornerRadius: plusSize.width / 2.0).cgPath)
+                        context.addPath(UIBezierPath(roundedRect: CGRect(x: floorToScreenPixels((size.width - plusSize.height) / 2.0), y: floorToScreenPixels((size.height - plusSize.width) / 2.0), width: plusSize.height, height: plusSize.width).offsetBy(dx: 0.0, dy: -17.0), cornerRadius: plusSize.width / 2.0).cgPath)
                         context.fillPath()
                         
                         context.translateBy(x: size.width / 2.0, y: size.height / 2.0)
@@ -437,7 +421,7 @@ public final class EmojiKeyboardItemLayer: MultiAnimationRenderTarget {
                         let components = string.components(separatedBy: "\n")
                         for component in components {
                             context.saveGState()
-                            let attributedString = NSAttributedString(string: component, attributes: [NSAttributedString.Key.font: Font.medium(16.0), NSAttributedString.Key.foregroundColor: color])
+                            let attributedString = NSAttributedString(string: component, attributes: [NSAttributedString.Key.font: Font.medium(17.0), NSAttributedString.Key.foregroundColor: color])
                             
                             let line = CTLineCreateWithAttributedString(attributedString)
                             let lineBounds = CTLineGetBoundsWithOptions(line, .useGlyphPathBounds)

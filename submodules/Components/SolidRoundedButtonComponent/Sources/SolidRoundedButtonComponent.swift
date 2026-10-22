@@ -9,7 +9,6 @@ public final class SolidRoundedButtonComponent: Component {
     public typealias Theme = SolidRoundedButtonTheme
     
     public let title: String?
-    public let subtitle: String?
     public let label: String?
     public let badge: String?
     public let icon: UIImage?
@@ -19,7 +18,6 @@ public final class SolidRoundedButtonComponent: Component {
     public let height: CGFloat
     public let cornerRadius: CGFloat
     public let gloss: Bool
-    public let glass: Bool
     public let isEnabled: Bool
     public let iconName: String?
     public let animationName: String?
@@ -30,7 +28,6 @@ public final class SolidRoundedButtonComponent: Component {
     
     public init(
         title: String? = nil,
-        subtitle: String? = nil,
         label: String? = nil,
         badge: String? = nil,
         icon: UIImage? = nil,
@@ -40,7 +37,6 @@ public final class SolidRoundedButtonComponent: Component {
         height: CGFloat = 48.0,
         cornerRadius: CGFloat = 24.0,
         gloss: Bool = false,
-        glass: Bool = false,
         isEnabled: Bool = true,
         iconName: String? = nil,
         animationName: String? = nil,
@@ -50,7 +46,6 @@ public final class SolidRoundedButtonComponent: Component {
         action: @escaping () -> Void
     ) {
         self.title = title
-        self.subtitle = subtitle
         self.label = label
         self.badge = badge
         self.icon = icon
@@ -60,7 +55,6 @@ public final class SolidRoundedButtonComponent: Component {
         self.height = height
         self.cornerRadius = cornerRadius
         self.gloss = gloss
-        self.glass = glass
         self.isEnabled = isEnabled
         self.iconName = iconName
         self.animationName = animationName
@@ -72,9 +66,6 @@ public final class SolidRoundedButtonComponent: Component {
     
     public static func ==(lhs: SolidRoundedButtonComponent, rhs: SolidRoundedButtonComponent) -> Bool {
         if lhs.title != rhs.title {
-            return false
-        }
-        if lhs.subtitle != rhs.subtitle {
             return false
         }
         if lhs.label != rhs.label {
@@ -102,9 +93,6 @@ public final class SolidRoundedButtonComponent: Component {
             return false
         }
         if lhs.gloss != rhs.gloss {
-            return false
-        }
-        if lhs.glass != rhs.glass {
             return false
         }
         if lhs.isEnabled != rhs.isEnabled {
@@ -159,7 +147,6 @@ public final class SolidRoundedButtonComponent: Component {
             
             if let button = self.button {
                 button.title = component.title
-                button.subtitle = component.subtitle
                 button.label = component.label
                 button.badge = component.badge
                 button.iconPosition = component.iconPosition

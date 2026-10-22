@@ -8,8 +8,6 @@ load(
 apple_static_xcframework_import(
     name = "RecaptchaEnterprise",
     xcframework_imports = glob(["RecaptchaEnterprise.xcframework/**"]),
-    features = [
-    ],
     visibility = [
         "//visibility:public",
     ],

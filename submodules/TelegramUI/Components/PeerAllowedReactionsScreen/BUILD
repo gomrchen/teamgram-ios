@@ -35,7 +35,6 @@ swift_library(
         "//submodules/Components/HierarchyTrackingLayer",
         "//submodules/TelegramUI/Components/ListSectionComponent",
         "//submodules/TelegramUI/Components/ListItemSliderSelectorComponent",
-        "//submodules/TelegramUI/Components/ListSwitchItemComponent",
     ],
     visibility = [
         "//visibility:public",

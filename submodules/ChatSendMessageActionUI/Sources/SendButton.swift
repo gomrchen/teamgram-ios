@@ -17,7 +17,6 @@ import WallpaperBackgroundNode
 import AppBundle
 import ActivityIndicator
 import RadialStatusNode
-import GlassBackgroundComponent
 
 final class SendButton: HighlightTrackingButton {
     enum Kind {
@@ -28,7 +27,8 @@ final class SendButton: HighlightTrackingButton {
     private let kind: Kind
     
     private let containerView: UIView
-    private let backgroundView: UIImageView
+    private var backgroundContent: WallpaperBubbleBackgroundNode?
+    private let backgroundLayer: SimpleLayer
     private let iconView: UIImageView
     private var activityIndicator: RadialStatusNode?
     
@@ -41,8 +41,7 @@ final class SendButton: HighlightTrackingButton {
         self.containerView = UIView()
         self.containerView.isUserInteractionEnabled = false
         
-        self.backgroundView = UIImageView()
-        self.backgroundView.image = generateStretchableFilledCircleImage(diameter: 34.0, color: .white)?.withRenderingMode(.alwaysTemplate)
+        self.backgroundLayer = SimpleLayer()
         
         self.iconView = UIImageView()
         self.iconView.isUserInteractionEnabled = false
@@ -52,7 +51,7 @@ final class SendButton: HighlightTrackingButton {
         self.containerView.clipsToBounds = true
         self.addSubview(self.containerView)
         
-        self.containerView.addSubview(self.backgroundView)
+        self.containerView.layer.addSublayer(self.backgroundLayer)
         self.containerView.addSubview(self.iconView)
     }
     
@@ -70,18 +69,34 @@ final class SendButton: HighlightTrackingButton {
         size: CGSize,
         transition: ComponentTransition
     ) {
-        let innerSize: CGSize
-        if size.height == 40.0 {
-            innerSize = CGSize(width: size.width - 3.0 * 2.0, height: size.height - 3.0 * 2.0)
-        } else {
-            innerSize = CGSize(width: isAnimatedIn ? 38.0 : size.width - 5.0 * 2.0, height: 33.0)
-        }
+        let innerSize = CGSize(width: size.width - 5.5 * 2.0, height: 33.0)
         let containerFrame = CGRect(origin: CGPoint(x: floorToScreenPixels((size.width - innerSize.width) * 0.5), y: floorToScreenPixels((size.height - innerSize.height) * 0.5)), size: innerSize)
         transition.setFrame(view: self.containerView, frame: containerFrame)
         transition.setCornerRadius(layer: self.containerView.layer, cornerRadius: innerSize.height * 0.5)
         
-        self.backgroundView.tintColor = presentationData.theme.chat.inputPanel.actionControlFillColor
-        transition.setFrame(view: self.backgroundView, frame: CGRect(origin: CGPoint(), size: innerSize))
+        if self.window != nil {
+            if self.backgroundContent == nil, let backgroundNode = backgroundNode as? WallpaperBackgroundNodeImpl {
+                if let backgroundContent = backgroundNode.makeLegacyBubbleBackground(for: .outgoing) {
+                    self.backgroundContent = backgroundContent
+                    self.containerView.insertSubview(backgroundContent.view, at: 0)
+                }
+            }
+        }
+        
+        if let backgroundContent = self.backgroundContent {
+            transition.setFrame(view: backgroundContent.view, frame: CGRect(origin: CGPoint(), size: innerSize))
+        }
+        
+        if backgroundNode != nil && [.day, .night].contains(presentationData.theme.referenceTheme.baseTheme) && !presentationData.theme.chat.message.outgoing.bubble.withWallpaper.hasSingleFillColor {
+            self.backgroundContent?.isHidden = false
+            self.backgroundLayer.isHidden = true
+        } else {
+            self.backgroundContent?.isHidden = true
+            self.backgroundLayer.isHidden = false
+        }
+        
+        self.backgroundLayer.backgroundColor = presentationData.theme.chat.inputPanel.actionControlFillColor.cgColor
+        transition.setFrame(layer: self.backgroundLayer, frame: CGRect(origin: CGPoint(), size: innerSize))
         
         if self.previousIsAnimatedIn != isAnimatedIn {
             self.previousIsAnimatedIn = isAnimatedIn
@@ -125,7 +140,7 @@ final class SendButton: HighlightTrackingButton {
         }
         
         if let icon = self.iconView.image {
-            let iconFrame = CGRect(origin: CGPoint(x: floorToScreenPixels((innerSize.width - icon.size.width) * 0.5), y: floorToScreenPixels((innerSize.height - icon.size.height) * 0.5)), size: icon.size)
+            let iconFrame = CGRect(origin: CGPoint(x: floorToScreenPixels((innerSize.width - icon.size.width) * 0.5) - UIScreenPixel, y: floorToScreenPixels((innerSize.height - icon.size.height) * 0.5)), size: icon.size)
             transition.setPosition(view: self.iconView, position: iconFrame.center)
             transition.setBounds(view: self.iconView, bounds: CGRect(origin: CGPoint(), size: iconFrame.size))
             
@@ -183,5 +198,8 @@ final class SendButton: HighlightTrackingButton {
     }
     
     func updateGlobalRect(rect: CGRect, within containerSize: CGSize, transition: ComponentTransition) {
+        if let backgroundContent = self.backgroundContent {
+            backgroundContent.update(rect: CGRect(origin: CGPoint(x: rect.minX + self.containerView.frame.minX, y: rect.minY + self.containerView.frame.minY), size: backgroundContent.bounds.size), within: containerSize, transition: transition.containedViewLayoutTransition)
+        }
     }
 }

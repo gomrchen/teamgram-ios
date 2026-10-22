@@ -177,7 +177,7 @@ final class BusinessIntroSetupScreenComponent: Component {
                     let editorController = context.sharedContext.makeStickerEditorScreen(
                         context: context,
                         source: result,
-                        mode: .businessIntro,
+                        intro: true,
                         transitionArguments: transitionView.flatMap { ($0, transitionRect, transitionImage) },
                         completion: { [weak self] file, emoji, commit in
                             dismissImpl?()
@@ -749,7 +749,6 @@ final class BusinessIntroSetupScreenComponent: Component {
             introSectionItems.append(AnyComponentWithIdentity(id: introSectionItems.count, component: AnyComponent(Rectangle(color: .clear, height: 346.0, tag: self.introPlaceholderTag))))
             introSectionItems.append(AnyComponentWithIdentity(id: introSectionItems.count, component: AnyComponent(ListMultilineTextFieldItemComponent(
                 externalState: self.titleInputState,
-                style: .glass,
                 context: component.context,
                 theme: environment.theme,
                 strings: environment.strings,
@@ -781,7 +780,6 @@ final class BusinessIntroSetupScreenComponent: Component {
             self.resetTitle = nil
             introSectionItems.append(AnyComponentWithIdentity(id: introSectionItems.count, component: AnyComponent(ListMultilineTextFieldItemComponent(
                 externalState: self.textInputState,
-                style: .glass,
                 context: component.context,
                 theme: environment.theme,
                 strings: environment.strings,
@@ -832,7 +830,6 @@ final class BusinessIntroSetupScreenComponent: Component {
             
             introSectionItems.append(AnyComponentWithIdentity(id: introSectionItems.count, component: AnyComponent(ListActionItemComponent(
                 theme: environment.theme,
-                style: .glass,
                 title: AnyComponent(VStack([
                     AnyComponentWithIdentity(id: AnyHashable(0), component: AnyComponent(MultilineTextComponent(
                         text: .plain(NSAttributedString(
@@ -862,7 +859,6 @@ final class BusinessIntroSetupScreenComponent: Component {
                 transition: transition,
                 component: AnyComponent(ListSectionComponent(
                     theme: environment.theme,
-                    style: .glass,
                     header: AnyComponent(MultilineTextComponent(
                         text: .plain(NSAttributedString(
                             string: environment.strings.Business_Intro_CustomizeSectionHeader,
@@ -950,13 +946,11 @@ final class BusinessIntroSetupScreenComponent: Component {
                 transition: transition,
                 component: AnyComponent(ListSectionComponent(
                     theme: environment.theme,
-                    style: .glass,
                     header: nil,
                     footer: nil,
                     items: [
                         AnyComponentWithIdentity(id: 0, component: AnyComponent(ListActionItemComponent(
                             theme: environment.theme,
-                            style: .glass,
                             title: AnyComponent(VStack([
                                 AnyComponentWithIdentity(id: AnyHashable(0), component: AnyComponent(MultilineTextComponent(
                                     text: .plain(NSAttributedString(
@@ -1112,8 +1106,8 @@ final class BusinessIntroSetupScreenComponent: Component {
                 self.scrollView.contentSize = contentSize
             }
             let scrollInsets = UIEdgeInsets(top: environment.navigationHeight, left: 0.0, bottom: 0.0, right: 0.0)
-            if self.scrollView.verticalScrollIndicatorInsets != scrollInsets {
-                self.scrollView.verticalScrollIndicatorInsets = scrollInsets
+            if self.scrollView.scrollIndicatorInsets != scrollInsets {
+                self.scrollView.scrollIndicatorInsets = scrollInsets
             }
                         
             if !previousBounds.isEmpty, !transition.animation.isImmediate {

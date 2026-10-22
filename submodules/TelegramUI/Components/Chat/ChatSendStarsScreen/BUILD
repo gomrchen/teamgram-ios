@@ -35,9 +35,6 @@ swift_library(
         "//submodules/CheckNode",
         "//submodules/TextFormat",
         "//submodules/TelegramUI/Components/Stars/StarsBalanceOverlayComponent",
-        "//submodules/TelegramStringFormatting",
-        "//submodules/TelegramUI/Components/ChatScheduleTimeController",
-        "//submodules/TelegramUI/Components/Stories/LiveChat/StoryLiveChatMessageComponent",
     ],
     visibility = [
         "//visibility:public",

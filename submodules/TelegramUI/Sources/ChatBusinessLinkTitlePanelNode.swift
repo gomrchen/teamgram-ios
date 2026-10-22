@@ -14,7 +14,6 @@ import TelegramCore
 import SwiftSignalKit
 import UndoUI
 import ShareController
-import LegacyChatHeaderPanelComponent
 
 private final class ChatBusinessLinkTitlePanelComponent: Component {
     let context: AccountContext

@@ -184,7 +184,7 @@ final class StatsMessageItemNode: ListViewItemNode, ItemListItemNode {
         
         self.activateArea = AccessibilityAreaNode()
         
-        super.init(layerBacked: false)
+        super.init(layerBacked: false, dynamicBounce: false)
         
         self.containerNode.addSubnode(self.contextSourceNode)
         self.containerNode.targetNodeForActivationProgress = self.contextSourceNode.contentNode
@@ -661,7 +661,6 @@ final class StatsMessageItemNode: ListViewItemNode, ItemListItemNode {
                             component: AnyComponent(AvatarStoryIndicatorComponent(
                                 hasUnseen: true,
                                 hasUnseenCloseFriendsItems: false,
-                                hasLiveItems: false,
                                 colors: AvatarStoryIndicatorComponent.Colors(
                                     unseenColors: item.presentationData.theme.chatList.storyUnseenColors.array,
                                     unseenCloseFriendsColors: item.presentationData.theme.chatList.storyUnseenPrivateColors.array,

@@ -25,7 +25,6 @@ public final class AvatarVideoNode: ASDisplayNode {
     
     private var emojiMarkup: TelegramMediaImage.EmojiMarkup?
     
-    private var videoFileDisposable: Disposable?
     private var fileDisposable = MetaDisposable()
     private var animationFile: TelegramMediaFile?
     private var itemLayer: EmojiKeyboardItemLayer?
@@ -33,7 +32,6 @@ public final class AvatarVideoNode: ASDisplayNode {
     private var animationNode: AnimatedStickerNode?
     private let stickerFetchedDisposable = MetaDisposable()
     
-    private var videoItemLayer: EmojiKeyboardItemLayer?
     private var videoNode: UniversalVideoNode?
     private var videoContent: NativeVideoContent?
     private let playbackStartDisposable = MetaDisposable()
@@ -57,7 +55,6 @@ public final class AvatarVideoNode: ASDisplayNode {
     }
     
     deinit {
-        self.videoFileDisposable?.dispose()
         self.fileDisposable.dispose()
         self.stickerFetchedDisposable.dispose()
         self.playbackStartDisposable.dispose()
@@ -140,7 +137,6 @@ public final class AvatarVideoNode: ASDisplayNode {
                     self.videoLoopCount += 1
                     if self.videoLoopCount >= maxVideoLoopCount {
                         self.itemLayer?.isVisibleForAnimations = false
-                        self.videoItemLayer?.isVisibleForAnimations = false
                     }
                 }
             }
@@ -215,9 +211,6 @@ public final class AvatarVideoNode: ASDisplayNode {
             if videoContent.id != self.videoContent?.id {
                 self.videoNode?.removeFromSupernode()
                 self.videoContent = videoContent
-                
-                self.videoFileDisposable?.dispose()
-                self.videoFileDisposable = fetchedMediaResource(mediaBox: self.context.account.postbox.mediaBox, userLocation: .peer(peer.id), userContentType: .avatar, reference: videoFileReference.resourceReference(videoFileReference.media.resource)).startStrict()
             }
         }
     }
@@ -238,111 +231,56 @@ public final class AvatarVideoNode: ASDisplayNode {
         }
         self.animationNode?.visibility = isVisible
         if isVisible, let videoContent = self.videoContent, self.videoLoopCount < maxVideoLoopCount {
-            var useDirectCache = false
-            if self.internalSize.width <= 200.0 {
-                useDirectCache = true
-            }
-            
-            if useDirectCache {
-                if self.videoItemLayer == nil {
-                    let animationData = EntityKeyboardAnimationData(file: TelegramMediaFile.Accessor(videoContent.fileReference.media))
-                    let videoItemLayer = EmojiKeyboardItemLayer(
-                        item: EmojiPagerContentComponent.Item(
-                            animationData: animationData,
-                            content: .animation(animationData),
-                            itemFile: TelegramMediaFile.Accessor(videoContent.fileReference.media),
-                            subgroupId: nil,
-                            icon: .none,
-                            tintMode: .none
-                        ),
-                        context: self.context,
-                        attemptSynchronousLoad: false,
-                        content: .animation(animationData),
-                        cache: self.context.animationCache,
-                        renderer: self.context.animationRenderer,
-                        placeholderColor: .clear,
-                        blurredBadgeColor: .clear,
-                        accentIconColor: .white,
-                        pointSize: self.internalSize,
-                        onUpdateDisplayPlaceholder: { _, _ in
-                        }
-                    )
-                    videoItemLayer.onLoop = { [weak self] in
-                        if let self {
-                            self.videoLoopCount += 1
-                            if self.videoLoopCount >= maxVideoLoopCount {
-                                self.itemLayer?.isVisibleForAnimations = false
+            if self.videoNode == nil {
+                let context = self.context
+                let mediaManager = context.sharedContext.mediaManager
+                let videoNode = UniversalVideoNode(context: context, postbox: context.account.postbox, audioSession: mediaManager.audioSession, manager: mediaManager.universalVideoManager, decoration: VideoDecoration(), content: videoContent, priority: .embedded)
+                videoNode.clipsToBounds = true
+                videoNode.isUserInteractionEnabled = false
+                videoNode.isHidden = true
+                videoNode.playbackCompleted = { [weak self] in
+                    if let strongSelf = self {
+                        strongSelf.videoLoopCount += 1
+                        if strongSelf.videoLoopCount >= maxVideoLoopCount {
+                            if let videoNode = strongSelf.videoNode {
+                                strongSelf.videoNode = nil
+                                videoNode.layer.animateAlpha(from: 1.0, to: 0.0, duration: 0.2, removeOnCompletion: false, completion: { [weak videoNode] _ in
+                                    videoNode?.removeFromSupernode()
+                                })
                             }
                         }
                     }
-                    
-                    self.videoItemLayer = videoItemLayer
-                    self.layer.addSublayer(videoItemLayer)
                 }
-            } else {
-                if let videoItemLayer = self.videoItemLayer {
-                    self.videoItemLayer = nil
-                    videoItemLayer.removeFromSuperlayer()
-                }
-            }
-            
-            if useDirectCache {
-                if let videoNode = self.videoNode {
-                    self.videoNode = nil
-                    videoNode.removeFromSupernode()
-                }
-            } else {
-                if self.videoNode == nil {
-                    let context = self.context
-                    let mediaManager = context.sharedContext.mediaManager
-                    let videoNode = UniversalVideoNode(context: context, postbox: context.account.postbox, audioSession: mediaManager.audioSession, manager: mediaManager.universalVideoManager, decoration: VideoDecoration(), content: videoContent, priority: .embedded)
-                    videoNode.clipsToBounds = true
-                    videoNode.isUserInteractionEnabled = false
-                    videoNode.isHidden = true
-                    videoNode.playbackCompleted = { [weak self] in
+                
+                if let _ = videoContent.startTimestamp {
+                    self.playbackStartDisposable.set((videoNode.status
+                    |> map { status -> Bool in
+                        if let status = status, case .playing = status.status {
+                            return true
+                        } else {
+                            return false
+                        }
+                    }
+                    |> filter { playing in
+                        return playing
+                    }
+                    |> take(1)
+                    |> deliverOnMainQueue).startStrict(completed: { [weak self] in
                         if let strongSelf = self {
-                            strongSelf.videoLoopCount += 1
-                            if strongSelf.videoLoopCount >= maxVideoLoopCount {
-                                if let videoNode = strongSelf.videoNode {
-                                    strongSelf.videoNode = nil
-                                    videoNode.layer.animateAlpha(from: 1.0, to: 0.0, duration: 0.2, removeOnCompletion: false, completion: { [weak videoNode] _ in
-                                        videoNode?.removeFromSupernode()
-                                    })
-                                }
+                            Queue.mainQueue().after(0.15) {
+                                strongSelf.videoNode?.isHidden = false
                             }
                         }
-                    }
-                    
-                    if let _ = videoContent.startTimestamp {
-                        self.playbackStartDisposable.set((videoNode.status
-                        |> map { status -> Bool in
-                            if let status = status, case .playing = status.status {
-                                return true
-                            } else {
-                                return false
-                            }
-                        }
-                        |> filter { playing in
-                            return playing
-                        }
-                        |> take(1)
-                        |> deliverOnMainQueue).startStrict(completed: { [weak self] in
-                            if let strongSelf = self {
-                                Queue.mainQueue().after(0.15) {
-                                    strongSelf.videoNode?.isHidden = false
-                                }
-                            }
-                        }))
-                    } else {
-                        self.playbackStartDisposable.set(nil)
-                        videoNode.isHidden = false
-                    }
-                    videoNode.canAttachContent = true
-                    videoNode.play()
-                    
-                    self.addSubnode(videoNode)
-                    self.videoNode = videoNode
+                    }))
+                } else {
+                    self.playbackStartDisposable.set(nil)
+                    videoNode.isHidden = false
                 }
+                videoNode.canAttachContent = true
+                videoNode.play()
+                
+                self.addSubnode(videoNode)
+                self.videoNode = videoNode
             }
         } else if let videoNode = self.videoNode {
             self.videoNode = nil
@@ -351,7 +289,6 @@ public final class AvatarVideoNode: ASDisplayNode {
         if self.videoLoopCount < maxVideoLoopCount {
             self.itemLayer?.isVisibleForAnimations = isVisible
         }
-        self.videoItemLayer?.isVisibleForAnimations = isVisible
     }
     
     public func updateLayout(size: CGSize, cornerRadius: CGFloat, transition: ContainedViewLayoutTransition) {
@@ -363,9 +300,6 @@ public final class AvatarVideoNode: ASDisplayNode {
         if let videoNode = self.videoNode {
             videoNode.frame = CGRect(origin: .zero, size: size)
             videoNode.updateLayout(size: size, transition: transition)
-        }
-        if let videoItemLayer = self.videoItemLayer {
-            videoItemLayer.frame = CGRect(origin: .zero, size: size)
         }
         
         let itemSize = CGSize(width: size.width * 0.67, height: size.height * 0.67)

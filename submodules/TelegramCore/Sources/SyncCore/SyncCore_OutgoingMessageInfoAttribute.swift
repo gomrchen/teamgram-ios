@@ -21,15 +21,13 @@ public class OutgoingMessageInfoAttribute: MessageAttribute {
     public let acknowledged: Bool
     public let correlationId: Int64?
     public let bubbleUpEmojiOrStickersets: [ItemCollectionId]
-    public let partialReference: PartialMediaReference?
     
-    public init(uniqueId: Int64, flags: OutgoingMessageInfoFlags, acknowledged: Bool, correlationId: Int64?, bubbleUpEmojiOrStickersets: [ItemCollectionId], partialReference: PartialMediaReference?) {
+    public init(uniqueId: Int64, flags: OutgoingMessageInfoFlags, acknowledged: Bool, correlationId: Int64?, bubbleUpEmojiOrStickersets: [ItemCollectionId]) {
         self.uniqueId = uniqueId
         self.flags = flags
         self.acknowledged = acknowledged
         self.correlationId = correlationId
         self.bubbleUpEmojiOrStickersets = bubbleUpEmojiOrStickersets
-        self.partialReference = partialReference
     }
     
     required public init(decoder: PostboxDecoder) {
@@ -41,11 +39,6 @@ public class OutgoingMessageInfoAttribute: MessageAttribute {
             self.bubbleUpEmojiOrStickersets = ItemCollectionId.decodeArrayFromBuffer(ReadBuffer(data: data))
         } else {
             self.bubbleUpEmojiOrStickersets = []
-        }
-        if let partialReference = decoder.decodeAnyObjectForKey("partialReference", decoder: { PartialMediaReference(decoder: $0) }) as? PartialMediaReference {
-            self.partialReference = partialReference
-        } else {
-            self.partialReference = nil
         }
     }
     
@@ -61,18 +54,13 @@ public class OutgoingMessageInfoAttribute: MessageAttribute {
         let bubbleUpEmojiOrStickersetsBuffer = WriteBuffer()
         ItemCollectionId.encodeArrayToBuffer(self.bubbleUpEmojiOrStickersets, buffer: bubbleUpEmojiOrStickersetsBuffer)
         encoder.encodeData(bubbleUpEmojiOrStickersetsBuffer.makeData(), forKey: "bubbleUpEmojiOrStickersets")
-        if let partialReference {
-            encoder.encodeObjectWithEncoder(partialReference, encoder: partialReference.encode, forKey: "partialReference")
-        } else {
-            encoder.encodeNil(forKey: "partialReference")
-        }
     }
     
     public func withUpdatedFlags(_ flags: OutgoingMessageInfoFlags) -> OutgoingMessageInfoAttribute {
-        return OutgoingMessageInfoAttribute(uniqueId: self.uniqueId, flags: flags, acknowledged: self.acknowledged, correlationId: self.correlationId, bubbleUpEmojiOrStickersets: self.bubbleUpEmojiOrStickersets, partialReference: self.partialReference)
+        return OutgoingMessageInfoAttribute(uniqueId: self.uniqueId, flags: flags, acknowledged: self.acknowledged, correlationId: self.correlationId, bubbleUpEmojiOrStickersets: self.bubbleUpEmojiOrStickersets)
     }
     
     public func withUpdatedAcknowledged(_ acknowledged: Bool) -> OutgoingMessageInfoAttribute {
-        return OutgoingMessageInfoAttribute(uniqueId: self.uniqueId, flags: self.flags, acknowledged: acknowledged, correlationId: self.correlationId, bubbleUpEmojiOrStickersets: self.bubbleUpEmojiOrStickersets, partialReference: self.partialReference)
+        return OutgoingMessageInfoAttribute(uniqueId: self.uniqueId, flags: self.flags, acknowledged: acknowledged, correlationId: self.correlationId, bubbleUpEmojiOrStickersets: self.bubbleUpEmojiOrStickersets)
     }
 }

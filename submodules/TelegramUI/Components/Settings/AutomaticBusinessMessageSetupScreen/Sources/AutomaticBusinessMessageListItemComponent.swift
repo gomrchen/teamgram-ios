@@ -72,7 +72,6 @@ final class GreetingMessageListItemComponent: Component {
         private var itemNode: ListViewItemNode?
         
         var customUpdateIsHighlighted: ((Bool) -> Void)?
-        var enumerateSiblings: (((UIView) -> Void) -> Void)?
         private(set) var separatorInset: CGFloat = 0.0
         
         override init(frame: CGRect) {
@@ -205,17 +204,15 @@ final class GreetingMessageListItemComponent: Component {
                     },
                     openStarsTopup: { _ in
                     },
+                    dismissNotice: { _ in
+                    },
                     editPeer: { _ in
                     },
                     openWebApp: { _ in
                     },
                     openPhotoSetup: {
                     },
-                    openAdInfo: { _, _ in
-                    },
-                    openAccountFreezeInfo: {
-                    },
-                    openUrl: { _ in
+                    openAdInfo: { _ in
                     }
                 )
                 self.chatListNodeInteraction = chatListNodeInteraction
@@ -263,7 +260,7 @@ final class GreetingMessageListItemComponent: Component {
                 hasActiveRevealControls: false,
                 selected: false,
                 header: nil,
-                enabledContextActions: nil,
+                enableContextActions: false,
                 hiddenOffset: false,
                 interaction: chatListNodeInteraction
             )

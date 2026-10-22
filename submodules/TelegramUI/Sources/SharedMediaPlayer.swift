@@ -9,7 +9,6 @@ import TelegramAudio
 import AccountContext
 import TelegramUniversalVideoContent
 import DeviceProximity
-import PeerMessagesMediaPlaylist
 
 private enum SharedMediaPlaybackItem: Equatable {
     case audio(MediaPlayer)

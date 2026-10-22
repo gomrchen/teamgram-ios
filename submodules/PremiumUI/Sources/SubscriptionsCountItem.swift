@@ -91,7 +91,7 @@ private final class SubscriptionsCountItemNode: ListViewItemNode {
             return textNode
         }
         
-        super.init(layerBacked: false)
+        super.init(layerBacked: false, dynamicBounce: false)
         
         self.textNodes.forEach(self.addSubnode)
     }

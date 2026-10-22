@@ -16,8 +16,6 @@ import PhoneNumberFormat
 import ItemListUI
 import AnimatedStickerNode
 import TelegramAnimatedStickerNode
-import ComponentFlow
-import SearchInputPanelComponent
 
 private enum ContactListSearchGroup {
     case contacts
@@ -54,14 +52,14 @@ private enum ContactListSearchEntryId: Hashable {
 }
 
 private enum ContactListSearchEntry: Comparable, Identifiable {
-    case addContact(theme: PresentationTheme, strings: PresentationStrings, phoneNumber: String)
-    case peer(index: Int, theme: PresentationTheme, strings: PresentationStrings, peer: ContactListPeer, presence: EnginePeer.Presence?, group: ContactListSearchGroup, enabled: Bool, requiresPremiumForMessaging: Bool, displayCallIcons: Bool)
+    case addContact(PresentationTheme, PresentationStrings, String)
+    case peer(Int, PresentationTheme, PresentationStrings, ContactListPeer, EnginePeer.Presence?, ContactListSearchGroup, Bool, Bool)
     
     var stableId: ContactListSearchEntryId {
         switch self {
             case .addContact:
                 return .addContact
-            case let .peer(_, _, _, peer, _, _, _, _, _):
+            case let .peer(_, _, _, peer, _, _, _, _):
                 return .peerId(peer.id)
         }
     }
@@ -74,9 +72,9 @@ private enum ContactListSearchEntry: Comparable, Identifiable {
                 } else {
                     return false
                 }
-            case let .peer(lhsIndex, lhsTheme, lhsStrings, lhsPeer, lhsPresence, lhsGroup, lhsEnabled, lhsRequiresPremiumForMessaging, lhsDisplayCallIcons):
+            case let .peer(lhsIndex, lhsTheme, lhsStrings, lhsPeer, lhsPresence, lhsGroup, lhsEnabled, lhsRequiresPremiumForMessaging):
                 switch rhs {
-                    case let .peer(rhsIndex, rhsTheme, rhsStrings, rhsPeer, rhsPresence, rhsGroup, rhsEnabled, rhsRequiresPremiumForMessaging, rhsDisplayCallIcons):
+                    case let .peer(rhsIndex, rhsTheme, rhsStrings, rhsPeer, rhsPresence, rhsGroup, rhsEnabled, rhsRequiresPremiumForMessaging):
                         if lhsIndex != rhsIndex {
                             return false
                         }
@@ -105,9 +103,6 @@ private enum ContactListSearchEntry: Comparable, Identifiable {
                         if lhsRequiresPremiumForMessaging != rhsRequiresPremiumForMessaging {
                             return false
                         }
-                        if lhsDisplayCallIcons != rhsDisplayCallIcons {
-                            return false
-                        }
                         return true
                     default:
                         return false
@@ -119,23 +114,23 @@ private enum ContactListSearchEntry: Comparable, Identifiable {
         switch lhs {
         case .addContact:
             return true
-        case let .peer(lhsIndex, _, _, _, _, _, _, _, _):
+        case let .peer(lhsIndex, _, _, _, _, _, _, _):
             switch rhs {
             case .addContact:
                 return false
-            case let .peer(rhsIndex, _, _, _, _, _, _, _, _):
+            case let .peer(rhsIndex, _, _, _, _, _, _, _):
                 return lhsIndex < rhsIndex
             }
         }
     }
     
-    func item(context: AccountContext, presentationData: PresentationData, nameSortOrder: PresentationPersonNameOrder, nameDisplayOrder: PresentationPersonNameOrder, timeFormat: PresentationDateTimeFormat, isPeerEnabled: @escaping (ContactListPeer) -> Bool, addContact: ((String) -> Void)?, openPeer: @escaping (ContactListPeer, ContactsSearchContainerNode.OpenPeerAction) -> Void, openDisabledPeer: @escaping (EnginePeer, ChatListDisabledPeerReason) -> Void, contextAction: ((EnginePeer, ASDisplayNode, ContextGesture?, CGPoint?) -> Void)?) -> ListViewItem {
+    func item(context: AccountContext, presentationData: PresentationData, nameSortOrder: PresentationPersonNameOrder, nameDisplayOrder: PresentationPersonNameOrder, timeFormat: PresentationDateTimeFormat, addContact: ((String) -> Void)?, openPeer: @escaping (ContactListPeer) -> Void, openDisabledPeer: @escaping (EnginePeer, ChatListDisabledPeerReason) -> Void, contextAction: ((EnginePeer, ASDisplayNode, ContextGesture?, CGPoint?) -> Void)?) -> ListViewItem {
         switch self {
             case let .addContact(theme, strings, phoneNumber):
                 return ContactsAddItem(context: context, theme: theme, strings: strings, phoneNumber: phoneNumber, header: ChatListSearchItemHeader(type: .phoneNumber, theme: theme, strings: strings, actionTitle: nil, action: nil), action: {
                     addContact?(phoneNumber)
                 })
-            case let .peer(_, theme, strings, peer, presence, group, enabled, requiresPremiumForMessaging, displayCallIcons):
+            case let .peer(_, theme, strings, peer, presence, group, enabled, requiresPremiumForMessaging):
                 let header: ListViewItemHeader
                 let status: ContactsPeerItemStatus
                 switch group {
@@ -166,16 +161,8 @@ private enum ContactListSearchEntry: Comparable, Identifiable {
                     case let .deviceContact(stableId, contact):
                         peerItem = .deviceContact(stableId: stableId, contact: contact)
                 }
-                var additionalActions: [ContactsPeerItemAction] = []
-                if displayCallIcons {
-                    additionalActions = [ContactsPeerItemAction(icon: .voiceCall, action: { _, sourceNode, gesture  in
-                        openPeer(peer, .voiceCall)
-                    }), ContactsPeerItemAction(icon: .videoCall, action: { _, sourceNode, gesture in
-                        openPeer(peer, .videoCall)
-                    })]
-                }
-                return ContactsPeerItem(presentationData: ItemListPresentationData(presentationData), sortOrder: nameSortOrder, displayOrder: nameDisplayOrder, context: context, peerMode: .peer, peer: peerItem, status: status, requiresPremiumForMessaging: requiresPremiumForMessaging, enabled: enabled && isPeerEnabled(peer), selection: .none, editing: ContactsPeerItemEditing(editable: false, editing: false, revealed: false), additionalActions: additionalActions, index: nil, header: header, action: { _ in
-                    openPeer(peer, .generic)
+                return ContactsPeerItem(presentationData: ItemListPresentationData(presentationData), sortOrder: nameSortOrder, displayOrder: nameDisplayOrder, context: context, peerMode: .peer, peer: peerItem, status: status, requiresPremiumForMessaging: requiresPremiumForMessaging, enabled: enabled, selection: .none, editing: ContactsPeerItemEditing(editable: false, editing: false, revealed: false), index: nil, header: header, action: { _ in
+                    openPeer(peer)
                 }, disabledAction: { _ in
                     if case let .peer(peer, _, _) = peer {
                         openDisabledPeer(EnginePeer(peer), requiresPremiumForMessaging ? .premiumRequired : .generic)
@@ -200,12 +187,12 @@ struct ContactListSearchContainerTransition {
     let query: String
 }
 
-private func contactListSearchContainerPreparedRecentTransition(from fromEntries: [ContactListSearchEntry], to toEntries: [ContactListSearchEntry], isSearching: Bool, emptyResults: Bool, query: String, context: AccountContext, presentationData: PresentationData, nameSortOrder: PresentationPersonNameOrder, nameDisplayOrder: PresentationPersonNameOrder, timeFormat: PresentationDateTimeFormat, isPeerEnabled: @escaping (ContactListPeer) -> Bool, addContact: ((String) -> Void)?, openPeer: @escaping (ContactListPeer, ContactsSearchContainerNode.OpenPeerAction) -> Void, openDisabledPeer: @escaping (EnginePeer, ChatListDisabledPeerReason) -> Void, contextAction: ((EnginePeer, ASDisplayNode, ContextGesture?, CGPoint?) -> Void)?) -> ContactListSearchContainerTransition {
+private func contactListSearchContainerPreparedRecentTransition(from fromEntries: [ContactListSearchEntry], to toEntries: [ContactListSearchEntry], isSearching: Bool, emptyResults: Bool, query: String, context: AccountContext, presentationData: PresentationData, nameSortOrder: PresentationPersonNameOrder, nameDisplayOrder: PresentationPersonNameOrder, timeFormat: PresentationDateTimeFormat, addContact: ((String) -> Void)?, openPeer: @escaping (ContactListPeer) -> Void, openDisabledPeer: @escaping (EnginePeer, ChatListDisabledPeerReason) -> Void, contextAction: ((EnginePeer, ASDisplayNode, ContextGesture?, CGPoint?) -> Void)?) -> ContactListSearchContainerTransition {
     let (deleteIndices, indicesAndItems, updateIndices) = mergeListsStableWithUpdates(leftList: fromEntries, rightList: toEntries)
     
     let deletions = deleteIndices.map { ListViewDeleteItem(index: $0, directionHint: nil) }
-    let insertions = indicesAndItems.map { ListViewInsertItem(index: $0.0, previousIndex: $0.2, item: $0.1.item(context: context, presentationData: presentationData, nameSortOrder: nameSortOrder, nameDisplayOrder: nameDisplayOrder, timeFormat: timeFormat, isPeerEnabled: isPeerEnabled, addContact: addContact, openPeer: openPeer, openDisabledPeer: openDisabledPeer, contextAction: contextAction), directionHint: nil) }
-    let updates = updateIndices.map { ListViewUpdateItem(index: $0.0, previousIndex: $0.2, item: $0.1.item(context: context, presentationData: presentationData, nameSortOrder: nameSortOrder, nameDisplayOrder: nameDisplayOrder, timeFormat: timeFormat, isPeerEnabled: isPeerEnabled, addContact: addContact, openPeer: openPeer, openDisabledPeer: openDisabledPeer, contextAction: contextAction), directionHint: nil) }
+    let insertions = indicesAndItems.map { ListViewInsertItem(index: $0.0, previousIndex: $0.2, item: $0.1.item(context: context, presentationData: presentationData, nameSortOrder: nameSortOrder, nameDisplayOrder: nameDisplayOrder, timeFormat: timeFormat, addContact: addContact, openPeer: openPeer, openDisabledPeer: openDisabledPeer, contextAction: contextAction), directionHint: nil) }
+    let updates = updateIndices.map { ListViewUpdateItem(index: $0.0, previousIndex: $0.2, item: $0.1.item(context: context, presentationData: presentationData, nameSortOrder: nameSortOrder, nameDisplayOrder: nameDisplayOrder, timeFormat: timeFormat, addContact: addContact, openPeer: openPeer, openDisabledPeer: openDisabledPeer, contextAction: contextAction), directionHint: nil) }
     
     return ContactListSearchContainerTransition(deletions: deletions, insertions: insertions, updates: updates, isSearching: isSearching, emptyResults: emptyResults, query: query)
 }
@@ -224,23 +211,13 @@ public struct ContactsSearchCategories: OptionSet {
 }
 
 public final class ContactsSearchContainerNode: SearchDisplayControllerContentNode {
-    public enum OpenPeerAction {
-        case generic
-        case voiceCall
-        case videoCall
-    }
-
     private let context: AccountContext
-    private let glass: Bool
-    private let externalSearchBar: Bool
-    private let isPeerEnabled: (ContactListPeer) -> Bool
     private let addContact: ((String) -> Void)?
-    private let openPeer: (ContactListPeer, ContactsSearchContainerNode.OpenPeerAction) -> Void
+    private let openPeer: (ContactListPeer) -> Void
     private let openDisabledPeer: (EnginePeer, ChatListDisabledPeerReason) -> Void
     private let contextAction: ((EnginePeer, ASDisplayNode, ContextGesture?, CGPoint?) -> Void)?
     
     private let dimNode: ASDisplayNode
-    private let backgroundNode: ASDisplayNode
     public let listNode: ListView
     
     private let emptyResultsTitleNode: ImmediateTextNode
@@ -257,31 +234,12 @@ public final class ContactsSearchContainerNode: SearchDisplayControllerContentNo
     private var containerViewLayout: (ContainerViewLayout, CGFloat)?
     private var enqueuedTransitions: [ContactListSearchContainerTransition] = []
     
-    private let searchInput = ComponentView<Empty>()
-    
     public override var hasDim: Bool {
         return true
     }
     
-    public init(
-        context: AccountContext,
-        glass: Bool = false,
-        externalSearchBar: Bool = false,
-        updatedPresentationData: (initial: PresentationData, signal: Signal<PresentationData, NoError>)? = nil,
-        onlyWriteable: Bool,
-        categories: ContactsSearchCategories,
-        filters: [ContactListFilter] = [.excludeSelf],
-        displayCallIcons: Bool = false,
-        isPeerEnabled: @escaping (ContactListPeer) -> Bool = { _ in true },
-        addContact: ((String) -> Void)?,
-        openPeer: @escaping (ContactListPeer, ContactsSearchContainerNode.OpenPeerAction) -> Void,
-        openDisabledPeer: @escaping (EnginePeer, ChatListDisabledPeerReason) -> Void,
-        contextAction: ((EnginePeer, ASDisplayNode, ContextGesture?, CGPoint?) -> Void)?
-    ) {
+    public init(context: AccountContext, updatedPresentationData: (initial: PresentationData, signal: Signal<PresentationData, NoError>)? = nil, onlyWriteable: Bool, categories: ContactsSearchCategories, filters: [ContactListFilter] = [.excludeSelf], addContact: ((String) -> Void)?, openPeer: @escaping (ContactListPeer) -> Void, openDisabledPeer: @escaping (EnginePeer, ChatListDisabledPeerReason) -> Void, contextAction: ((EnginePeer, ASDisplayNode, ContextGesture?, CGPoint?) -> Void)?) {
         self.context = context
-        self.glass = glass
-        self.externalSearchBar = externalSearchBar
-        self.isPeerEnabled = isPeerEnabled
         self.addContact = addContact
         self.openPeer = openPeer
         self.openDisabledPeer = openDisabledPeer
@@ -293,16 +251,10 @@ public final class ContactsSearchContainerNode: SearchDisplayControllerContentNo
         self.themeAndStringsPromise = Promise((self.presentationData.theme, self.presentationData.strings))
         
         self.dimNode = ASDisplayNode()
-        self.dimNode.backgroundColor = .clear
-        
-        self.backgroundNode = ASDisplayNode()
-        self.backgroundNode.backgroundColor = self.presentationData.theme.list.plainBackgroundColor
-        self.backgroundNode.alpha = 0.0
-        
+        self.dimNode.backgroundColor = UIColor.black.withAlphaComponent(0.5)
         self.listNode = ListView()
         self.listNode.backgroundColor = self.presentationData.theme.list.plainBackgroundColor
-        self.listNode.alpha = 0.0
-        
+        self.listNode.isHidden = true
         self.listNode.accessibilityPageScrolledString = { row, count in
             return presentationData.strings.VoiceOver_ScrollStatus(row, count).string
         }
@@ -311,19 +263,16 @@ public final class ContactsSearchContainerNode: SearchDisplayControllerContentNo
         self.emptyResultsTitleNode.displaysAsynchronously = false
         self.emptyResultsTitleNode.attributedText = NSAttributedString(string: self.presentationData.strings.Contacts_Search_NoResults, font: Font.semibold(17.0), textColor: self.presentationData.theme.list.freeTextColor)
         self.emptyResultsTitleNode.textAlignment = .center
-        self.emptyResultsTitleNode.alpha = 0.0
-        self.emptyResultsTitleNode.isUserInteractionEnabled = false
+        self.emptyResultsTitleNode.isHidden = true
         
         self.emptyResultsTextNode = ImmediateTextNode()
         self.emptyResultsTextNode.displaysAsynchronously = false
         self.emptyResultsTextNode.maximumNumberOfLines = 0
         self.emptyResultsTextNode.textAlignment = .center
-        self.emptyResultsTextNode.alpha = 0.0
-        self.emptyResultsTextNode.isUserInteractionEnabled = false
-        
+        self.emptyResultsTextNode.isHidden = true
+             
         self.emptyResultsAnimationNode = DefaultAnimatedStickerNodeImpl()
-        self.emptyResultsAnimationNode.alpha = 0.0
-        self.emptyResultsAnimationNode.isUserInteractionEnabled = false
+        self.emptyResultsAnimationNode.isHidden = true
         
         super.init()
         
@@ -334,13 +283,14 @@ public final class ContactsSearchContainerNode: SearchDisplayControllerContentNo
         self.isOpaque = false
         
         self.addSubnode(self.dimNode)
-        self.addSubnode(self.backgroundNode)
         self.addSubnode(self.listNode)
         
         self.addSubnode(self.emptyResultsAnimationNode)
         self.addSubnode(self.emptyResultsTitleNode)
         self.addSubnode(self.emptyResultsTextNode)
-                
+        
+        self.listNode.isHidden = true
+        
         let themeAndStringsPromise = self.themeAndStringsPromise
         
         let previousFoundRemoteContacts = Atomic<([FoundPeer], [FoundPeer])?>(value: nil)
@@ -491,7 +441,7 @@ public final class ContactsSearchContainerNode: SearchDisplayControllerContentNo
                                 enabled = false
                             }
                         }
-                        entries.append(.peer(index: index, theme: themeAndStrings.0, strings: themeAndStrings.1, peer: .peer(peer: peer._asPeer(), isGlobal: false, participantCount: nil), presence: localPeersAndPresences.1[peer.id], group: .contacts, enabled: enabled, requiresPremiumForMessaging: requiresPremiumForMessaging, displayCallIcons: displayCallIcons))
+                        entries.append(.peer(index, themeAndStrings.0, themeAndStrings.1, .peer(peer: peer._asPeer(), isGlobal: false, participantCount: nil), localPeersAndPresences.1[peer.id], .contacts, enabled, requiresPremiumForMessaging))
                         if searchDeviceContacts, case let .user(user) = peer, let phone = user.phone {
                             existingNormalizedPhoneNumbers.insert(DeviceContactNormalizedPhoneNumber(rawValue: formatPhoneNumber(phone)))
                         }
@@ -533,7 +483,7 @@ public final class ContactsSearchContainerNode: SearchDisplayControllerContentNo
                                     }
                                 }
                                 
-                                entries.append(.peer(index: index, theme: themeAndStrings.0, strings: themeAndStrings.1, peer: .peer(peer: peer.peer, isGlobal: true, participantCount: peer.subscribers), presence: nil, group: .global, enabled: enabled, requiresPremiumForMessaging: requiresPremiumForMessaging, displayCallIcons: displayCallIcons))
+                                entries.append(.peer(index, themeAndStrings.0, themeAndStrings.1, .peer(peer: peer.peer, isGlobal: true, participantCount: peer.subscribers), nil, .global, enabled, requiresPremiumForMessaging))
                                 if searchDeviceContacts, let user = peer.peer as? TelegramUser, let phone = user.phone {
                                     existingNormalizedPhoneNumbers.insert(DeviceContactNormalizedPhoneNumber(rawValue: formatPhoneNumber(phone)))
                                 }
@@ -568,7 +518,7 @@ public final class ContactsSearchContainerNode: SearchDisplayControllerContentNo
                                     }
                                 }
                                 
-                                entries.append(.peer(index: index, theme: themeAndStrings.0, strings: themeAndStrings.1, peer: .peer(peer: peer.peer, isGlobal: true, participantCount: peer.subscribers), presence: nil, group: .global, enabled: enabled, requiresPremiumForMessaging: requiresPremiumForMessaging, displayCallIcons: displayCallIcons))
+                                entries.append(.peer(index, themeAndStrings.0, themeAndStrings.1, .peer(peer: peer.peer, isGlobal: true, participantCount: peer.subscribers), nil, .global, enabled, requiresPremiumForMessaging))
                                 if searchDeviceContacts, let user = peer.peer as? TelegramUser, let phone = user.phone {
                                     existingNormalizedPhoneNumbers.insert(DeviceContactNormalizedPhoneNumber(rawValue: formatPhoneNumber(phone)))
                                 }
@@ -589,13 +539,13 @@ public final class ContactsSearchContainerNode: SearchDisplayControllerContentNo
                                     continue outer
                                 }
                             }
-                            entries.append(.peer(index: index, theme: themeAndStrings.0, strings: themeAndStrings.1, peer: .deviceContact(stableId, contact.0), presence: nil, group: .deviceContacts, enabled: true, requiresPremiumForMessaging: false, displayCallIcons: displayCallIcons))
+                            entries.append(.peer(index, themeAndStrings.0, themeAndStrings.1, .deviceContact(stableId, contact.0), nil, .deviceContacts, true, false))
                             index += 1
                         }
                     }
                     
                     if let _ = addContact, isViablePhoneNumber(query) {
-                        entries.append(.addContact(theme: themeAndStrings.0, strings: themeAndStrings.1, phoneNumber: query))
+                        entries.append(.addContact(themeAndStrings.0, themeAndStrings.1, query))
                     }
                     
                     return (entries, query)
@@ -621,9 +571,9 @@ public final class ContactsSearchContainerNode: SearchDisplayControllerContentNo
                     }
                 }
                 
-                let transition = contactListSearchContainerPreparedRecentTransition(from: previousItems, to: items ?? [], isSearching: items != nil, emptyResults: items?.isEmpty ?? false, query: query, context: context, presentationData: strongSelf.presentationData, nameSortOrder: strongSelf.presentationData.nameSortOrder, nameDisplayOrder: strongSelf.presentationData.nameDisplayOrder, timeFormat: strongSelf.presentationData.dateTimeFormat, isPeerEnabled: strongSelf.isPeerEnabled, addContact: addContact, openPeer: { peer, action in
+                let transition = contactListSearchContainerPreparedRecentTransition(from: previousItems, to: items ?? [], isSearching: items != nil, emptyResults: items?.isEmpty ?? false, query: query, context: context, presentationData: strongSelf.presentationData, nameSortOrder: strongSelf.presentationData.nameSortOrder, nameDisplayOrder: strongSelf.presentationData.nameDisplayOrder, timeFormat: strongSelf.presentationData.dateTimeFormat, addContact: addContact, openPeer: { peer in
                     self?.listNode.clearHighlightAnimated(true)
-                    self?.openPeer(peer, action)
+                    self?.openPeer(peer)
                 }, openDisabledPeer: { peer, reason in
                     guard let self else {
                         return
@@ -646,7 +596,7 @@ public final class ContactsSearchContainerNode: SearchDisplayControllerContentNo
     }
     
     override public func scrollToTop() {
-        if self.listNode.alpha > 0.0 {
+        if !self.listNode.isHidden {
             self.listNode.transaction(deleteIndices: [], insertIndicesAndItems: [], updateIndicesAndItems: [], options: [.Synchronous, .LowLatency], scrollToItem: ListViewScrollToItem(index: 0, position: .top(0.0), animated: true, curve: .Default(duration: nil), directionHint: .Up), updateSizeAndInsets: nil, stationaryItemRange: nil, updateOpaqueState: nil, completion: { _ in })
         }
     }
@@ -662,8 +612,6 @@ public final class ContactsSearchContainerNode: SearchDisplayControllerContentNo
         
         self.presentationData = presentationData
         self.themeAndStringsPromise.set(.single((presentationData.theme, presentationData.strings)))
-        
-        self.backgroundNode.backgroundColor = self.presentationData.theme.list.plainBackgroundColor
         self.listNode.backgroundColor = self.presentationData.theme.list.plainBackgroundColor
     }
     
@@ -675,13 +623,6 @@ public final class ContactsSearchContainerNode: SearchDisplayControllerContentNo
         }
     }
     
-    private func deactivateInput() {
-        if let (layout, _) = self.containerViewLayout, let searchInputView = self.searchInput.view as? SearchInputPanelComponent.View {
-            let transition = ComponentTransition.spring(duration: 0.4)
-            transition.setFrame(view: searchInputView, frame: CGRect(origin: CGPoint(x: searchInputView.frame.minX, y: layout.size.height), size: searchInputView.frame.size))
-        }
-    }
-    
     override public func containerLayoutUpdated(_ layout: ContainerViewLayout, navigationBarHeight: CGFloat, transition: ContainedViewLayoutTransition) {
         super.containerLayoutUpdated(layout, navigationBarHeight: navigationBarHeight, transition: transition)
         
@@ -689,26 +630,10 @@ public final class ContactsSearchContainerNode: SearchDisplayControllerContentNo
         self.containerViewLayout = (layout, navigationBarHeight)
         
         let topInset = navigationBarHeight
-        transition.updateFrame(node: self.dimNode, frame: CGRect(origin: CGPoint(x: 0.0, y: 0.0), size: CGSize(width: layout.size.width, height: layout.size.height)))
+        transition.updateFrame(node: self.dimNode, frame: CGRect(origin: CGPoint(x: 0.0, y: topInset), size: CGSize(width: layout.size.width, height: layout.size.height - topInset)))
         
-        self.backgroundNode.frame = CGRect(origin: .zero, size: CGSize(width: layout.size.width, height: navigationBarHeight))
-        
-        self.listNode.frame = CGRect(origin: CGPoint(x: 0.0, y: 0.0), size: CGSize(width: layout.size.width, height: layout.size.height))
-        let listDuration: Double
-        let listCurve: ListViewAnimationCurve
-        switch transition {
-        case .immediate:
-            listDuration = 0.0
-            listCurve = .Default(duration: nil)
-        case let .animated(duration, curve):
-            listDuration = duration
-            if case .spring = curve {
-                listCurve = .Spring(duration: duration)
-            } else {
-                listCurve = .Default(duration: nil)
-            }
-        }
-        self.listNode.transaction(deleteIndices: [], insertIndicesAndItems: [], updateIndicesAndItems: [], options: [.Synchronous], scrollToItem: nil, updateSizeAndInsets: ListViewUpdateSizeAndInsets(size: layout.size, insets: UIEdgeInsets(top: topInset, left: layout.safeInsets.left, bottom: layout.intrinsicInsets.bottom, right: layout.safeInsets.right), duration: listDuration, curve: listCurve), stationaryItemRange: nil, updateOpaqueState: nil, completion: { _ in })
+        self.listNode.frame = CGRect(origin: CGPoint(), size: layout.size)
+        self.listNode.transaction(deleteIndices: [], insertIndicesAndItems: [], updateIndicesAndItems: [], options: [.Synchronous], scrollToItem: nil, updateSizeAndInsets: ListViewUpdateSizeAndInsets(size: layout.size, insets: UIEdgeInsets(top: topInset, left: layout.safeInsets.left, bottom: layout.intrinsicInsets.bottom, right: layout.safeInsets.right), duration: 0.0, curve: .Default(duration: nil)), stationaryItemRange: nil, updateOpaqueState: nil, completion: { _ in })
         
         let size = layout.size
         let sideInset = layout.safeInsets.left
@@ -730,47 +655,6 @@ public final class ContactsSearchContainerNode: SearchDisplayControllerContentNo
         textTransition.updateFrame(node: self.emptyResultsTitleNode, frame: CGRect(origin: CGPoint(x: sideInset + padding + (size.width - sideInset * 2.0 - padding * 2.0 - emptyTitleSize.width) / 2.0, y: emptyAnimationY + emptyAnimationHeight + emptyAnimationSpacing), size: emptyTitleSize))
         textTransition.updateFrame(node: self.emptyResultsTextNode, frame: CGRect(origin: CGPoint(x: sideInset + padding + (size.width - sideInset * 2.0 - padding * 2.0 - emptyTextSize.width) / 2.0, y: emptyAnimationY + emptyAnimationHeight + emptyAnimationSpacing + emptyTitleSize.height + emptyTextSpacing), size: emptyTextSize))
         self.emptyResultsAnimationNode.updateLayout(size: self.emptyResultsAnimationSize)
-        
-        if self.glass && !self.externalSearchBar {
-            let searchInputSize = self.searchInput.update(
-                transition: .immediate,
-                component: AnyComponent(
-                    SearchInputPanelComponent(
-                        theme: self.presentationData.theme,
-                        strings: self.presentationData.strings,
-                        metrics: layout.metrics,
-                        safeInsets: layout.safeInsets,
-                        updated: { [weak self] query in
-                            guard let self else {
-                                return
-                            }
-                            self.searchTextUpdated(text: query)
-                        },
-                        cancel: { [weak self] in
-                            guard let self else {
-                                return
-                            }
-                            self.cancel?()
-                            self.deactivateInput()
-                        }
-                    )
-                ),
-                environment: {},
-                containerSize: CGSize(width: layout.size.width, height: layout.size.height)
-            )
-            
-            let bottomInset: CGFloat = layout.insets(options: .input).bottom
-            let searchInputFrame = CGRect(origin: CGPoint(x: 0.0, y: layout.size.height - bottomInset - searchInputSize.height), size: searchInputSize)
-            if let searchInputView = self.searchInput.view as? SearchInputPanelComponent.View {
-                if searchInputView.superview == nil {
-                    self.view.addSubview(searchInputView)
-                    searchInputView.frame = CGRect(origin: CGPoint(x: searchInputFrame.minX, y: layout.size.height), size: searchInputFrame.size)
-                    
-                    searchInputView.activateInput()
-                }
-                transition.updateFrame(view: searchInputView, frame: searchInputFrame)
-            }
-        }
         
         if !hadValidLayout {
             while !self.enqueuedTransitions.isEmpty {
@@ -810,16 +694,14 @@ public final class ContactsSearchContainerNode: SearchDisplayControllerContentNo
                 if let (layout, navigationBarHeight) = strongSelf.containerViewLayout {
                     strongSelf.containerLayoutUpdated(layout, navigationBarHeight: navigationBarHeight, transition: .immediate)
                 }
-                
-                //let containerTransition = ContainedViewLayoutTransition.animated(duration: 0.3, curve: .easeInOut)
-                ContainedViewLayoutTransition.immediate.updateAlpha(node: strongSelf.listNode, alpha: isSearching ? 1.0 : 0.0)
-                ContainedViewLayoutTransition.immediate.updateAlpha(node: strongSelf.backgroundNode, alpha: isSearching ? 1.0 : 0.0)
+                strongSelf.listNode.isHidden = !isSearching
                 strongSelf.dimNode.isHidden = isSearching
                 
-                ContainedViewLayoutTransition.immediate.updateAlpha(node: strongSelf.emptyResultsAnimationNode, alpha: emptyResults ? 1.0 : 0.0)
-                ContainedViewLayoutTransition.immediate.updateAlpha(node: strongSelf.emptyResultsTitleNode, alpha: emptyResults ? 1.0 : 0.0)
-                ContainedViewLayoutTransition.immediate.updateAlpha(node: strongSelf.emptyResultsTextNode, alpha: emptyResults ? 1.0 : 0.0)
+                strongSelf.emptyResultsAnimationNode.isHidden = !emptyResults
+                strongSelf.emptyResultsTitleNode.isHidden = !emptyResults
+                strongSelf.emptyResultsTextNode.isHidden = !emptyResults
                 strongSelf.emptyResultsAnimationNode.visibility = emptyResults
+                
             })
         }
     }

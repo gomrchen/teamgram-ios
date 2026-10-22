@@ -85,6 +85,8 @@ typedef enum
 @property (nonatomic, assign) CGFloat zoomLevel;
 @property (nonatomic, readonly) CGFloat minZoomLevel;
 @property (nonatomic, readonly) CGFloat maxZoomLevel;
+@property (nonatomic, readonly) int32_t maxMarkZoomValue;
+@property (nonatomic, readonly) int32_t secondMarkZoomValue;
 
 - (void)setZoomLevel:(CGFloat)zoomLevel animated:(bool)animated;
 
@@ -98,8 +100,6 @@ typedef enum
 @property (nonatomic, readonly) NSTimeInterval videoRecordingDuration;
 
 @property (nonatomic, assign) bool autoStartVideoRecording;
-
-@property (nonatomic, strong) NSArray<NSNumber *> *zoomLevels;
 
 - (instancetype)initWithMode:(PGCameraMode)mode position:(PGCameraPosition)position;
 

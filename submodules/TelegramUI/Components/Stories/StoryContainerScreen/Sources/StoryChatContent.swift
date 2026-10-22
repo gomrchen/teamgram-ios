@@ -223,10 +223,6 @@ public final class StoryContentContextImpl: StoryContentContext {
                             sendPaidMessageStars: cachedUserData.sendPaidMessageStars
                         )
                     } else if let cachedChannelData = cachedPeerDataView.cachedPeerData as? CachedChannelData {
-                        var sendPaidMessageStars: StarsAmount?
-                        if case let .channel(channel) = peer {
-                            sendPaidMessageStars = channel.sendPaidMessageStars
-                        }
                         additionalPeerData = StoryContentContextState.AdditionalPeerData(
                             isMuted: true,
                             areVoiceMessagesAvailable: true,
@@ -236,7 +232,7 @@ public final class StoryContentContextImpl: StoryContentContext {
                             preferHighQualityStories: preferHighQualityStories,
                             boostsToUnrestrict: cachedChannelData.boostsToUnrestrict,
                             appliedBoosts: cachedChannelData.appliedBoosts,
-                            sendPaidMessageStars: sendPaidMessageStars
+                            sendPaidMessageStars: cachedChannelData.sendPaidMessageStars
                         )
                     } else {
                         additionalPeerData = StoryContentContextState.AdditionalPeerData(
@@ -318,8 +314,7 @@ public final class StoryContentContextImpl: StoryContentContext {
                         isMy: item.isMy,
                         myReaction: item.myReaction,
                         forwardInfo: forwardInfo,
-                        author: item.authorId.flatMap { peers[$0].flatMap(EnginePeer.init) },
-                        folderIds: item.folderIds
+                        author: item.authorId.flatMap { peers[$0].flatMap(EnginePeer.init) }
                     )
                 }
                 var totalCount = peerStoryItemsView.items.count
@@ -356,8 +351,7 @@ public final class StoryContentContextImpl: StoryContentContext {
                                 isMy: true,
                                 myReaction: nil,
                                 forwardInfo: pendingForwardsInfo[item.randomId],
-                                author: nil,
-                                folderIds: item.folders
+                                author: nil
                             ))
                             totalCount += 1
                         }
@@ -589,7 +583,6 @@ public final class StoryContentContextImpl: StoryContentContext {
     private var focusedItem: (peerId: EnginePeer.Id, storyId: Int32?)?
     
     private var currentState: StateContext?
-    private var stateIsEmpty: Bool = false
     private var currentStateUpdatedDisposable: Disposable?
     
     private var pendingState: StateContext?
@@ -646,11 +639,10 @@ public final class StoryContentContextImpl: StoryContentContext {
                 
                 let storySubscriptions = EngineStorySubscriptions(
                     accountItem: nil,
-                    items: state.items.isEmpty ? [] : [EngineStorySubscriptions.Item(
+                    items: [EngineStorySubscriptions.Item(
                         peer: peer,
                         hasUnseen: state.hasUnseen,
                         hasUnseenCloseFriends: state.hasUnseenCloseFriends,
-                        hasLiveItems: false,
                         hasPending: false,
                         storyCount: state.items.count,
                         unseenCount: 0,
@@ -939,9 +931,6 @@ public final class StoryContentContextImpl: StoryContentContext {
                             self.updateState()
                         })
                     })
-                } else {
-                    self.stateIsEmpty = true
-                    self.updateState()
                 }
             }
         } else {
@@ -951,12 +940,6 @@ public final class StoryContentContextImpl: StoryContentContext {
     
     private func updateState() {
         guard let currentState = self.currentState else {
-            if self.stateIsEmpty {
-                self.stateValue = nil
-                self.statePromise.set(.single(StoryContentContextState(slice: nil, previousSlice: nil, nextSlice: nil)))
-                
-                self.updatedPromise.set(.single(Void()))
-            }
             return
         }
         let stateValue = StoryContentContextState(
@@ -1367,8 +1350,7 @@ public final class SingleStoryContentContextImpl: StoryContentContext {
                     isMy: itemValue.isMy,
                     myReaction: itemValue.myReaction,
                     forwardInfo: forwardInfo,
-                    author: itemValue.authorId.flatMap { peers[$0].flatMap(EnginePeer.init) },
-                    folderIds: itemValue.folderIds
+                    author: itemValue.authorId.flatMap { peers[$0].flatMap(EnginePeer.init) }
                 )
                 
                 let mainItem = StoryContentItem(
@@ -1470,7 +1452,6 @@ public final class PeerStoryListContentContextImpl: StoryContentContext {
     }
     
     private let context: AccountContext
-    let listContext: StoryListContext
     
     public private(set) var stateValue: StoryContentContextState?
     public var state: Signal<StoryContentContextState, NoError> {
@@ -1501,7 +1482,6 @@ public final class PeerStoryListContentContextImpl: StoryContentContext {
     
     public init(context: AccountContext, listContext: StoryListContext, initialId: StoryId?, splitIndexIntoDays: Bool) {
         self.context = context
-        self.listContext = listContext
         
         let preferHighQualityStories: Signal<Bool, NoError> = combineLatest(
             context.sharedContext.automaticMediaDownloadSettings
@@ -2048,8 +2028,6 @@ public func waitUntilStoryMediaPreloaded(context: AccountContext, peerId: Engine
             }
         case let .file(file):
             fetchPriorityResourceId = file.resource.id.stringRepresentation
-        case .liveStream:
-            return .complete()
         default:
             break
         }
@@ -2308,8 +2286,7 @@ private func getCachedStory(storyId: StoryId, transaction: Transaction) -> Engin
             isMy: item.isMy,
             myReaction: item.myReaction,
             forwardInfo: item.forwardInfo.flatMap { EngineStoryItem.ForwardInfo($0, transaction: transaction) },
-            author: item.authorId.flatMap { transaction.getPeer($0).flatMap(EnginePeer.init) },
-            folderIds: item.folderIds
+            author: item.authorId.flatMap { transaction.getPeer($0).flatMap(EnginePeer.init) }
         )
     } else {
         return nil
@@ -2499,10 +2476,6 @@ public final class RepostStoriesContentContextImpl: StoryContentContext {
                             sendPaidMessageStars: cachedUserData.sendPaidMessageStars
                         )
                     } else if let cachedChannelData = cachedPeerDataView.cachedPeerData as? CachedChannelData {
-                        var sendPaidMessageStars: StarsAmount?
-                        if case let .channel(channel) = peer {
-                            sendPaidMessageStars = channel.sendPaidMessageStars
-                        }
                         additionalPeerData = StoryContentContextState.AdditionalPeerData(
                             isMuted: true,
                             areVoiceMessagesAvailable: true,
@@ -2512,7 +2485,7 @@ public final class RepostStoriesContentContextImpl: StoryContentContext {
                             preferHighQualityStories: preferHighQualityStories,
                             boostsToUnrestrict: cachedChannelData.boostsToUnrestrict,
                             appliedBoosts: cachedChannelData.appliedBoosts,
-                            sendPaidMessageStars: sendPaidMessageStars
+                            sendPaidMessageStars: cachedChannelData.sendPaidMessageStars
                         )
                     } else {
                         additionalPeerData = StoryContentContextState.AdditionalPeerData(

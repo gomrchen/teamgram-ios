@@ -27,7 +27,6 @@ public final class OpenChatMessageParams {
     public let message: Message
     public let mediaIndex: Int?
     public let standalone: Bool
-    public let copyProtected: Bool
     public let reverseMessageGalleryOrder: Bool
     public let mode: ChatControllerInteractionOpenMessageMode
     public let navigationController: NavigationController?
@@ -39,9 +38,8 @@ public final class OpenChatMessageParams {
     public let openUrl: (String) -> Void
     public let openPeer: (Peer, ChatControllerInteractionNavigateToPeer) -> Void
     public let callPeer: (PeerId, Bool) -> Void
-    public let openConferenceCall: (Message) -> Void
     public let enqueueMessage: (EnqueueMessage) -> Void
-    public let sendSticker: ((FileMediaReference, UIView?, CGRect?) -> Bool)?
+    public let sendSticker: ((FileMediaReference, UIView, CGRect) -> Bool)?
     public let sendEmoji: ((String, ChatTextInputTextCustomEmojiAttribute) -> Void)?
     public let setupTemporaryHiddenMedia: (Signal<Any?, NoError>, Int, Media) -> Void
     public let chatAvatarHiddenMedia: (Signal<MessageId?, NoError>, Media) -> Void
@@ -49,7 +47,6 @@ public final class OpenChatMessageParams {
     public let playlistLocation: PeerMessagesPlaylistLocation?
     public let gallerySource: GalleryControllerItemSource?
     public let centralItemUpdated: ((MessageId) -> Void)?
-    public let navigateToMessageContext: ((EngineMessage) -> Void)?
     public let getSourceRect: (() -> CGRect?)?
     public let blockInteraction: Promise<Bool>
     
@@ -62,7 +59,6 @@ public final class OpenChatMessageParams {
         message: Message,
         mediaIndex: Int? = nil,
         standalone: Bool,
-        copyProtected: Bool = false,
         reverseMessageGalleryOrder: Bool,
         mode: ChatControllerInteractionOpenMessageMode = .default,
         navigationController: NavigationController?,
@@ -74,9 +70,8 @@ public final class OpenChatMessageParams {
         openUrl: @escaping (String) -> Void,
         openPeer: @escaping (Peer, ChatControllerInteractionNavigateToPeer) -> Void,
         callPeer: @escaping (PeerId, Bool) -> Void,
-        openConferenceCall: @escaping (Message) -> Void,
         enqueueMessage: @escaping (EnqueueMessage) -> Void,
-        sendSticker: ((FileMediaReference, UIView?, CGRect?) -> Bool)?,
+        sendSticker: ((FileMediaReference, UIView, CGRect) -> Bool)?,
         sendEmoji: ((String, ChatTextInputTextCustomEmojiAttribute) -> Void)?,
         setupTemporaryHiddenMedia: @escaping (Signal<Any?, NoError>, Int, Media) -> Void,
         chatAvatarHiddenMedia: @escaping (Signal<MessageId?, NoError>, Media) -> Void,
@@ -84,7 +79,6 @@ public final class OpenChatMessageParams {
         playlistLocation: PeerMessagesPlaylistLocation? = nil,
         gallerySource: GalleryControllerItemSource? = nil,
         centralItemUpdated: ((MessageId) -> Void)? = nil,
-        navigateToMessageContext: ((EngineMessage) -> Void)? = nil,
         getSourceRect: (() -> CGRect?)? = nil
     ) {
         self.context = context
@@ -95,7 +89,6 @@ public final class OpenChatMessageParams {
         self.message = message
         self.mediaIndex = mediaIndex
         self.standalone = standalone
-        self.copyProtected = copyProtected
         self.reverseMessageGalleryOrder = reverseMessageGalleryOrder
         self.mode = mode
         self.navigationController = navigationController
@@ -107,7 +100,6 @@ public final class OpenChatMessageParams {
         self.openUrl = openUrl
         self.openPeer = openPeer
         self.callPeer = callPeer
-        self.openConferenceCall = openConferenceCall
         self.enqueueMessage = enqueueMessage
         self.sendSticker = sendSticker
         self.sendEmoji = sendEmoji
@@ -117,7 +109,6 @@ public final class OpenChatMessageParams {
         self.playlistLocation = playlistLocation
         self.gallerySource = gallerySource
         self.centralItemUpdated = centralItemUpdated
-        self.navigateToMessageContext = navigateToMessageContext
         self.getSourceRect = getSourceRect
         self.blockInteraction = Promise()
     }

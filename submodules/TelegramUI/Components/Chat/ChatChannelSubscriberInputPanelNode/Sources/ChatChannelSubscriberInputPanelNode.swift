@@ -15,14 +15,8 @@ import AccountContext
 import OldChannelsController
 import TooltipUI
 import TelegramNotices
-import GlassBackgroundComponent
-import ComponentFlow
-import ComponentDisplayAdapters
-import GlassControls
-import BundleIconComponent
-import MultilineTextComponent
 
-private enum SubscriberAction: Equatable, Hashable {
+private enum SubscriberAction: Equatable {
     case join
     case joinGroup
     case applyToJoin
@@ -146,25 +140,15 @@ private func actionForPeer(context: AccountContext, peer: Peer, interfaceState: 
 private let badgeFont = Font.regular(14.0)
 
 public final class ChatChannelSubscriberInputPanelNode: ChatInputPanelNode {
-    private let panelContainer = UIView()
-    private let panel = ComponentView<Empty>()
+    private let button: HighlightableButtonNode
+    private let discussButton: HighlightableButtonNode
+    private let discussButtonText: ImmediateTextNode
+    private let badgeBackground: ASImageNode
+    private let badgeText: ImmediateTextNode
+    private let activityIndicator: UIActivityIndicatorView
     
-    /*private let buttonBackgroundView: GlassBackgroundView
-    private let button: HighlightableButton
-    private let buttonTitle: ImmediateTextNode
-    private let buttonTintTitle: ImmediateTextNode
-    
-    private let helpButtonBackgroundView: GlassBackgroundView
-    private let helpButton: HighlightableButton
-    private let helpButtonIconView: UIImageView
-    
-    private let giftButtonBackgroundView: GlassBackgroundView
-    private let giftButton: HighlightableButton
-    private let giftButtonIconView: UIImageView
-    
-    private let suggestedPostButtonBackgroundView: GlassBackgroundView
-    private let suggestedPostButton: HighlightableButton
-    private let suggestedPostButtonIconView: UIImageView*/
+    private let helpButton: HighlightableButtonNode
+    private let giftButton: HighlightableButtonNode
     
     private var action: SubscriberAction?
     
@@ -174,12 +158,49 @@ public final class ChatChannelSubscriberInputPanelNode: ChatInputPanelNode {
     
     private var presentationInterfaceState: ChatPresentationInterfaceState?
     
-    private var layoutData: (CGFloat, CGFloat, CGFloat, CGFloat, UIEdgeInsets, CGFloat, CGFloat, Bool, LayoutMetrics)?
+    private var layoutData: (CGFloat, CGFloat, CGFloat, CGFloat, UIEdgeInsets, CGFloat, Bool, LayoutMetrics)?
     
     public override init() {
+        self.button = HighlightableButtonNode()
+        self.discussButton = HighlightableButtonNode()
+        self.activityIndicator = UIActivityIndicatorView(style: .gray)
+        self.activityIndicator.isHidden = true
+        
+        self.discussButtonText = ImmediateTextNode()
+        self.discussButtonText.displaysAsynchronously = false
+        
+        self.badgeBackground = ASImageNode()
+        self.badgeBackground.displaysAsynchronously = false
+        self.badgeBackground.displayWithoutProcessing = true
+        self.badgeBackground.isHidden = true
+        
+        self.badgeText = ImmediateTextNode()
+        self.badgeText.displaysAsynchronously = false
+        self.badgeText.isHidden = true
+        
+        self.helpButton = HighlightableButtonNode()
+        self.helpButton.isHidden = true
+        self.giftButton = HighlightableButtonNode()
+        self.giftButton.isHidden = true
+        
+        self.discussButton.addSubnode(self.discussButtonText)
+        self.discussButton.addSubnode(self.badgeBackground)
+        self.discussButton.addSubnode(self.badgeText)
+        
         super.init()
         
-        self.view.addSubview(self.panelContainer)
+        self.clipsToBounds = true
+        
+        self.addSubnode(self.button)
+        self.addSubnode(self.discussButton)
+        self.view.addSubview(self.activityIndicator)
+        self.addSubnode(self.helpButton)
+        self.addSubnode(self.giftButton)
+        
+        self.button.addTarget(self, action: #selector(self.buttonPressed), forControlEvents: .touchUpInside)
+        self.discussButton.addTarget(self, action: #selector(self.discussPressed), forControlEvents: .touchUpInside)
+        self.helpButton.addTarget(self, action: #selector(self.helpPressed), forControlEvents: .touchUpInside)
+        self.giftButton.addTarget(self, action: #selector(self.giftPressed), forControlEvents: .touchUpInside)
     }
     
     deinit {
@@ -201,10 +222,6 @@ public final class ChatChannelSubscriberInputPanelNode: ChatInputPanelNode {
     @objc private func helpPressed() {
         self.interfaceInteraction?.presentGigagroupHelp()
     }
-
-    @objc private func suggestedPostPressed() {
-        self.interfaceInteraction?.openMonoforum()
-    }
     
     @objc private func buttonPressed() {
         guard let context = self.context, let action = self.action, let presentationInterfaceState = self.presentationInterfaceState, let peer = presentationInterfaceState.renderedPeer?.peer else {
@@ -213,14 +230,33 @@ public final class ChatChannelSubscriberInputPanelNode: ChatInputPanelNode {
         
         switch action {
         case .join, .joinGroup, .applyToJoin:
+            var delayActivity = false
+            if let peer = peer as? TelegramChannel, case .broadcast = peer.info {
+                delayActivity = true
+            }
+            
+            if delayActivity {
+                Queue.mainQueue().after(1.5) {
+                    if self.isJoining {
+                        self.activityIndicator.isHidden = false
+                        self.activityIndicator.startAnimating()
+                    }
+                }
+            } else {
+                self.activityIndicator.isHidden = false
+                self.activityIndicator.startAnimating()
+            }
+            
             self.isJoining = true
-            if let (width, leftInset, rightInset, bottomInset, additionalSideInsets, maxHeight, maxOverlayHeight, isSecondary, metrics) = self.layoutData, let presentationInterfaceState = self.presentationInterfaceState {
-                let _ = self.updateLayout(width: width, leftInset: leftInset, rightInset: rightInset, bottomInset: bottomInset, additionalSideInsets: additionalSideInsets, maxHeight: maxHeight, maxOverlayHeight: maxOverlayHeight, isSecondary: isSecondary, transition: .immediate, interfaceState: presentationInterfaceState, metrics: metrics, force: true)
+            if let (width, leftInset, rightInset, bottomInset, additionalSideInsets, maxHeight, isSecondary, metrics) = self.layoutData, let presentationInterfaceState = self.presentationInterfaceState {
+                let _ = self.updateLayout(width: width, leftInset: leftInset, rightInset: rightInset, bottomInset: bottomInset,  additionalSideInsets: additionalSideInsets, maxHeight: maxHeight, isSecondary: isSecondary, transition: .immediate, interfaceState: presentationInterfaceState, metrics: metrics, force: true)
             }
             self.actionDisposable.set((context.peerChannelMemberCategoriesContextsManager.join(engine: context.engine, peerId: peer.id, hash: nil)
             |> afterDisposed { [weak self] in
                 Queue.mainQueue().async {
                     if let strongSelf = self {
+                        strongSelf.activityIndicator.isHidden = true
+                        strongSelf.activityIndicator.stopAnimating()
                         strongSelf.isJoining = false
                     }
                 }
@@ -251,31 +287,6 @@ public final class ChatChannelSubscriberInputPanelNode: ChatInputPanelNode {
                     }
                 }
                 strongSelf.interfaceInteraction?.presentController(textAlertController(context: context, title: nil, text: text, actions: [TextAlertAction(type: .defaultAction, title: presentationInterfaceState.strings.Common_OK, action: {})]), nil)
-            }, completed: { [weak self] in
-                guard let self else {
-                    return
-                }
-                Queue.mainQueue().after(0.5) {
-                    if let presentationInterfaceState = self.presentationInterfaceState, let peer = presentationInterfaceState.renderedPeer?.peer {
-                        var canEditRank = false
-                        if let channel = peer as? TelegramChannel, channel.hasPermission(.editRank) {
-                            canEditRank = true
-                        } else if let group = peer as? TelegramGroup, !group.hasBannedPermission(.banEditRank) {
-                            canEditRank = true
-                        }
-                        if canEditRank {
-                            let presentationData = context.sharedContext.currentPresentationData.with { $0 }
-                            let controller = UndoOverlayController(presentationData: presentationData, content: .actionSucceeded(title: nil, text: presentationData.strings.Chat_JoinedGroup_Text, cancel: presentationData.strings.Chat_JoinedGroup_AddTag, destructive: false), elevatedLayout: true, action: { action in
-                                if case .undo = action {
-                                    let tagController = context.sharedContext.makeChatCustomRankSetupScreen(context: context, peerId: peer.id, participantId: context.account.peerId, rank: nil, role: .member)
-                                    self.interfaceInteraction?.getNavigationController()?.pushViewController(tagController)
-                                }
-                                return true
-                            })
-                            self.interfaceInteraction?.presentController(controller, nil)
-                        }
-                    }
-                }
             }))
         case .kicked:
             break
@@ -292,237 +303,164 @@ public final class ChatChannelSubscriberInputPanelNode: ChatInputPanelNode {
         }
     }
     
-    override public func updateLayout(width: CGFloat, leftInset: CGFloat, rightInset: CGFloat, bottomInset: CGFloat, additionalSideInsets: UIEdgeInsets, maxHeight: CGFloat, maxOverlayHeight: CGFloat, isSecondary: Bool, transition: ContainedViewLayoutTransition, interfaceState: ChatPresentationInterfaceState, metrics: LayoutMetrics, isMediaInputExpanded: Bool) -> CGFloat {
-        return self.updateLayout(width: width, leftInset: leftInset, rightInset: rightInset, bottomInset: bottomInset, additionalSideInsets: additionalSideInsets, maxHeight: maxHeight, maxOverlayHeight: maxOverlayHeight, isSecondary: isSecondary, transition: transition, interfaceState: interfaceState, metrics: metrics, force: false)
+    @objc private func discussPressed() {
+        if let presentationInterfaceState = self.presentationInterfaceState, let peerDiscussionId = presentationInterfaceState.peerDiscussionId {
+            self.interfaceInteraction?.navigateToChat(peerDiscussionId)
+        }
     }
     
-    private var displayedGiftOrSuggestTooltip = false
-    private func presentGiftOrSuggestTooltip() {
-        guard let context = self.context, !self.displayedGiftOrSuggestTooltip, let parentController = self.interfaceInteraction?.chatController() else {
+    override public func updateLayout(width: CGFloat, leftInset: CGFloat, rightInset: CGFloat, bottomInset: CGFloat, additionalSideInsets: UIEdgeInsets, maxHeight: CGFloat, isSecondary: Bool, transition: ContainedViewLayoutTransition, interfaceState: ChatPresentationInterfaceState, metrics: LayoutMetrics, isMediaInputExpanded: Bool) -> CGFloat {
+        return self.updateLayout(width: width, leftInset: leftInset, rightInset: rightInset, bottomInset: bottomInset, additionalSideInsets: additionalSideInsets, maxHeight: maxHeight, isSecondary: isSecondary, transition: transition, interfaceState: interfaceState, metrics: metrics, force: false)
+    }
+    
+    private var displayedGiftTooltip = false
+    private func presentGiftTooltip() {
+        guard let context = self.context, !self.displayedGiftTooltip, let parentController = self.interfaceInteraction?.chatController() else {
             return
         }
-        self.displayedGiftOrSuggestTooltip = true
+        self.displayedGiftTooltip = true
 
-        let _ = (combineLatest(queue: .mainQueue(),
-            ApplicationSpecificNotice.getChannelSendGiftTooltip(accountManager: context.sharedContext.accountManager),
-            ApplicationSpecificNotice.getChannelSuggestTooltip(accountManager: context.sharedContext.accountManager)
-        |> deliverOnMainQueue)).start(next: { [weak self] giftCount, suggestCount in
+        let _ = (ApplicationSpecificNotice.getChannelSendGiftTooltip(accountManager: context.sharedContext.accountManager)
+        |> deliverOnMainQueue).start(next: { [weak self] count in
             guard let self else {
                 return
             }
-            
-            /*#if DEBUG
-            var giftCount = giftCount
-            var suggestCount = suggestCount
-            if "".isEmpty {
-                giftCount = 2
-                suggestCount = 0
+            guard count < 2 else {
+                return
             }
-            #endif*/
             
-            let giftItemView = (self.panel.view as? GlassControlPanelComponent.View)?.leftItemView?.itemView(id: AnyHashable("gift"))
-            let suggestPostItemView = (self.panel.view as? GlassControlPanelComponent.View)?.leftItemView?.itemView(id: AnyHashable("suggestPost"))
+            let _ = ApplicationSpecificNotice.incrementChannelSendGiftTooltip(accountManager: context.sharedContext.accountManager).start()
             
-            if giftCount < 2, let giftItemView {
-                let _ = ApplicationSpecificNotice.incrementChannelSendGiftTooltip(accountManager: context.sharedContext.accountManager).start()
+            Queue.mainQueue().after(0.4, {
+                let absoluteFrame = self.giftButton.view.convert(self.giftButton.bounds, to: parentController.view)
+                let location = CGRect(origin: CGPoint(x: absoluteFrame.midX, y: absoluteFrame.minY + 11.0), size: CGSize())
                 
-                Queue.mainQueue().after(0.4, { [weak giftItemView] in
-                    guard let giftItemView else {
-                        return
+                let presentationData = context.sharedContext.currentPresentationData.with { $0 }
+                let text: String = presentationData.strings.Chat_SendGiftTooltip
+              
+                let tooltipController = TooltipScreen(
+                    account: context.account,
+                    sharedContext: context.sharedContext,
+                    text: .plain(text: text),
+                    balancedTextLayout: false,
+                    style: .wide,
+                    arrowStyle: .small,
+                    icon: nil,
+                    location: .point(location, .bottom),
+                    displayDuration: .default,
+                    inset: 8.0,
+                    shouldDismissOnTouch: { _, _ in
+                        return .ignore
                     }
-                    let absoluteFrame = giftItemView.convert(giftItemView.bounds, to: parentController.view)
-                    let location = CGRect(origin: CGPoint(x: absoluteFrame.midX, y: absoluteFrame.minY), size: CGSize())
-                    
-                    let presentationData = context.sharedContext.currentPresentationData.with { $0 }
-                    let text: String = presentationData.strings.Chat_SendGiftTooltip
-                    
-                    let tooltipController = TooltipScreen(
-                        account: context.account,
-                        sharedContext: context.sharedContext,
-                        text: .plain(text: text),
-                        balancedTextLayout: false,
-                        style: .wide,
-                        arrowStyle: .small,
-                        icon: nil,
-                        location: .point(location, .bottom),
-                        displayDuration: .default,
-                        inset: 8.0,
-                        shouldDismissOnTouch: { _, _ in
-                            return .ignore
-                        }
-                    )
-                    self.interfaceInteraction?.presentControllerInCurrent(tooltipController, nil)
-                })
-            } else if suggestCount < 2, let suggestPostItemView {
-                let _ = ApplicationSpecificNotice.incrementChannelSuggestTooltip(accountManager: context.sharedContext.accountManager).start()
-                
-                Queue.mainQueue().after(0.4, { [weak suggestPostItemView] in
-                    guard let suggestPostItemView else {
-                        return
-                    }
-                    let absoluteFrame = suggestPostItemView.convert(suggestPostItemView.bounds, to: parentController.view)
-                    let location = CGRect(origin: CGPoint(x: absoluteFrame.midX, y: absoluteFrame.minY), size: CGSize())
-                    
-                    let presentationData = context.sharedContext.currentPresentationData.with { $0 }
-                    let _ = presentationData
-                    let text: String = presentationData.strings.Chat_ChannelMessagesHint
-                    
-                    let tooltipController = TooltipScreen(
-                        account: context.account,
-                        sharedContext: context.sharedContext,
-                        text: .plain(text: text),
-                        textBadge: presentationData.strings.Chat_ChannelMessagesHintBadge.isEmpty ? nil : presentationData.strings.Chat_ChannelMessagesHintBadge,
-                        balancedTextLayout: false,
-                        style: .wide,
-                        arrowStyle: .small,
-                        icon: nil,
-                        location: .point(location, .bottom),
-                        displayDuration: .default,
-                        inset: 8.0,
-                        shouldDismissOnTouch: { _, _ in
-                            return .ignore
-                        }
-                    )
-                    self.interfaceInteraction?.presentControllerInCurrent(tooltipController, nil)
-                })
-            }
+                )
+                self.interfaceInteraction?.presentControllerInCurrent(tooltipController, nil)
+            })
         })
     }
     
-    private func updateLayout(width: CGFloat, leftInset: CGFloat, rightInset: CGFloat, bottomInset: CGFloat, additionalSideInsets: UIEdgeInsets, maxHeight: CGFloat, maxOverlayHeight: CGFloat, isSecondary: Bool, transition: ContainedViewLayoutTransition, interfaceState: ChatPresentationInterfaceState, metrics: LayoutMetrics, force: Bool) -> CGFloat {
+    private func updateLayout(width: CGFloat, leftInset: CGFloat, rightInset: CGFloat, bottomInset: CGFloat, additionalSideInsets: UIEdgeInsets, maxHeight: CGFloat, isSecondary: Bool, transition: ContainedViewLayoutTransition, interfaceState: ChatPresentationInterfaceState, metrics: LayoutMetrics, force: Bool) -> CGFloat {
         let isFirstTime = self.layoutData == nil
-        self.layoutData = (width, leftInset, rightInset, bottomInset, additionalSideInsets, maxHeight, maxOverlayHeight, isSecondary, metrics)
+        self.layoutData = (width, leftInset, rightInset, bottomInset, additionalSideInsets, maxHeight, isSecondary, metrics)
         
-        var transition = transition
-        if !isFirstTime && !transition.isAnimated {
-            transition = .animated(duration: 0.4, curve: .spring)
-        }
-        
-        self.presentationInterfaceState = interfaceState
-        
-        var centerAction: (title: String, isAccent: Bool)?
-        if let context = self.context, let peer = interfaceState.renderedPeer?.peer, let action = actionForPeer(context: context, peer: peer, interfaceState: interfaceState, isJoining: self.isJoining, isMuted: interfaceState.peerIsMuted) {
-            self.action = action
-            let (title, _) = titleAndColorForAction(action, theme: interfaceState.theme, strings: interfaceState.strings)
+        if self.presentationInterfaceState != interfaceState || force {
+            let previousState = self.presentationInterfaceState
+            self.presentationInterfaceState = interfaceState
             
-            var isAccent = false
-            switch self.action {
-            case .join, .joinGroup, .applyToJoin:
-                isAccent = true
-            default:
-                break
+            if previousState?.theme !== interfaceState.theme {
+                self.badgeBackground.image = PresentationResourcesChatList.badgeBackgroundActive(interfaceState.theme, diameter: 20.0)
+                self.helpButton.setImage(generateTintedImage(image: UIImage(bundleImageName: "Chat/Input/Accessory Panels/Help"), color: interfaceState.theme.chat.inputPanel.panelControlAccentColor), for: .normal)
+                self.giftButton.setImage(generateTintedImage(image: UIImage(bundleImageName: "Chat/Input/Accessory Panels/Gift"), color: interfaceState.theme.chat.inputPanel.panelControlAccentColor), for: .normal)
             }
-            centerAction = (title, isAccent)
-        }
-        
-        var displayGift = false
-        var displaySuggestPost = false
-        var displayHelp = false
-        
-        if let peer = interfaceState.renderedPeer?.peer as? TelegramChannel {
-            if case .broadcast = peer.info, interfaceState.starGiftsAvailable {
-                displayGift = true
-            }
-            if case let .broadcast(broadcastInfo) = peer.info, broadcastInfo.flags.contains(.hasMonoforum) {
-                displaySuggestPost = true
-            }
-            if peer.flags.contains(.isGigagroup), self.action == .muteNotifications || self.action == .unmuteNotifications {
-                displayHelp = true
-            }
-        }
-        
-        var leftInset = leftInset + 8.0
-        var rightInset = rightInset + 8.0
-        if bottomInset <= 32.0 {
-            leftInset += 18.0
-            rightInset += 18.0
-        }
-        
-        var leftPanelItems: [GlassControlGroupComponent.Item] = []
-        if displaySuggestPost {
-            leftPanelItems.append(GlassControlGroupComponent.Item(
-                id: "suggestPost",
-                content: .icon("Chat/Input/Accessory Panels/SuggestPost"),
-                action: { [weak self] in
-                    self?.suggestedPostPressed()
-                }
-            ))
-        }
-        if displayGift {
-            leftPanelItems.append(GlassControlGroupComponent.Item(
-                id: "gift",
-                content: .icon("Chat/Input/Accessory Panels/Gift"),
-                action: { [weak self] in
-                    self?.giftPressed()
-                }
-            ))
-        }
-        if displayHelp {
-            leftPanelItems.append(GlassControlGroupComponent.Item(
-                id: "help",
-                content: .icon("Chat/Input/Accessory Panels/Help"),
-                action: { [weak self] in
-                    self?.helpPressed()
-                }
-            ))
-        }
-        
-        var centerPanelItem: GlassControlPanelComponent.Item?
-        if let centerAction {
-            centerPanelItem = GlassControlPanelComponent.Item(
-                items: [GlassControlGroupComponent.Item(
-                    id: 0,
-                    content: .text(centerAction.title),
-                    action: { [weak self] in
-                        self?.buttonPressed()
+            
+            if let context = self.context, let peer = interfaceState.renderedPeer?.peer, previousState?.renderedPeer?.peer == nil || !peer.isEqual(previousState!.renderedPeer!.peer!) || previousState?.theme !== interfaceState.theme || previousState?.strings !== interfaceState.strings || previousState?.peerIsMuted != interfaceState.peerIsMuted || previousState?.pinnedMessage != interfaceState.pinnedMessage || force {
+                
+                if let action = actionForPeer(context: context, peer: peer, interfaceState: interfaceState, isJoining: self.isJoining, isMuted: interfaceState.peerIsMuted) {
+                    let previousAction = self.action
+                    self.action = action
+                    let (title, color) = titleAndColorForAction(action, theme: interfaceState.theme, strings: interfaceState.strings)
+                    
+                    var offset: CGFloat = 30.0
+                    
+                    if let previousAction = previousAction, [.join, .muteNotifications].contains(previousAction) && action == .unmuteNotifications || [.join, .unmuteNotifications].contains(previousAction) && action == .muteNotifications {
+                        if [.join, .muteNotifications].contains(previousAction) {
+                            offset *= -1.0
+                        }
+                        if let snapshotView = self.button.view.snapshotContentTree() {
+                            snapshotView.frame = self.button.frame
+                            self.button.supernode?.view.addSubview(snapshotView)
+                            
+                            snapshotView.layer.animateAlpha(from: 1.0, to: 0.0, duration: 0.2, removeOnCompletion: false, completion: { [weak snapshotView] _ in
+                                snapshotView?.removeFromSuperview()
+                            })
+                            snapshotView.layer.animatePosition(from: CGPoint(), to: CGPoint(x: 0.0, y: offset), duration: 0.2,  removeOnCompletion: false, additive: true)
+                            self.button.layer.animateAlpha(from: 0.0, to: 1.0, duration: 0.2)
+                            self.button.layer.animatePosition(from: CGPoint(x: 0.0, y: -offset), to: CGPoint(), duration: 0.2, additive: true)
+                        }
                     }
-                )],
-                background: centerAction.isAccent ? .activeTint : .panel,
-                keepWide: true
-            )
-        }
-        
-        var rightPanelItems: [GlassControlGroupComponent.Item] = []
-        rightPanelItems.append(GlassControlGroupComponent.Item(
-            id: "search",
-            content: .icon("Chat List/SearchIcon"),
-            action: { [weak self] in
-                guard let self else {
-                    return
+                    
+                    self.button.setTitle(title, with: Font.regular(17.0), with: color, for: [])
+                    self.button.accessibilityLabel = title
+                } else {
+                    self.action = nil
                 }
-                self.interfaceInteraction?.beginMessageSearch(.everything, "")
+                
+                self.discussButton.isHidden = true
             }
-        ))
+        }
         
         let panelHeight = defaultHeight(metrics: metrics)
-        let _ = isFirstTime
-        let panelFrame = CGRect(origin: CGPoint(x: leftInset, y: 0.0), size: CGSize(width: width - leftInset - rightInset, height: panelHeight))
         
-        let _ = self.panel.update(
-            transition: ComponentTransition(transition),
-            component: AnyComponent(GlassControlPanelComponent(
-                theme: interfaceState.theme,
-                preferClearGlass: interfaceState.preferredGlassType == .clear,
-                leftItem: leftPanelItems.isEmpty ? nil : GlassControlPanelComponent.Item(
-                    items: leftPanelItems,
-                    background: .panel
-                ),
-                centralItem: centerPanelItem,
-                rightItem: rightPanelItems.isEmpty ? nil : GlassControlPanelComponent.Item(
-                    items: rightPanelItems,
-                    background: .panel
-                )
-            )),
-            environment: {},
-            containerSize: panelFrame.size
-        )
-        if let panelView = self.panel.view {
-            if panelView.superview == nil {
-                self.panelContainer.addSubview(panelView)
+        if self.discussButton.isHidden {
+            if let peer = interfaceState.renderedPeer?.peer as? TelegramChannel {
+                if case .broadcast = peer.info, interfaceState.starGiftsAvailable {
+                    if self.giftButton.isHidden && !isFirstTime {
+                        self.giftButton.layer.animateAlpha(from: 0.0, to: 1.0, duration: 0.2)
+                        self.giftButton.layer.animateScale(from: 0.01, to: 1.0, duration: 0.2)
+                    }
+                    
+                    self.giftButton.isHidden = false
+                    self.helpButton.isHidden = true
+                    
+                    self.presentGiftTooltip()
+                } else if peer.flags.contains(.isGigagroup), self.action == .muteNotifications || self.action == .unmuteNotifications {
+                    self.giftButton.isHidden = true
+                    self.helpButton.isHidden = false
+                } else {
+                    self.giftButton.isHidden = true
+                    self.helpButton.isHidden = true
+                }
+            } else {
+                self.giftButton.isHidden = true
+                self.helpButton.isHidden = true
             }
-            transition.updateFrame(view: self.panelContainer, frame: panelFrame)
-            transition.updateFrame(view: panelView, frame: CGRect(origin: CGPoint(), size: panelFrame.size))
+            if let action = self.action, action == .muteNotifications || action == .unmuteNotifications {
+                let buttonWidth = self.button.calculateSizeThatFits(CGSize(width: width, height: panelHeight)).width + 24.0
+                self.button.frame = CGRect(origin: CGPoint(x: floor((width - buttonWidth) / 2.0), y: 0.0), size: CGSize(width: buttonWidth, height: panelHeight))
+            } else {
+                self.button.frame = CGRect(origin: CGPoint(x: leftInset, y: 0.0), size: CGSize(width: width - leftInset - rightInset, height: panelHeight))
+            }
+            self.giftButton.frame = CGRect(x: width - rightInset - panelHeight - 5.0, y: 0.0, width: panelHeight, height: panelHeight)
+            self.helpButton.frame = CGRect(x: width - rightInset - panelHeight, y: 0.0, width: panelHeight, height: panelHeight)
+        } else {
+            self.giftButton.isHidden = true
+            self.helpButton.isHidden = true
+                        
+            let availableWidth = min(600.0, width - leftInset - rightInset)
+            let leftOffset = floor((width - availableWidth) / 2.0)
+            self.button.frame = CGRect(origin: CGPoint(x: leftOffset, y: 0.0), size: CGSize(width: floor(availableWidth / 2.0), height: panelHeight))
+            self.discussButton.frame = CGRect(origin: CGPoint(x: leftOffset + floor(availableWidth / 2.0), y: 0.0), size: CGSize(width: floor(availableWidth / 2.0), height: panelHeight))
+            
+            let discussButtonSize = self.discussButton.bounds.size
+            let discussTextSize = self.discussButtonText.updateLayout(discussButtonSize)
+            self.discussButtonText.frame = CGRect(origin: CGPoint(x: floor((discussButtonSize.width - discussTextSize.width) / 2.0), y: floor((discussButtonSize.height - discussTextSize.height) / 2.0)), size: discussTextSize)
+            
+            let badgeOffset = self.discussButtonText.frame.maxX + 5.0 - self.badgeBackground.frame.minX
+            self.badgeBackground.frame = self.badgeBackground.frame.offsetBy(dx: badgeOffset, dy: 0.0)
+            self.badgeText.frame = self.badgeText.frame.offsetBy(dx: badgeOffset, dy: 0.0)
         }
+        
+        let indicatorSize = self.activityIndicator.bounds.size
+        self.activityIndicator.frame = CGRect(origin: CGPoint(x: width - rightInset - indicatorSize.width - 12.0, y: floor((panelHeight - indicatorSize.height) / 2.0)), size: indicatorSize)
         
         return panelHeight
     }

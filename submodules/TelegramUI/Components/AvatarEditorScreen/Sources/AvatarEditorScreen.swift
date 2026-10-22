@@ -27,9 +27,6 @@ import MediaEditor
 import AvatarBackground
 import LottieComponent
 import UndoUI
-import PremiumAlertController
-import GlassBarButtonComponent
-import BundleIconComponent
 
 public struct AvatarKeyboardInputData: Equatable {
     var emoji: EmojiPagerContentComponent
@@ -229,11 +226,11 @@ final class AvatarEditorScreenComponent: Component {
             
             self.backgroundContainerView = UIView()
             self.backgroundContainerView.clipsToBounds = true
-            self.backgroundContainerView.layer.cornerRadius = 26.0
+            self.backgroundContainerView.layer.cornerRadius = 10.0
             
             self.keyboardContainerView = UIView()
             self.keyboardContainerView.clipsToBounds = true
-            self.keyboardContainerView.layer.cornerRadius = 26.0
+            self.keyboardContainerView.layer.cornerRadius = 10.0
             
             self.panelBackgroundView = BlurredBackgroundView(color: .white)
             self.panelHostView = PagerExternalTopPanelContainer()
@@ -839,63 +836,50 @@ final class AvatarEditorScreenComponent: Component {
                 }
             }
             
-            //let backgroundIsBright = UIColor(rgb: state.selectedBackground.colors.first ?? 0).lightness > 0.8
+            let backgroundIsBright = UIColor(rgb: state.selectedBackground.colors.first ?? 0).lightness > 0.8
             
-            //state.expanded && !backgroundIsBright ? .white : environment.theme.rootController.navigationBar.accentTextColor
             let navigationCancelButtonSize = self.navigationCancelButton.update(
                 transition: transition,
-                component: AnyComponent(
-                    GlassBarButtonComponent(
-                        size: CGSize(width: 44.0, height: 44.0),
-                        backgroundColor: nil,
-                        isDark: environment.theme.overallDarkAppearance,
-                        state: .glass,
-                        component: AnyComponentWithIdentity(id: "close", component: AnyComponent(BundleIconComponent(name: "Navigation/Close", tintColor: environment.theme.chat.inputPanel.panelControlColor))),
-                        action: { [weak self] _ in
-                            guard let self else {
-                                return
-                            }
-                            self.controller?()?.dismiss()
+                component: AnyComponent(Button(
+                    content: AnyComponent(Text(text: environment.strings.Common_Cancel, font: Font.regular(17.0), color: state.expanded && !backgroundIsBright ? .white : environment.theme.rootController.navigationBar.accentTextColor)),
+                    action: { [weak self] in
+                        guard let self else {
+                            return
                         }
-                    )
-                ),
+                        self.controller?()?.dismiss()
+                    }
+                ).minSize(CGSize(width: 16.0, height: environment.navigationHeight - environment.statusBarHeight))),
                 environment: {},
-                containerSize: CGSize(width: 44.0, height: 44.0)
+                containerSize: CGSize(width: 150.0, height: environment.navigationHeight - environment.statusBarHeight)
             )
             if let navigationCancelButtonView = self.navigationCancelButton.view {
                 if navigationCancelButtonView.superview == nil {
                     self.addSubview(navigationCancelButtonView)
                 }
-                transition.setFrame(view: navigationCancelButtonView, frame: CGRect(origin: CGPoint(x: 16.0 + environment.safeInsets.left, y: 16.0), size: navigationCancelButtonSize))
+                transition.setFrame(view: navigationCancelButtonView, frame: CGRect(origin: CGPoint(x: 16.0 + environment.safeInsets.left, y: environment.statusBarHeight), size: navigationCancelButtonSize))
                 transition.setAlpha(view: navigationCancelButtonView, alpha: !state.editingColor ? 1.0 : 0.0)
             }
             
             let navigationDoneButtonSize = self.navigationDoneButton.update(
                 transition: transition,
-                component: AnyComponent(
-                    GlassBarButtonComponent(
-                        size: CGSize(width: 44.0, height: 44.0),
-                        backgroundColor: environment.theme.list.itemCheckColors.fillColor,
-                        isDark: environment.theme.overallDarkAppearance,
-                        state: .tintedGlass,
-                        component: AnyComponentWithIdentity(id: "done", component: AnyComponent(BundleIconComponent(name: "Navigation/Done", tintColor: environment.theme.list.itemCheckColors.foregroundColor))),
-                        action: { [weak self] _ in
-                            guard let self else {
-                                return
-                            }
-                            self.complete()
+                component: AnyComponent(Button(
+                    content: AnyComponent(Text(text: component.peerType == .suggest ? strings.AvatarEditor_Suggest : strings.AvatarEditor_Set, font: Font.semibold(17.0), color: state.expanded && !backgroundIsBright ? .white : environment.theme.rootController.navigationBar.accentTextColor)),
+                    action: { [weak self] in
+                        guard let self else {
+                            return
                         }
-                    )
-                ),
+                        self.complete()
+                    }
+                ).minSize(CGSize(width: 16.0, height: environment.navigationHeight - environment.statusBarHeight))),
                 environment: {},
-                containerSize: CGSize(width: 44.0, height: 44.0)
+                containerSize: CGSize(width: 150.0, height: environment.navigationHeight - environment.statusBarHeight)
             )
             if let navigationDoneButtonView = self.navigationDoneButton.view {
                 if navigationDoneButtonView.superview == nil {
                     self.addSubview(navigationDoneButtonView)
                 }
                 
-                transition.setFrame(view: navigationDoneButtonView, frame: CGRect(origin: CGPoint(x: availableSize.width - 16.0 - environment.safeInsets.right - navigationDoneButtonSize.width, y: 16.0), size: navigationDoneButtonSize))
+                transition.setFrame(view: navigationDoneButtonView, frame: CGRect(origin: CGPoint(x: availableSize.width - 16.0 - environment.safeInsets.right - navigationDoneButtonSize.width, y: environment.statusBarHeight), size: navigationDoneButtonSize))
                 transition.setAlpha(view: navigationDoneButtonView, alpha: (state.expanded || environment.inputHeight > 0.0) && !state.editingColor ? 1.0 : 0.0)
             }
                         
@@ -1205,10 +1189,9 @@ final class AvatarEditorScreenComponent: Component {
             contentHeight += keyboardTitleSize.height
             contentHeight += 8.0
             
-            let buttonInsets = ContainerViewLayout.concentricInsets(bottomInset: environment.safeInsets.bottom, innerDiameter: 52.0, sideInset: 30.0)
-            var bottomInset: CGFloat = buttonInsets.bottom
+            var bottomInset: CGFloat = environment.safeInsets.bottom > 0.0 ? environment.safeInsets.bottom : 16.0
             if !effectiveIsExpanded {
-                bottomInset += 52.0 + buttonInsets.bottom - 14.0
+                bottomInset += 50.0 + 16.0
             }
             
             let keyboardContainerFrame = CGRect(origin: CGPoint(x: sideInset, y: contentHeight), size: CGSize(width: availableSize.width - sideInset * 2.0, height: availableSize.height - contentHeight - bottomInset))
@@ -1236,7 +1219,6 @@ final class AvatarEditorScreenComponent: Component {
                         defaultToEmojiTab: true,
                         externalTopPanelContainer: self.panelHostView,
                         externalBottomPanelContainer: nil,
-                        externalTintMaskContainer: nil,
                         displayTopPanelBackground: .blur,
                         topPanelExtensionUpdated: { _, _ in },
                         topPanelScrollingOffset: { _, _ in },
@@ -1339,7 +1321,6 @@ final class AvatarEditorScreenComponent: Component {
                 component: AnyComponent(
                     ButtonComponent(
                         background: ButtonComponent.Background(
-                            style: .glass,
                             color: theme.list.itemCheckColors.fillColor,
                             foreground: theme.list.itemCheckColors.foregroundColor,
                             pressedColor: theme.list.itemCheckColors.fillColor.withMultipliedAlpha(0.8)
@@ -1350,18 +1331,22 @@ final class AvatarEditorScreenComponent: Component {
                         isEnabled: true,
                         displaysProgress: false,
                         action: { [weak self] in
-                            self?.complete()
+                            if isLocked {
+                                self?.presentPremiumToast()
+                            } else {
+                                self?.complete()
+                            }
                         }
                     )
                 ),
                 environment: {},
-                containerSize: CGSize(width: availableSize.width - buttonInsets.left - buttonInsets.right, height: 52.0)
+                containerSize: CGSize(width: availableSize.width - sideInset * 2.0, height: 50.0)
             )
             if let buttonView = self.buttonView.view {
                 if buttonView.superview == nil {
                     self.addSubview(buttonView)
                 }
-                transition.setFrame(view: buttonView, frame: CGRect(origin: CGPoint(x: buttonInsets.left, y: contentHeight), size: buttonSize))
+                transition.setFrame(view: buttonView, frame: CGRect(origin: CGPoint(x: sideInset, y: contentHeight), size: buttonSize))
             }
             
             let bottomPanelFrame = CGRect(origin: CGPoint(x: 0.0, y: contentHeight - 4.0), size: CGSize(width: availableSize.width, height: availableSize.height - contentHeight + 4.0))
@@ -1385,40 +1370,17 @@ final class AvatarEditorScreenComponent: Component {
         }
         
         private func presentPremiumToast() {
-            guard let environment = self.environment, let component = self.component, let state = self.state, let parentController = environment.controller() else {
+            guard let environment = self.environment, let component = self.component, let parentController = environment.controller() else {
                 return
             }
             HapticFeedback().impact(.light)
             
-            var text: String = environment.strings.AvatarEditor_PremiumNeeded_Background
-            if let selectedFile = state.selectedFile {
-                if selectedFile.isSticker {
-                    text = environment.strings.AvatarEditor_PremiumNeeded_Sticker
-                }
-            }
             let controller = premiumAlertController(
                 context: component.context,
                 parentController: parentController,
-                text: text
+                text: environment.strings.AvatarEditor_PremiumNeeded_Background
             )
             parentController.present(controller, in: .window(.root))
-        }
-        
-        private func isPremiumRequired() -> Bool {
-            guard let component = self.component, let state = self.state else {
-                return false
-            }
-            if component.peerType != .suggest, !component.context.isPremium {
-                if state.selectedBackground.isPremium {
-                    return true
-                }
-                if let selectedFile = state.selectedFile {
-                    if selectedFile.isSticker {
-                        return true
-                    }
-                }
-            }
-            return false
         }
         
         private let queue = Queue()
@@ -1426,12 +1388,6 @@ final class AvatarEditorScreenComponent: Component {
             guard let state = self.state, let file = state.selectedFile, let controller = self.controller?() else {
                 return
             }
-            
-            if self.isPremiumRequired() {
-                self.presentPremiumToast()
-                return
-            }
-            
             let context = controller.context
             let _ = context.animationCache.getFirstFrame(queue: self.queue, sourceId: file.resource.id.stringRepresentation, size: CGSize(width: 640.0, height: 640.0), fetch: animationCacheFetchFile(context: context, userLocation: .other, userContentType: .sticker, resource: .media(media: .standalone(media: file), resource: file.resource), type: AnimationCacheAnimationType(file: file), keyframeOnly: true, customColor: nil), completion: { result in
                 guard let item = result.item else {
@@ -1511,7 +1467,6 @@ final class AvatarEditorScreenComponent: Component {
                         cropOrientation: nil,
                         gradientColors: nil,
                         videoTrimRange: nil,
-                        videoBounce: false,
                         videoIsMuted: false,
                         videoIsFullHd: false,
                         videoIsMirrored: false,

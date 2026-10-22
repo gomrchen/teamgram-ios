@@ -257,7 +257,7 @@ public final class MediaStreamComponent: CombinedComponent {
         let local = Local()
         
         return { context in
-            _body(context, local)
+            _body(context, local) // { context in
         }
     }
     
@@ -363,15 +363,13 @@ public final class MediaStreamComponent: CombinedComponent {
             let video = video.update(
                 component: MediaStreamVideoComponent(
                     call: context.component.call,
-                    videoEndpointId: context.state.hasVideo ? "unified" : nil,
+                    hasVideo: context.state.hasVideo,
                     isVisible: environment.isVisible && context.state.isVisibleInHierarchy,
                     isAdmin: context.state.canManageCall,
                     peerTitle: context.state.peerTitle,
-                    addInset: !isFullscreen,
                     isFullscreen: isFullscreen,
                     videoLoading: context.state.videoStalled,
                     callPeer: context.state.chatPeer,
-                    enablePictureInPicture: true,
                     activatePictureInPicture: activatePictureInPicture,
                     deactivatePictureInPicture: deactivatePictureInPicture,
                     bringBackControllerForPictureInPictureDeactivation: { [weak call] completed in
@@ -508,7 +506,7 @@ public final class MediaStreamComponent: CombinedComponent {
                             let title: String = presentationData.strings.LiveStream_EditTitle
                             let text: String = presentationData.strings.LiveStream_EditTitleText
                             
-                            let editController = voiceChatTitleEditController(context: call.accountContext, forceTheme: defaultDarkPresentationTheme, title: title, text: text, placeholder: EnginePeer(chatPeer).displayTitle(strings: presentationData.strings, displayOrder: presentationData.nameDisplayOrder), value: initialTitle, maxLength: 40, apply: { [weak call] title in
+                            let editController = voiceChatTitleEditController(sharedContext: call.accountContext.sharedContext, account: call.accountContext.account, forceTheme: defaultDarkPresentationTheme, title: title, text: text, placeholder: EnginePeer(chatPeer).displayTitle(strings: presentationData.strings, displayOrder: presentationData.nameDisplayOrder), value: initialTitle, maxLength: 40, apply: { [weak call] title in
                                 guard let call = call else {
                                     return
                                 }
@@ -574,7 +572,7 @@ public final class MediaStreamComponent: CombinedComponent {
                                 title = presentationData.strings.LiveStream_StartRecordingTitle
                                 text = presentationData.strings.LiveStream_StartRecordingTextVideo
                                 
-                                let editController = voiceChatTitleEditController(context: call.accountContext, forceTheme: defaultDarkPresentationTheme, title: title, text: text, placeholder: placeholder, value: nil, maxLength: 40, apply: { [weak call, weak controller] title in
+                                let editController = voiceChatTitleEditController(sharedContext: call.accountContext.sharedContext, account: call.accountContext.account, forceTheme: defaultDarkPresentationTheme, title: title, text: text, placeholder: placeholder, value: nil, maxLength: 40, apply: { [weak call, weak controller] title in
                                     guard let call = call, let controller = controller else {
                                         return
                                     }
@@ -597,7 +595,7 @@ public final class MediaStreamComponent: CombinedComponent {
                         }
                         
                         let credentialsPromise = Promise<GroupCallStreamCredentials>()
-                        credentialsPromise.set(call.accountContext.engine.calls.getGroupCallStreamCredentials(peerId: peerId, isLiveStream: false, revokePreviousCredentials: false) |> `catch` { _ -> Signal<GroupCallStreamCredentials, NoError> in return .never() })
+                        credentialsPromise.set(call.accountContext.engine.calls.getGroupCallStreamCredentials(peerId: peerId, revokePreviousCredentials: false) |> `catch` { _ -> Signal<GroupCallStreamCredentials, NoError> in return .never() })
                         
                         items.append(.action(ContextMenuActionItem(id: nil, text: presentationData.strings.LiveStream_ViewCredentials, textColor: .primary, textLayout: .singleLine, textFont: .regular, badge: nil, icon: { theme in
                             return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Info"), color: theme.contextMenu.primaryColor, backgroundColor: nil)
@@ -655,7 +653,7 @@ public final class MediaStreamComponent: CombinedComponent {
                             }
                         }
                         
-                        let contextController = makeContextController(presentationData: presentationData.withUpdated(theme: defaultDarkPresentationTheme), source: .reference(ReferenceContentSource(sourceView: anchorView)), items: .single(ContextController.Items(content: .list(items))), gesture: nil)
+                        let contextController = ContextController(presentationData: presentationData.withUpdated(theme: defaultDarkPresentationTheme), source: .reference(ReferenceContentSource(sourceView: anchorView)), items: .single(ContextController.Items(content: .list(items))), gesture: nil)
                         controller.presentInGlobalOverlay(contextController)
                     }
                 ).minSize(CGSize(width: 44.0, height: 44.0)).tagged(moreButtonTag))
@@ -1054,10 +1052,10 @@ public final class MediaStreamComponentController: ViewControllerComponentContai
             view.expandFromPictureInPicture()
         }
         
-        self.view.clipsToBounds = true
-        
-        self.view.layer.animatePosition(from: CGPoint(x: self.view.frame.center.x, y: self.view.bounds.maxY + self.view.bounds.height / 2), to: self.view.center, duration: 0.5, timingFunction: kCAMediaTimingFunctionSpring, completion: { _ in
-        })
+            self.view.clipsToBounds = true
+            
+            self.view.layer.animatePosition(from: CGPoint(x: self.view.frame.center.x, y: self.view.bounds.maxY + self.view.bounds.height / 2), to: self.view.center, duration: 0.5, timingFunction: kCAMediaTimingFunctionSpring, completion: { _ in
+            })
         
         self.view.layer.allowsGroupOpacity = true
         
@@ -1083,7 +1081,8 @@ public final class MediaStreamComponentController: ViewControllerComponentContai
     
     override public func viewDidLoad() {
         super.viewDidLoad()
-        self.backgroundDimView.backgroundColor = .black.withAlphaComponent(0.3)
+        // TODO: replace with actual color
+        backgroundDimView.backgroundColor = .black.withAlphaComponent(0.3)
         self.view.clipsToBounds = false
     }
     
@@ -1095,7 +1094,7 @@ public final class MediaStreamComponentController: ViewControllerComponentContai
     override public func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         let dimViewSide: CGFloat = max(view.bounds.width, view.bounds.height)
-        self.backgroundDimView.frame = .init(x: view.bounds.midX - dimViewSide / 2, y: -view.bounds.height * 3, width: dimViewSide, height: view.bounds.height * 4)
+        backgroundDimView.frame = .init(x: view.bounds.midX - dimViewSide / 2, y: -view.bounds.height * 3, width: dimViewSide, height: view.bounds.height * 4)
     }
     
     public func dismiss(closing: Bool, manual: Bool) {
@@ -2040,7 +2039,7 @@ final class RoundGradientButtonComponent: Component {
     }
 }
 
-public final class Throttler<T: Hashable & Sendable> {
+public final class Throttler<T: Hashable> {
     public var duration: TimeInterval = 0.25
     public var queue: DispatchQueue = .main
     public var isEnabled: Bool { duration > 0 }

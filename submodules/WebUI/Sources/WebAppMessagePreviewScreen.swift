@@ -23,7 +23,6 @@ import ListItemComponentAdaptor
 import TelegramStringFormatting
 import UndoUI
 import ChatMessagePaymentAlertController
-import GlassBarButtonComponent
 
 private final class SheetContent: CombinedComponent {
     typealias EnvironmentType = ViewControllerComponentContainer.Environment
@@ -56,9 +55,9 @@ private final class SheetContent: CombinedComponent {
     }
     
     static var body: Body {
-        let closeButton = Child(GlassBarButtonComponent.self)
+        let closeButton = Child(Button.self)
         let title = Child(Text.self)
-        let previewSection = Child(ListSectionComponent.self)
+        let amountSection = Child(ListSectionComponent.self)
         let button = Child(ButtonComponent.self)
         
         return { context in
@@ -72,31 +71,22 @@ private final class SheetContent: CombinedComponent {
             let presentationData = component.context.sharedContext.currentPresentationData.with { $0 }
             
             let sideInset: CGFloat = 16.0
-            var contentSize = CGSize(width: context.availableSize.width, height: 38.0)
+            var contentSize = CGSize(width: context.availableSize.width, height: 18.0)
             
             let constrainedTitleWidth = context.availableSize.width - 16.0 * 2.0
             
             let closeButton = closeButton.update(
-                component: GlassBarButtonComponent(
-                    size: CGSize(width: 44.0, height: 44.0),
-                    backgroundColor: nil,
-                    isDark: theme.overallDarkAppearance,
-                    state: .glass,
-                    component: AnyComponentWithIdentity(id: "close", component: AnyComponent(
-                        BundleIconComponent(
-                            name: "Navigation/Close",
-                            tintColor: theme.rootController.navigationBar.glassBarButtonForegroundColor
-                        )
-                    )),
-                    action: { _ in
+                component: Button(
+                    content: AnyComponent(Text(text: environment.strings.Common_Cancel, font: Font.regular(17.0), color: theme.actionSheet.controlAccentColor)),
+                    action: {
                         component.dismiss()
                     }
                 ),
-                availableSize: CGSize(width: 44.0, height: 44.0),
+                availableSize: CGSize(width: 120.0, height: 30.0),
                 transition: .immediate
             )
             context.add(closeButton
-                .position(CGPoint(x: 16.0 + closeButton.size.width / 2.0, y: 16.0 + closeButton.size.height / 2.0))
+                .position(CGPoint(x: closeButton.size.width / 2.0 + sideInset, y: 28.0))
             )
                     
             let title = title.update(
@@ -105,7 +95,7 @@ private final class SheetContent: CombinedComponent {
                 transition: .immediate
             )
             context.add(title
-                .position(CGPoint(x: context.availableSize.width / 2.0, y: contentSize.height))
+                .position(CGPoint(x: context.availableSize.width / 2.0, y: contentSize.height + title.size.height / 2.0))
             )
             contentSize.height += title.size.height
             contentSize.height += 40.0
@@ -117,7 +107,7 @@ private final class SheetContent: CombinedComponent {
             })
 
             let amountInfoString = NSMutableAttributedString(attributedString: parseMarkdownIntoAttributedString(environment.strings.WebApp_ShareMessage_Info(component.botName).string, attributes: amountMarkdownAttributes, textAlignment: .natural))
-            let previewFooter = AnyComponent(MultilineTextComponent(
+            let amountFooter = AnyComponent(MultilineTextComponent(
                 text: .plain(amountInfoString),
                 maximumNumberOfLines: 0,
                 highlightColor: environment.theme.list.itemAccentColor.withAlphaComponent(0.1),
@@ -139,12 +129,11 @@ private final class SheetContent: CombinedComponent {
             var text: String = ""
             var entities: TextEntitiesMessageAttribute?
             var media: [Media] = []
-            var replyMarkup: ReplyMarkupMessageAttribute?
             
             switch component.preparedMessage.result {
             case let .internalReference(reference):
                 switch reference.message {
-                case let .auto(textValue, entitiesValue, replyMarkupValue):
+                case let .auto(textValue, entitiesValue, _):
                     text = textValue
                     entities = entitiesValue
                     if let file = reference.file {
@@ -152,49 +141,39 @@ private final class SheetContent: CombinedComponent {
                     } else if let image = reference.image {
                         media = [image]
                     }
-                    replyMarkup = replyMarkupValue
-                case let .text(textValue, entitiesValue, disableUrlPreview, previewParameters, replyMarkupValue):
+                case let .text(textValue, entitiesValue, disableUrlPreview, previewParameters, _):
                     text = textValue
                     entities = entitiesValue
                     let _ = disableUrlPreview
                     let _ = previewParameters
-                    replyMarkup = replyMarkupValue
-                case let .contact(contact, replyMarkupValue):
+                case let .contact(contact, _):
                     media = [contact]
-                    replyMarkup = replyMarkupValue
-                case let .mapLocation(map, replyMarkupValue):
+                case let .mapLocation(map, _):
                     media = [map]
-                    replyMarkup = replyMarkupValue
-                case let .invoice(invoice, replyMarkupValue):
+                case let .invoice(invoice, _):
                     media = [invoice]
-                    replyMarkup = replyMarkupValue
                 default:
                     break
                 }
             case let .externalReference(reference):
                 switch reference.message {
-                case let .auto(textValue, entitiesValue, replyMarkupValue):
+                case let .auto(textValue, entitiesValue, _):
                     text = textValue
                     entities = entitiesValue
                     if let content = reference.content {
                         media = [content]
                     }
-                    replyMarkup = replyMarkupValue
-                case let .text(textValue, entitiesValue, disableUrlPreview, previewParameters, replyMarkupValue):
+                case let .text(textValue, entitiesValue, disableUrlPreview, previewParameters, _):
                     text = textValue
                     entities = entitiesValue
                     let _ = disableUrlPreview
                     let _ = previewParameters
-                    replyMarkup = replyMarkupValue
-                case let .contact(contact, replyMarkupValue):
+                case let .contact(contact, _):
                     media = [contact]
-                    replyMarkup = replyMarkupValue
-                case let .mapLocation(map, replyMarkupValue):
+                case let .mapLocation(map, _):
                     media = [map]
-                    replyMarkup = replyMarkupValue
-                case let .invoice(invoice, replyMarkupValue):
+                case let .invoice(invoice, _):
                     media = [invoice]
-                    replyMarkup = replyMarkupValue
                 default:
                     break
                 }
@@ -204,13 +183,12 @@ private final class SheetContent: CombinedComponent {
                 text: text,
                 entities: entities,
                 media: media,
-                replyMarkup: replyMarkup,
                 botAddress: component.botAddress
             )
                      
             let listItemParams = ListViewItemLayoutParams(width: context.availableSize.width - sideInset * 2.0, leftInset: 0.0, rightInset: 0.0, availableHeight: 10000.0, isStandalone: true)
             
-            let previewSection = previewSection.update(
+            let amountSection = amountSection.update(
                 component: ListSectionComponent(
                     theme: theme,
                     header: AnyComponent(MultilineTextComponent(
@@ -221,7 +199,7 @@ private final class SheetContent: CombinedComponent {
                         )),
                         maximumNumberOfLines: 0
                     )),
-                    footer: previewFooter,
+                    footer: amountFooter,
                     items: [
                         AnyComponentWithIdentity(id: 0, component: AnyComponent(ListItemComponentAdaptor(
                             itemGenerator: PeerNameColorChatPreviewItem(
@@ -245,25 +223,24 @@ private final class SheetContent: CombinedComponent {
                 availableSize: CGSize(width: context.availableSize.width - sideInset * 2.0, height: .greatestFiniteMagnitude),
                 transition: context.transition
             )
-            context.add(previewSection
-                .position(CGPoint(x: context.availableSize.width / 2.0, y: contentSize.height + previewSection.size.height / 2.0))
+            context.add(amountSection
+                .position(CGPoint(x: context.availableSize.width / 2.0, y: contentSize.height + amountSection.size.height / 2.0))
                 .clipsToBounds(true)
                 .cornerRadius(10.0)
             )
-            contentSize.height += previewSection.size.height
+            contentSize.height += amountSection.size.height
             contentSize.height += 32.0
             
             let buttonString: String = environment.strings.WebApp_ShareMessage_Share
             let buttonAttributedString = NSMutableAttributedString(string: buttonString, font: Font.semibold(17.0), textColor: theme.list.itemCheckColors.foregroundColor, paragraphAlignment: .center)
             
-            let buttonInsets = ContainerViewLayout.concentricInsets(bottomInset: environment.safeInsets.bottom, innerDiameter: 52.0, sideInset: 30.0)
             let button = button.update(
                 component: ButtonComponent(
                     background: ButtonComponent.Background(
-                        style: .glass,
                         color: theme.list.itemCheckColors.fillColor,
                         foreground: theme.list.itemCheckColors.foregroundColor,
                         pressedColor: theme.list.itemCheckColors.fillColor.withMultipliedAlpha(0.9),
+                        cornerRadius: 10.0
                     ),
                     content: AnyComponentWithIdentity(
                         id: AnyHashable(0),
@@ -277,15 +254,19 @@ private final class SheetContent: CombinedComponent {
                         }
                     }
                 ),
-                availableSize: CGSize(width: context.availableSize.width - buttonInsets.left - buttonInsets.right, height: 52.0),
+                availableSize: CGSize(width: context.availableSize.width - sideInset * 2.0, height: 50),
                 transition: .immediate
             )
             context.add(button
+                .clipsToBounds(true)
+                .cornerRadius(10.0)
                 .position(CGPoint(x: context.availableSize.width / 2.0, y: contentSize.height + button.size.height / 2.0))
             )
             contentSize.height += button.size.height
-            contentSize.height += buttonInsets.bottom
+            contentSize.height += 15.0
             
+            contentSize.height += max(environment.inputHeight, environment.safeInsets.bottom)
+
             return contentSize
         }
     }
@@ -335,7 +316,6 @@ private final class WebAppMessagePreviewSheetComponent: CombinedComponent {
             
             let controller = environment.controller
             
-            let theme = environment.theme.withModalBlocksBackground()
             let sheet = sheet.update(
                 component: SheetComponent<EnvironmentType>(
                     content: AnyComponent<EnvironmentType>(SheetContent(
@@ -352,8 +332,7 @@ private final class WebAppMessagePreviewSheetComponent: CombinedComponent {
                             })
                         }
                     )),
-                    style: .glass,
-                    backgroundColor: .color(theme.list.blocksBackgroundColor),
+                    backgroundColor: .color(environment.theme.list.blocksBackgroundColor),
                     followContentSizeChanges: false,
                     clipsContent: true,
                     isScrollEnabled: false,
@@ -362,8 +341,6 @@ private final class WebAppMessagePreviewSheetComponent: CombinedComponent {
                 environment: {
                     environment
                     SheetComponentEnvironment(
-                        metrics: environment.metrics,
-                        deviceMetrics: environment.deviceMetrics,
                         isDisplaying: environment.value.isVisible,
                         isCentered: environment.metrics.widthClass == .regular,
                         hasInputHeight: !environment.inputHeight.isZero,
@@ -442,20 +419,16 @@ public final class WebAppMessagePreviewScreen: ViewControllerComponentContainer 
         let _ = (self.context.engine.data.get(
             EngineDataMap(
                 peers.map { TelegramEngine.EngineData.Item.Peer.SendPaidMessageStars.init(id: $0.id) }
-            ),
-            EngineDataList(
-                peers.map { TelegramEngine.EngineData.Item.Peer.RenderedPeer.init(id: $0.id) }
             )
         )
-        |> deliverOnMainQueue).start(next: { [weak self] sendPaidMessageStars, renderedPeers in
+        |> deliverOnMainQueue).start(next: { [weak self] sendPaidMessageStars in
             guard let self else {
                 return
             }
-            let renderedPeers = renderedPeers.compactMap({ $0 })
             var totalAmount: StarsAmount = .zero
-            var chargingPeers: [EngineRenderedPeer] = []
-            for peer in renderedPeers {
-                if let maybeAmount = sendPaidMessageStars[peer.peerId], let amount = maybeAmount {
+            var chargingPeers: [EnginePeer] = []
+            for peer in peers {
+                if let maybeAmount = sendPaidMessageStars[peer.id], let amount = maybeAmount {
                     totalAmount = totalAmount + amount
                     chargingPeers.append(peer)
                 }
@@ -543,22 +516,9 @@ public final class WebAppMessagePreviewScreen: ViewControllerComponentContainer 
     }
     
     fileprivate func proceed() {
-        let peerTypes = self.preparedMessage.peerTypes
-        var types: [ReplyMarkupButtonRequestPeerType] = []
-        if peerTypes.contains(.users) {
-            types.append(.user(.init(isBot: false, isPremium: nil)))
-        }
-        if peerTypes.contains(.bots) {
-            types.append(.user(.init(isBot: true, isPremium: nil)))
-        }
-        if peerTypes.contains(.channels) {
-            types.append(.channel(.init(isCreator: false, hasUsername: nil, userAdminRights: TelegramChatAdminRights(rights: [.canPostMessages]), botAdminRights: nil)))
-        }
-        if peerTypes.contains(.groups) {
-            types.append(.group(.init(isCreator: false, hasUsername: nil, isForum: nil, botParticipant: false, userAdminRights: nil, botAdminRights: nil)))
-        }
+        let requestPeerType = self.preparedMessage.peerTypes.requestPeerTypes
         
-        let controller = self.context.sharedContext.makePeerSelectionController(PeerSelectionControllerParams(context: self.context, filter: [.excludeRecent, .doNotSearchMessages], requestPeerType: types, hasContactSelector: false, multipleSelection: true, selectForumThreads: true, immediatelyActivateMultipleSelection: true))
+        let controller = self.context.sharedContext.makePeerSelectionController(PeerSelectionControllerParams(context: self.context, filter: [.excludeRecent, .doNotSearchMessages], requestPeerType: requestPeerType, hasContactSelector: false, multipleSelection: true, selectForumThreads: true, immediatelyActivateMultipleSelection: true))
         
         controller.multiplePeersSelected = { [weak self, weak controller] peers, _, _, _, _, _ in
             guard let self else {

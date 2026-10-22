@@ -1,5 +1,3 @@
-import Foundation
-import UIKit
 import AsyncDisplayKit
 import Display
 import TelegramCore
@@ -18,7 +16,6 @@ import PeerInfoPaneNode
 import ChatListUI
 import DeleteChatPeerActionSheetItem
 import UndoUI
-import ComponentDisplayAdapters
 
 private final class SearchNavigationContentNode: ASDisplayNode, PeerInfoPanelNodeNavigationContentNode {
     private struct Params: Equatable {
@@ -59,15 +56,15 @@ private final class SearchNavigationContentNode: ASDisplayNode, PeerInfoPanelNod
     func update(width: CGFloat, defaultHeight: CGFloat, insets: UIEdgeInsets, transition: ContainedViewLayoutTransition) -> CGFloat {
         self.params = Params(width: width, defaultHeight: defaultHeight, insets: insets)
         
-        let size = CGSize(width: width, height: 60.0)
-        transition.updateFrame(node: self.contentNode, frame: CGRect(origin: CGPoint(x: 0.0, y: -6.0), size: size))
-        let _ = self.contentNode.updateLayout(size: size, leftInset: insets.left, rightInset: insets.right, transition: transition)
+        let size = CGSize(width: width, height: defaultHeight)
+        transition.updateFrame(node: self.contentNode, frame: CGRect(origin: CGPoint(x: 0.0, y: 10.0), size: size))
+        self.contentNode.updateLayout(size: size, leftInset: insets.left, rightInset: insets.right, transition: transition)
         
-        var contentHeight: CGFloat = size.height
+        var contentHeight: CGFloat = size.height + 10.0
         
         if self.appliedPanelNode !== self.panelNode {
             if let previous = self.appliedPanelNode {
-                ComponentTransition(transition).setAlpha(view: previous.view, alpha: 0.0, completion: { [weak previous] _ in
+                transition.updateAlpha(node: previous, alpha: 0.0, completion: { [weak previous] _ in
                     previous?.removeFromSupernode()
                 })
             }
@@ -80,10 +77,9 @@ private final class SearchNavigationContentNode: ASDisplayNode, PeerInfoPanelNod
                 let panelFrame = CGRect(origin: CGPoint(x: 0.0, y: contentHeight), size: CGSize(width: width, height: panelHeight))
                 panelNode.frame = panelFrame
                 panelNode.alpha = 0.0
-                ComponentTransition(transition).setAlpha(view: panelNode.view, alpha: 1.0)
+                transition.updateAlpha(node: panelNode, alpha: 1.0)
                 
-                contentHeight += 14.0 + 66.0
-                contentHeight += panelHeight
+                contentHeight += panelHeight - 1.0
             }
         } else if let panelNode = self.panelNode, let chatController = self.chatController {
             let panelLayout = panelNode.updateLayout(width: width, leftInset: insets.left, rightInset: insets.right, transition: transition, chatController: chatController)
@@ -91,8 +87,7 @@ private final class SearchNavigationContentNode: ASDisplayNode, PeerInfoPanelNod
             let panelFrame = CGRect(origin: CGPoint(x: 0.0, y: contentHeight), size: CGSize(width: width, height: panelHeight))
             transition.updateFrame(node: panelNode, frame: panelFrame)
             
-            contentHeight += 14.0 + 66.0
-            contentHeight += panelHeight
+            contentHeight += panelHeight - 1.0
         }
         
         return contentHeight
@@ -154,7 +149,7 @@ public final class PeerInfoChatListPaneNode: ASDisplayNode, PeerInfoPaneNode, AS
         
         self.chatListNode = ChatListNode(
             context: self.context,
-            location: .savedMessagesChats(peerId: context.account.peerId),
+            location: .savedMessagesChats,
             chatListFilter: nil,
             previewing: false,
             fillPreloadItems: false,
@@ -215,7 +210,6 @@ public final class PeerInfoChatListPaneNode: ASDisplayNode, PeerInfoPaneNode, AS
                     channelMessageId: nil,
                     isChannelPost: false,
                     isForumPost: false,
-                    isMonoforumPost: false,
                     maxMessage: nil,
                     maxReadIncomingMessageId: nil,
                     maxReadOutgoingMessageId: nil,
@@ -259,11 +253,11 @@ public final class PeerInfoChatListPaneNode: ASDisplayNode, PeerInfoPaneNode, AS
             } else if let emptyShimmerEffectNode = self.emptyShimmerEffectNode {
                 self.emptyShimmerEffectNode = nil
                 let emptyNodeTransition = transition.isAnimated ? transition : .animated(duration: 0.3, curve: .easeInOut)
-                ComponentTransition(emptyNodeTransition).setAlpha(view: emptyShimmerEffectNode.view, alpha: 0.0, completion: { [weak emptyShimmerEffectNode] _ in
+                emptyNodeTransition.updateAlpha(node: emptyShimmerEffectNode, alpha: 0.0, completion: { [weak emptyShimmerEffectNode] _ in
                     emptyShimmerEffectNode?.removeFromSupernode()
                 })
                 self.chatListNode.alpha = 0.0
-                ComponentTransition(emptyNodeTransition).setAlpha(view: self.chatListNode.view, alpha: 1.0)
+                emptyNodeTransition.updateAlpha(node: self.chatListNode, alpha: 1.0)
             }
         }
         
@@ -384,12 +378,12 @@ public final class PeerInfoChatListPaneNode: ASDisplayNode, PeerInfoPaneNode, AS
             if case let .peer(peerData) = item.content {
                 let threadId = peerData.peer.peerId.toInt64()
                 let chatController = self.context.sharedContext.makeChatController(context: self.context, chatLocation: .replyThread(message: ChatReplyThreadMessage(
-                    peerId: self.context.account.peerId, threadId: threadId, channelMessageId: nil, isChannelPost: false, isForumPost: false, isMonoforumPost: false, maxMessage: nil, maxReadIncomingMessageId: nil, maxReadOutgoingMessageId: nil, unreadCount: 0, initialFilledHoles: IndexSet(), initialAnchor: .automatic, isNotAvailable: false
+                    peerId: self.context.account.peerId, threadId: threadId, channelMessageId: nil, isChannelPost: false, isForumPost: false, maxMessage: nil, maxReadIncomingMessageId: nil, maxReadOutgoingMessageId: nil, unreadCount: 0, initialFilledHoles: IndexSet(), initialAnchor: .automatic, isNotAvailable: false
                 )), subject: nil, botStart: nil, mode: .standard(.previewing), params: nil)
                 chatController.canReadHistory.set(false)
                 let source: ContextContentSource = .controller(ContextControllerContentSourceImpl(controller: chatController, sourceNode: node, navigationController: parentController.navigationController as? NavigationController))
                 
-                let contextController = makeContextController(presentationData: self.presentationData, source: source, items: savedMessagesPeerMenuItems(context: self.context, threadId: threadId, parentController: parentController, deletePeerChat: { [weak self] peerId in
+                let contextController = ContextController(presentationData: self.presentationData, source: source, items: savedMessagesPeerMenuItems(context: self.context, threadId: threadId, parentController: parentController, deletePeerChat: { [weak self] peerId in
                     guard let self else {
                         return
                     }
@@ -446,7 +440,7 @@ public final class PeerInfoChatListPaneNode: ASDisplayNode, PeerInfoPaneNode, AS
                         
                         chatController.displayNode.layer.allowsGroupOpacity = true
                         if transition.isAnimated {
-                            ComponentTransition.easeInOut(duration: 0.2).setAlpha(view: chatController.displayNode.view, alpha: 1.0)
+                            ComponentTransition.easeInOut(duration: 0.2).setAlpha(layer: chatController.displayNode.layer, alpha: 1.0)
                         }
                         
                         if self.searchNavigationContentNode?.contentNode !== contentNode {

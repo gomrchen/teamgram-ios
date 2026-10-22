@@ -19,7 +19,6 @@ import AlertComponent
 import TelegramPresentationData
 import ComponentFlow
 import MultilineTextComponent
-import AVFoundation
 
 private func resolvedEmojiKey(data: Data) -> [String] {
     let resolvedKey = stringForEmojiHashOfData(data, 4) ?? []
@@ -157,11 +156,6 @@ extension VideoChatScreenComponent.View {
         }
         
         let canManageCall = callState.canManageCall
-
-        var isConference = false
-        if case let .group(groupCall) = currentCall {
-            isConference = groupCall.isConference
-        }
         
         var items: [ContextMenuItem] = []
         
@@ -179,6 +173,35 @@ extension VideoChatScreenComponent.View {
                     break
                 }
             }
+        }
+        
+        if case let .group(groupCall) = currentCall, let encryptionKey = groupCall.encryptionKeyValue {
+            //TODO:localize
+            let emojiKey = resolvedEmojiKey(data: encryptionKey)
+            items.append(.action(ContextMenuActionItem(text: "Encryption Key", textLayout: .secondLineWithValue(emojiKey.joined(separator: "")), icon: { theme in
+                return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Lock"), color: theme.actionSheet.primaryTextColor)
+            }, action: { [weak self] c, _ in
+                c?.dismiss(completion: nil)
+                
+                guard let self, let environment = self.environment else {
+                    return
+                }
+                
+                let alertController = componentAlertController(
+                    theme: AlertControllerTheme(presentationTheme: defaultDarkPresentationTheme, fontSize: .regular),
+                    content: AnyComponent(EmojiKeyAlertComponet(
+                        theme: defaultDarkPresentationTheme,
+                        emojiKey: emojiKey,
+                        title: "This call is end-to-end encrypted",
+                        text: "If the emojis on everyone's screens are the same, this call is 100% secure."
+                    )),
+                    actions: [ComponentAlertAction(type: .defaultAction, title: environment.strings.Common_OK, action: {})],
+                    actionLayout: .horizontal
+                )
+                
+                environment.controller()?.present(alertController, in: .window(.root))
+            })))
+            items.append(.separator)
         }
         
         if let (availableOutputs, currentOutput) = self.audioOutputState, availableOutputs.count > 1 {
@@ -210,7 +233,7 @@ extension VideoChatScreenComponent.View {
             })))
         }
         
-        if canManageCall && !isConference {
+        if canManageCall {
             let text: String
             if case let .channel(channel) = peer, case .broadcast = channel.info {
                 text = environment.strings.LiveStream_EditTitle
@@ -227,31 +250,6 @@ extension VideoChatScreenComponent.View {
                 }
                 self.openTitleEditing()
             })))
-            
-            if callState.canEnableMessages {
-                items.append(.action(ContextMenuActionItem(text: callState.messagesAreEnabled ? environment.strings.VoiceChat_ContextDisableMessages : environment.strings.VoiceChat_ContextEnableMessages, icon: { theme -> UIImage? in
-                    return generateTintedImage(image: UIImage(bundleImageName: callState.messagesAreEnabled ? "Call/MessagesDisable" : "Call/MessagesEnable"), color: theme.actionSheet.primaryTextColor)
-                }, action: { [weak self] _, f in
-                    f(.default)
-                    
-                    guard let self, let currentCall = self.currentCall else {
-                        return
-                    }
-                    let isEnabled = !callState.messagesAreEnabled
-                    currentCall.setMessagesEnabled(isEnabled: isEnabled)
-                    
-                    let iconName: String
-                    let text: String
-                    if isEnabled {
-                        iconName = "Call/ToastMessagesEnabled"
-                        text = environment.strings.VoiceChat_ToastMessagesEnabled
-                    } else {
-                        iconName = "Call/ToastMessagesDisabled"
-                        text = environment.strings.VoiceChat_ToastMessagesDisabled
-                    }
-                    self.presentToast(icon: .icon(iconName), text: text, duration: 3)
-                })))
-            }
 
             var hasPermissions = true
             if let peer = self.peer, case let .channel(chatPeer) = peer {
@@ -338,7 +336,7 @@ extension VideoChatScreenComponent.View {
                         if isSelected {
                             return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Check"), color: .white)
                         } else {
-                            return UIImage()
+                            return nil
                         }
                     }, action: { [weak self] _, f in
                         f(.default)
@@ -377,7 +375,7 @@ extension VideoChatScreenComponent.View {
             }
         }
 
-        if canManageCall && !isConference {
+        if canManageCall {
             if let recordingStartTimestamp = callState.recordingStartTimestamp {
                 items.append(.custom(VoiceChatRecordingContextItem(timestamp: recordingStartTimestamp, action: { [weak self] _, f in
                     f(.dismissWithoutContent)
@@ -469,7 +467,7 @@ extension VideoChatScreenComponent.View {
                                 }
                             }
 
-                            let controller = voiceChatTitleEditController(context: currentCall.accountContext, forceTheme: environment.theme, title: title, text: text, placeholder: placeholder, value: nil, maxLength: 40, apply: { [weak self] title in
+                            let controller = voiceChatTitleEditController(sharedContext: currentCall.accountContext.sharedContext, account: currentCall.accountContext.account, forceTheme: environment.theme, title: title, text: text, placeholder: placeholder, value: nil, maxLength: 40, apply: { [weak self] title in
                                 guard let self, let environment = self.environment, case let .group(groupCall) = self.currentCall, let peer = self.peer, let title else {
                                     return
                                 }
@@ -483,7 +481,7 @@ extension VideoChatScreenComponent.View {
                                     text = environment.strings.VoiceChat_RecordingStarted
                                 }
 
-                                self.presentToast(icon: .animation("anim_vcrecord"), text: text, duration: 3)
+                                self.presentUndoOverlay(content: .voiceChatRecording(text: text), action: { _ in return false })
                                 groupCall.playTone(.recordingStarted)
                             })
                             environment.controller()?.present(controller, in: .window(.root))
@@ -596,7 +594,7 @@ extension VideoChatScreenComponent.View {
         }
 
         let presentationData = currentCall.accountContext.sharedContext.currentPresentationData.with({ $0 }).withUpdated(theme: environment.theme)
-        let contextController = makeContextController(presentationData: presentationData, source: .reference(VoiceChatContextReferenceContentSource(controller: controller, sourceView: sourceView)), items: .single(ContextController.Items(content: .list(items))), gesture: nil)
+        let contextController = ContextController(presentationData: presentationData, source: .reference(VoiceChatContextReferenceContentSource(controller: controller, sourceView: sourceView)), items: .single(ContextController.Items(content: .list(items))), gesture: nil)
         controller.presentInGlobalOverlay(contextController)
     }
     
@@ -730,7 +728,7 @@ extension VideoChatScreenComponent.View {
                 if output == currentOutput {
                     return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Check"), color: theme.actionSheet.primaryTextColor)
                 } else {
-                    return UIImage()
+                    return nil
                 }
             }, action: { [weak self] _, f in
                 f(.default)
@@ -763,7 +761,7 @@ extension VideoChatScreenComponent.View {
             items.append(.separator)
             items.append(.action(ContextMenuActionItem(text: environment.strings.VoiceChat_SpeakPermissionEveryone, icon: { theme in
                 if isMuted {
-                    return UIImage()
+                    return nil
                 } else {
                     return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Check"), color: theme.actionSheet.primaryTextColor)
                 }
@@ -777,7 +775,7 @@ extension VideoChatScreenComponent.View {
             })))
             items.append(.action(ContextMenuActionItem(text: environment.strings.VoiceChat_SpeakPermissionAdmin, icon: { theme in
                 if !isMuted {
-                    return UIImage()
+                    return nil
                 } else {
                     return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Check"), color: theme.actionSheet.primaryTextColor)
                 }

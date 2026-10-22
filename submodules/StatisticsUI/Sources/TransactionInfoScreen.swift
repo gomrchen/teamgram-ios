@@ -12,25 +12,25 @@ import SheetComponent
 import BundleIconComponent
 import BalancedTextComponent
 import MultilineTextComponent
-import ButtonComponent
+import SolidRoundedButtonComponent
+import LottieComponent
 import AccountContext
 import TelegramStringFormatting
 import PremiumPeerShortcutComponent
-import GlassBarButtonComponent
 
 private final class SheetContent: CombinedComponent {
     typealias EnvironmentType = ViewControllerComponentContainer.Environment
     
     let context: AccountContext
     let peer: EnginePeer
-    let transaction: StarsContext.State.Transaction
+    let transaction: RevenueStatsTransactionsContext.State.Transaction
     let openExplorer: (String) -> Void
     let dismiss: () -> Void
     
     init(
         context: AccountContext,
         peer: EnginePeer,
-        transaction: StarsContext.State.Transaction,
+        transaction: RevenueStatsTransactionsContext.State.Transaction,
         openExplorer: @escaping (String) -> Void,
         dismiss: @escaping () -> Void
     ) {
@@ -55,6 +55,18 @@ private final class SheetContent: CombinedComponent {
     }
     
     final class State: ComponentState {
+        var cachedCloseImage: (UIImage, PresentationTheme)?
+        
+        let playOnce =  ActionSlot<Void>()
+        private var didPlayAnimation = false
+                
+        func playAnimationIfNeeded() {
+            guard !self.didPlayAnimation else {
+                return
+            }
+            self.didPlayAnimation = true
+            self.playOnce.invoke(Void())
+        }
     }
     
     func makeState() -> State {
@@ -62,23 +74,25 @@ private final class SheetContent: CombinedComponent {
     }
     
     static var body: Body {
-        let closeButton = Child(GlassBarButtonComponent.self)
+        let closeButton = Child(Button.self)
                 
         let amount = Child(MultilineTextComponent.self)
         let title = Child(MultilineTextComponent.self)
         let date = Child(MultilineTextComponent.self)
         let peerShortcut = Child(PremiumPeerShortcutComponent.self)
         
-        let actionButton = Child(ButtonComponent.self)
+        let actionButton = Child(SolidRoundedButtonComponent.self)
 
         return { context in
             let environment = context.environment[EnvironmentType.self]
             let component = context.component
+            let state = context.state
             
             let theme = environment.theme
             let strings = environment.strings
             let dateTimeFormat = component.context.sharedContext.currentPresentationData.with { $0 }.dateTimeFormat
             
+            let sideInset: CGFloat = 16.0 + environment.safeInsets.left
             let textSideInset: CGFloat = 32.0 + environment.safeInsets.left
             
             let titleFont = Font.semibold(17.0)
@@ -89,27 +103,26 @@ private final class SheetContent: CombinedComponent {
             
             var contentSize = CGSize(width: context.availableSize.width, height: 45.0)
             
+            let closeImage: UIImage
+            if let (image, theme) = state.cachedCloseImage, theme === environment.theme {
+                closeImage = image
+            } else {
+                closeImage = generateCloseButtonImage(backgroundColor: UIColor(rgb: 0x808084, alpha: 0.1), foregroundColor: theme.actionSheet.inputClearButtonColor)!
+                state.cachedCloseImage = (closeImage, theme)
+            }
+            
             let closeButton = closeButton.update(
-                component: GlassBarButtonComponent(
-                    size: CGSize(width: 44.0, height: 44.0),
-                    backgroundColor: nil,
-                    isDark: theme.overallDarkAppearance,
-                    state: .glass,
-                    component: AnyComponentWithIdentity(id: "close", component: AnyComponent(
-                        BundleIconComponent(
-                            name: "Navigation/Close",
-                            tintColor: theme.chat.inputPanel.panelControlColor
-                        )
-                    )),
-                    action: { _ in
-                        component.dismiss()
+                component: Button(
+                    content: AnyComponent(Image(image: closeImage)),
+                    action: { [weak component] in
+                        component?.dismiss()
                     }
                 ),
-                availableSize: CGSize(width: 44.0, height: 44.0),
+                availableSize: CGSize(width: 30.0, height: 30.0),
                 transition: .immediate
             )
             context.add(closeButton
-                .position(CGPoint(x: 16.0 + closeButton.size.width / 2.0, y: 16.0 + closeButton.size.height / 2.0))
+                .position(CGPoint(x: context.availableSize.width - environment.safeInsets.left - closeButton.size.width, y: 28.0))
             )
             
             let amountString: NSMutableAttributedString
@@ -123,52 +136,39 @@ private final class SheetContent: CombinedComponent {
             let labelColor: UIColor
             
             var showPeer = false
-            if let fromDate = component.transaction.adsProceedsFromDate, let toDate = component.transaction.adsProceedsToDate {
+            switch component.transaction {
+            case let .proceeds(amount, fromDate, toDate):
                 labelColor = theme.list.itemDisclosureActions.constructive.fillColor
-                amountString = tonAmountAttributedString(formatTonAmountText(component.transaction.count.amount.value, dateTimeFormat: dateTimeFormat, showPlus: true), integralFont: integralFont, fractionalFont: fractionalFont, color: labelColor, decimalSeparator: dateTimeFormat.decimalSeparator).mutableCopy() as! NSMutableAttributedString
+                amountString = tonAmountAttributedString(formatTonAmountText(amount, dateTimeFormat: dateTimeFormat, showPlus: true), integralFont: integralFont, fractionalFont: fractionalFont, color: labelColor, decimalSeparator: dateTimeFormat.decimalSeparator).mutableCopy() as! NSMutableAttributedString
                 dateString = "\(stringForMediumCompactDate(timestamp: fromDate, strings: strings, dateTimeFormat: dateTimeFormat)) – \(stringForMediumCompactDate(timestamp: toDate, strings: strings, dateTimeFormat: dateTimeFormat))"
                 titleString = strings.Monetization_TransactionInfo_Proceeds
                 buttonTitle = strings.Common_OK
                 explorerUrl = nil
                 showPeer = true
-            } else if case .fragment = component.transaction.peer {
-                if component.transaction.flags.contains(.isRefund) {
-                    labelColor = theme.list.itemDisclosureActions.constructive.fillColor
-                    titleString = strings.Monetization_TransactionInfo_Refund
-                    amountString = tonAmountAttributedString(formatTonAmountText(component.transaction.count.amount.value, dateTimeFormat: dateTimeFormat, showPlus: true), integralFont: integralFont, fractionalFont: fractionalFont, color: labelColor, decimalSeparator: dateTimeFormat.decimalSeparator).mutableCopy() as! NSMutableAttributedString
-                    dateString = stringForFullDate(timestamp: component.transaction.date, strings: strings, dateTimeFormat: dateTimeFormat)
+            case let .withdrawal(status, amount, date, provider, _, transactionUrl):
+                labelColor = theme.list.itemDestructiveColor
+                amountString = tonAmountAttributedString(formatTonAmountText(amount, dateTimeFormat: dateTimeFormat), integralFont: integralFont, fractionalFont: fractionalFont, color: labelColor, decimalSeparator: dateTimeFormat.decimalSeparator).mutableCopy() as! NSMutableAttributedString
+                dateString = stringForFullDate(timestamp: date, strings: strings, dateTimeFormat: dateTimeFormat)
+                
+                switch status {
+                case .succeed:
+                    titleString = strings.Monetization_TransactionInfo_Withdrawal(provider).string
+                    buttonTitle = strings.Monetization_TransactionInfo_ViewInExplorer
+                case .pending:
+                    titleString = strings.Monetization_TransactionInfo_Pending
                     buttonTitle = strings.Common_OK
-                } else {
-                    labelColor = theme.list.itemDestructiveColor
-                    amountString = tonAmountAttributedString(formatTonAmountText(component.transaction.count.amount.value, dateTimeFormat: dateTimeFormat), integralFont: integralFont, fractionalFont: fractionalFont, color: labelColor, decimalSeparator: dateTimeFormat.decimalSeparator).mutableCopy() as! NSMutableAttributedString
-                    dateString = stringForFullDate(timestamp: component.transaction.date, strings: strings, dateTimeFormat: dateTimeFormat)
-                    
-                    if component.transaction.flags.contains(.isPending) {
-                        titleString = strings.Monetization_TransactionInfo_Pending
-                        buttonTitle = strings.Common_OK
-                    } else if component.transaction.flags.contains(.isFailed) {
-                        titleString = strings.Monetization_TransactionInfo_Failed
-                        buttonTitle = strings.Common_OK
-                        titleColor = theme.list.itemDestructiveColor
-                    } else {
-                        titleString = strings.Monetization_TransactionInfo_Withdrawal("Fragment").string
-                        buttonTitle = strings.Monetization_TransactionInfo_ViewInExplorer
-                    }
+                case .failed:
+                    titleString = strings.Monetization_TransactionInfo_Failed
+                    buttonTitle = strings.Common_OK
+                    titleColor = theme.list.itemDestructiveColor
                 }
-                explorerUrl = component.transaction.transactionUrl
-            } else if component.transaction.flags.contains(.isRefund) {
+                explorerUrl = transactionUrl
+            case let .refund(amount, date, _):
                 labelColor = theme.list.itemDisclosureActions.constructive.fillColor
                 titleString = strings.Monetization_TransactionInfo_Refund
-                amountString = tonAmountAttributedString(formatTonAmountText(component.transaction.count.amount.value, dateTimeFormat: dateTimeFormat, showPlus: true), integralFont: integralFont, fractionalFont: fractionalFont, color: labelColor, decimalSeparator: dateTimeFormat.decimalSeparator).mutableCopy() as! NSMutableAttributedString
-                dateString = stringForFullDate(timestamp: component.transaction.date, strings: strings, dateTimeFormat: dateTimeFormat)
+                amountString = tonAmountAttributedString(formatTonAmountText(amount, dateTimeFormat: dateTimeFormat, showPlus: true), integralFont: integralFont, fractionalFont: fractionalFont, color: labelColor, decimalSeparator: dateTimeFormat.decimalSeparator).mutableCopy() as! NSMutableAttributedString
+                dateString = stringForFullDate(timestamp: date, strings: strings, dateTimeFormat: dateTimeFormat)
                 buttonTitle = strings.Common_OK
-                explorerUrl = nil
-            } else {
-                labelColor = theme.list.itemDisclosureActions.constructive.fillColor
-                amountString = tonAmountAttributedString(formatTonAmountText(component.transaction.count.amount.value, dateTimeFormat: dateTimeFormat, showPlus: true), integralFont: integralFont, fractionalFont: fractionalFont, color: labelColor, decimalSeparator: dateTimeFormat.decimalSeparator).mutableCopy() as! NSMutableAttributedString
-                dateString = ""
-                titleString = ""
-                buttonTitle = ""
                 explorerUrl = nil
             }
             
@@ -242,30 +242,27 @@ private final class SheetContent: CombinedComponent {
                     .position(CGPoint(x: context.availableSize.width / 2.0, y: contentSize.height + peerShortcut.size.height / 2.0))
                 )
                 contentSize.height += peerShortcut.size.height
-                contentSize.height += 32.0
+                contentSize.height += 50.0
             } else {
-                contentSize.height += 27.0
+                contentSize.height += 45.0
             }
            
-            let buttonInsets = ContainerViewLayout.concentricInsets(bottomInset: environment.safeInsets.bottom, innerDiameter: 52.0, sideInset: 30.0)
             let actionButton = actionButton.update(
-                component: ButtonComponent(
-                    background: ButtonComponent.Background(
-                        style: .glass,
-                        color: theme.list.itemCheckColors.fillColor,
-                        foreground: theme.list.itemCheckColors.foregroundColor,
-                        pressedColor: theme.list.itemCheckColors.fillColor.withMultipliedAlpha(0.9)
+                component: SolidRoundedButtonComponent(
+                    title: buttonTitle,
+                    theme: SolidRoundedButtonComponent.Theme(
+                        backgroundColor: theme.list.itemCheckColors.fillColor,
+                        backgroundColors: [],
+                        foregroundColor: theme.list.itemCheckColors.foregroundColor
                     ),
-                    content: AnyComponentWithIdentity(
-                        id: AnyHashable(0),
-                        component: AnyComponent(ButtonTextContentComponent(
-                            text: buttonTitle,
-                            badge: 0,
-                            textColor: theme.list.itemCheckColors.foregroundColor,
-                            badgeBackground: theme.list.itemCheckColors.foregroundColor,
-                            badgeForeground: theme.list.itemCheckColors.fillColor
-                        ))
-                    ),
+                    font: .bold,
+                    fontSize: 17.0,
+                    height: 50.0,
+                    cornerRadius: 10.0,
+                    gloss: false,
+                    iconName: nil,
+                    animationName: nil,
+                    iconPosition: .left,
                     action: {
                         component.dismiss()
                         if let explorerUrl {
@@ -273,14 +270,18 @@ private final class SheetContent: CombinedComponent {
                         }
                     }
                 ),
-                availableSize: CGSize(width: context.availableSize.width - buttonInsets.left - buttonInsets.right, height: 52.0),
+                availableSize: CGSize(width: context.availableSize.width - sideInset * 2.0, height: 50.0),
                 transition: context.transition
             )
             context.add(actionButton
                 .position(CGPoint(x: context.availableSize.width / 2.0, y: contentSize.height + actionButton.size.height / 2.0))
             )
             contentSize.height += actionButton.size.height
-            contentSize.height += buttonInsets.bottom
+            contentSize.height += 22.0
+                        
+            contentSize.height += environment.safeInsets.bottom
+            
+            state.playAnimationIfNeeded()
             
             return contentSize
         }
@@ -292,13 +293,13 @@ private final class SheetContainerComponent: CombinedComponent {
     
     let context: AccountContext
     let peer: EnginePeer
-    let transaction: StarsContext.State.Transaction
+    let transaction: RevenueStatsTransactionsContext.State.Transaction
     let openExplorer: (String) -> Void
     
     init(
         context: AccountContext,
         peer: EnginePeer,
-        transaction: StarsContext.State.Transaction,
+        transaction: RevenueStatsTransactionsContext.State.Transaction,
         openExplorer: @escaping (String) -> Void
     ) {
         self.context = context
@@ -346,7 +347,6 @@ private final class SheetContainerComponent: CombinedComponent {
                             })
                         }
                     )),
-                    style: .glass,
                     backgroundColor: .color(environment.theme.actionSheet.opaqueItemBackgroundColor),
                     followContentSizeChanges: true,
                     externalState: sheetExternalState,
@@ -355,8 +355,6 @@ private final class SheetContainerComponent: CombinedComponent {
                 environment: {
                     environment
                     SheetComponentEnvironment(
-                        metrics: environment.metrics,
-                        deviceMetrics: environment.deviceMetrics,
                         isDisplaying: environment.value.isVisible,
                         isCentered: environment.metrics.widthClass == .regular,
                         hasInputHeight: !environment.inputHeight.isZero,
@@ -412,7 +410,7 @@ final class TransactionInfoScreen: ViewControllerComponentContainer {
     init(
         context: AccountContext,
         peer: EnginePeer,
-        transaction: StarsContext.State.Transaction,
+        transaction: RevenueStatsTransactionsContext.State.Transaction,
         openExplorer: @escaping (String) -> Void
     ) {
         self.context = context

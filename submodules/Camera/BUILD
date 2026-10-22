@@ -59,9 +59,6 @@ swift_library(
         "//submodules/ImageBlur:ImageBlur",
         "//submodules/TelegramCore:TelegramCore",
         "//submodules/Utils/DeviceModel",
-        "//submodules/rlottie:RLottieBinding",
-        "//submodules/AppBundle",
-        "//submodules/GZip",
     ],
     visibility = [
         "//visibility:public",

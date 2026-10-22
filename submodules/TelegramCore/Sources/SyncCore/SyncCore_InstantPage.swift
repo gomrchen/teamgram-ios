@@ -522,139 +522,139 @@ public indirect enum InstantPageBlock: PostboxCoding, Equatable {
             self = .unsupported
         case .instantpageblockTitle:
             guard let value = flatBuffersObject.value(type: TelegramCore_InstantPageBlock_Title.self) else {
-                throw FlatBuffersError.missingRequiredField()
+                throw FlatBuffersError.missingRequiredField(file: #file, line: #line)
             }
             self = .title(try RichText(flatBuffersObject: value.text))
         case .instantpageblockSubtitle:
             guard let value = flatBuffersObject.value(type: TelegramCore_InstantPageBlock_Subtitle.self) else {
-                throw FlatBuffersError.missingRequiredField()
+                throw FlatBuffersError.missingRequiredField(file: #file, line: #line)
             }
             self = .subtitle(try RichText(flatBuffersObject: value.text))
         case .instantpageblockAuthordate:
             guard let value = flatBuffersObject.value(type: TelegramCore_InstantPageBlock_AuthorDate.self) else {
-                throw FlatBuffersError.missingRequiredField()
+                throw FlatBuffersError.missingRequiredField(file: #file, line: #line)
             }
             self = .authorDate(author: try RichText(flatBuffersObject: value.author), date: value.date)
         case .instantpageblockHeader:
             guard let value = flatBuffersObject.value(type: TelegramCore_InstantPageBlock_Header.self) else {
-                throw FlatBuffersError.missingRequiredField()
+                throw FlatBuffersError.missingRequiredField(file: #file, line: #line)
             }
             self = .header(try RichText(flatBuffersObject: value.text))
         case .instantpageblockSubheader:
             guard let value = flatBuffersObject.value(type: TelegramCore_InstantPageBlock_Subheader.self) else {
-                throw FlatBuffersError.missingRequiredField()
+                throw FlatBuffersError.missingRequiredField(file: #file, line: #line)
             }
             self = .subheader(try RichText(flatBuffersObject: value.text))
         case .instantpageblockParagraph:
             guard let value = flatBuffersObject.value(type: TelegramCore_InstantPageBlock_Paragraph.self) else {
-                throw FlatBuffersError.missingRequiredField()
+                throw FlatBuffersError.missingRequiredField(file: #file, line: #line)
             }
             self = .paragraph(try RichText(flatBuffersObject: value.text))
         case .instantpageblockPreformatted:
             guard let value = flatBuffersObject.value(type: TelegramCore_InstantPageBlock_Preformatted.self) else {
-                throw FlatBuffersError.missingRequiredField()
+                throw FlatBuffersError.missingRequiredField(file: #file, line: #line)
             }
             self = .preformatted(try RichText(flatBuffersObject: value.text))
         case .instantpageblockFooter:
             guard let value = flatBuffersObject.value(type: TelegramCore_InstantPageBlock_Footer.self) else {
-                throw FlatBuffersError.missingRequiredField()
+                throw FlatBuffersError.missingRequiredField(file: #file, line: #line)
             }
             self = .footer(try RichText(flatBuffersObject: value.text))
         case .instantpageblockDivider:
             self = .divider
         case .instantpageblockAnchor:
             guard let value = flatBuffersObject.value(type: TelegramCore_InstantPageBlock_Anchor.self) else {
-                throw FlatBuffersError.missingRequiredField()
+                throw FlatBuffersError.missingRequiredField(file: #file, line: #line)
             }
             self = .anchor(value.name)
         case .instantpageblockList:
             guard let value = flatBuffersObject.value(type: TelegramCore_InstantPageBlock_List.self) else {
-                throw FlatBuffersError.missingRequiredField()
+                throw FlatBuffersError.missingRequiredField(file: #file, line: #line)
             }
             self = .list(items: try (0 ..< value.itemsCount).map { try InstantPageListItem(flatBuffersObject: value.items(at: $0)!) }, ordered: value.ordered)
         case .instantpageblockBlockquote:
             guard let value = flatBuffersObject.value(type: TelegramCore_InstantPageBlock_BlockQuote.self) else {
-                throw FlatBuffersError.missingRequiredField()
+                throw FlatBuffersError.missingRequiredField(file: #file, line: #line)
             }
             self = .blockQuote(text: try RichText(flatBuffersObject: value.text), caption: try RichText(flatBuffersObject: value.caption))
         case .instantpageblockPullquote:
             guard let value = flatBuffersObject.value(type: TelegramCore_InstantPageBlock_PullQuote.self) else {
-                throw FlatBuffersError.missingRequiredField()
+                throw FlatBuffersError.missingRequiredField(file: #file, line: #line)
             }
             self = .pullQuote(text: try RichText(flatBuffersObject: value.text), caption: try RichText(flatBuffersObject: value.caption))
         case .instantpageblockImage:
             guard let value = flatBuffersObject.value(type: TelegramCore_InstantPageBlock_Image.self) else {
-                throw FlatBuffersError.missingRequiredField()
+                throw FlatBuffersError.missingRequiredField(file: #file, line: #line)
             }
             self = .image(id: MediaId(value.id), caption: try InstantPageCaption(flatBuffersObject: value.caption), url: value.url, webpageId: value.webpageId.flatMap(MediaId.init))
         case .instantpageblockVideo:
             guard let value = flatBuffersObject.value(type: TelegramCore_InstantPageBlock_Video.self) else {
-                throw FlatBuffersError.missingRequiredField()
+                throw FlatBuffersError.missingRequiredField(file: #file, line: #line)
             }
             self = .video(id: MediaId(value.id), caption: try InstantPageCaption(flatBuffersObject: value.caption), autoplay: value.autoplay, loop: value.loop)
         case .instantpageblockAudio:
             guard let value = flatBuffersObject.value(type: TelegramCore_InstantPageBlock_Audio.self) else {
-                throw FlatBuffersError.missingRequiredField()
+                throw FlatBuffersError.missingRequiredField(file: #file, line: #line)
             }
             self = .audio(id: MediaId(value.id), caption: try InstantPageCaption(flatBuffersObject: value.caption))
         case .instantpageblockCover:
             guard let value = flatBuffersObject.value(type: TelegramCore_InstantPageBlock_Cover.self) else {
-                throw FlatBuffersError.missingRequiredField()
+                throw FlatBuffersError.missingRequiredField(file: #file, line: #line)
             }
             self = .cover(try InstantPageBlock(flatBuffersObject: value.block))
         case .instantpageblockWebembed:
             guard let value = flatBuffersObject.value(type: TelegramCore_InstantPageBlock_WebEmbed.self) else {
-                throw FlatBuffersError.missingRequiredField()
+                throw FlatBuffersError.missingRequiredField(file: #file, line: #line)
             }
             self = .webEmbed(url: value.url, html: value.html, dimensions: value.dimensions.flatMap(PixelDimensions.init), caption: try InstantPageCaption(flatBuffersObject: value.caption), stretchToWidth: value.stretchToWidth, allowScrolling: value.allowScrolling, coverId: value.coverId.flatMap(MediaId.init))
         case .instantpageblockPostembed:
             guard let value = flatBuffersObject.value(type: TelegramCore_InstantPageBlock_PostEmbed.self) else {
-                throw FlatBuffersError.missingRequiredField()
+                throw FlatBuffersError.missingRequiredField(file: #file, line: #line)
             }
             self = .postEmbed(url: value.url, webpageId: value.webpageId.flatMap(MediaId.init), avatarId: value.avatarId.flatMap(MediaId.init), author: value.author, date: value.date, blocks: try (0 ..< value.blocksCount).map { try InstantPageBlock(flatBuffersObject: value.blocks(at: $0)!) }, caption: try InstantPageCaption(flatBuffersObject: value.caption))
         case .instantpageblockCollage:
             guard let value = flatBuffersObject.value(type: TelegramCore_InstantPageBlock_Collage.self) else {
-                throw FlatBuffersError.missingRequiredField()
+                throw FlatBuffersError.missingRequiredField(file: #file, line: #line)
             }
             self = .collage(items: try (0 ..< value.itemsCount).map { try InstantPageBlock(flatBuffersObject: value.items(at: $0)!) }, caption: try InstantPageCaption(flatBuffersObject: value.caption))
         case .instantpageblockSlideshow:
             guard let value = flatBuffersObject.value(type: TelegramCore_InstantPageBlock_Slideshow.self) else {
-                throw FlatBuffersError.missingRequiredField()
+                throw FlatBuffersError.missingRequiredField(file: #file, line: #line)
             }
             self = .slideshow(items: try (0 ..< value.itemsCount).map { try InstantPageBlock(flatBuffersObject: value.items(at: $0)!) }, caption: try InstantPageCaption(flatBuffersObject: value.caption))
         case .instantpageblockChannelbanner:
             guard let value = flatBuffersObject.value(type: TelegramCore_InstantPageBlock_ChannelBanner.self) else {
-                throw FlatBuffersError.missingRequiredField()
+                throw FlatBuffersError.missingRequiredField(file: #file, line: #line)
             }
             let channel = try value.channel.flatMap { try TelegramChannel(flatBuffersObject: $0) }
             self = .channelBanner(channel)
         case .instantpageblockKicker:
             guard let value = flatBuffersObject.value(type: TelegramCore_InstantPageBlock_Kicker.self) else {
-                throw FlatBuffersError.missingRequiredField()
+                throw FlatBuffersError.missingRequiredField(file: #file, line: #line)
             }
             self = .kicker(try RichText(flatBuffersObject: value.text))
         case .instantpageblockTable:
             guard let value = flatBuffersObject.value(type: TelegramCore_InstantPageBlock_Table.self) else {
-                throw FlatBuffersError.missingRequiredField()
+                throw FlatBuffersError.missingRequiredField(file: #file, line: #line)
             }
             self = .table(title: try RichText(flatBuffersObject: value.title), rows: try (0 ..< value.rowsCount).map { try InstantPageTableRow(flatBuffersObject: value.rows(at: $0)!) }, bordered: value.bordered, striped: value.striped)
         case .instantpageblockDetails:
             guard let value = flatBuffersObject.value(type: TelegramCore_InstantPageBlock_Details.self) else {
-                throw FlatBuffersError.missingRequiredField()
+                throw FlatBuffersError.missingRequiredField(file: #file, line: #line)
             }
             self = .details(title: try RichText(flatBuffersObject: value.title), blocks: try (0 ..< value.blocksCount).map { try InstantPageBlock(flatBuffersObject: value.blocks(at: $0)!) }, expanded: value.expanded)
         case .instantpageblockRelatedarticles:
             guard let value = flatBuffersObject.value(type: TelegramCore_InstantPageBlock_RelatedArticles.self) else {
-                throw FlatBuffersError.missingRequiredField()
+                throw FlatBuffersError.missingRequiredField(file: #file, line: #line)
             }
             self = .relatedArticles(title: try RichText(flatBuffersObject: value.title), articles: try (0 ..< value.articlesCount).map { try InstantPageRelatedArticle(flatBuffersObject: value.articles(at: $0)!) })
         case .instantpageblockMap:
             guard let value = flatBuffersObject.value(type: TelegramCore_InstantPageBlock_Map.self) else {
-                throw FlatBuffersError.missingRequiredField()
+                throw FlatBuffersError.missingRequiredField(file: #file, line: #line)
             }
             self = .map(latitude: value.latitude, longitude: value.longitude, zoom: value.zoom, dimensions: PixelDimensions(value.dimensions), caption: try InstantPageCaption(flatBuffersObject: value.caption))
         case .none_:
-            throw FlatBuffersError.missingRequiredField()
+            throw FlatBuffersError.missingRequiredField(file: #file, line: #line)
         }
     }
     
@@ -1023,13 +1023,13 @@ public indirect enum InstantPageListItem: PostboxCoding, Equatable {
         switch flatBuffersObject.valueType {
         case .instantpagelistitemText:
             guard let textValue = flatBuffersObject.value(type: TelegramCore_InstantPageListItem_Text.self) else {
-                throw FlatBuffersError.missingRequiredField()
+                throw FlatBuffersError.missingRequiredField(file: #file, line: #line)
             }
             self = .text(try RichText(flatBuffersObject: textValue.text), textValue.number)
             
         case .instantpagelistitemBlocks:
             guard let blocksValue = flatBuffersObject.value(type: TelegramCore_InstantPageListItem_Blocks.self) else {
-                throw FlatBuffersError.missingRequiredField()
+                throw FlatBuffersError.missingRequiredField(file: #file, line: #line)
             }
             let blocks = try (0 ..< blocksValue.blocksCount).map { i in
                 return try InstantPageBlock(flatBuffersObject: blocksValue.blocks(at: i)!)
@@ -1038,7 +1038,7 @@ public indirect enum InstantPageListItem: PostboxCoding, Equatable {
         case .instantpagelistitemUnknown:
             self = .unknown
         case .none_:
-            throw FlatBuffersError.missingRequiredField()
+            throw FlatBuffersError.missingRequiredField(file: #file, line: #line)
         }
     }
     
@@ -1411,7 +1411,7 @@ public final class InstantPage: PostboxCoding, Equatable {
         self.url = decoder.decodeStringForKey("url", orElse: "")
         self.views = decoder.decodeOptionalInt32ForKey("v")
         
-        #if DEBUG && false
+        #if DEBUG
         var builder = FlatBufferBuilder(initialSize: 1024)
         let offset = self.encodeToFlatBuffers(builder: &builder)
         builder.finish(offset: offset)

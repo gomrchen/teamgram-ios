@@ -28,8 +28,6 @@ public enum PermissionRequestStatus {
                 self = .unreachable
             case .allowed:
                 self = .allowed
-            case .limited:
-                self = .allowed
         }
     }
 }

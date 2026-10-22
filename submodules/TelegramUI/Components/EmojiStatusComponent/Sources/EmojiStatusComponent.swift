@@ -41,7 +41,6 @@ public final class EmojiStatusComponent: Component {
     public enum SizeType {
         case compact
         case large
-        case smaller
     }
     
     public enum Content: Equatable {
@@ -51,7 +50,7 @@ public final class EmojiStatusComponent: Component {
         case text(color: UIColor, string: String)
         case animation(content: AnimationContent, size: CGSize, placeholderColor: UIColor, themeColor: UIColor?, loopMode: LoopMode)
         case topic(title: String, color: Int32, size: CGSize)
-        case image(image: UIImage?, tintColor: UIColor?)
+        case image(image: UIImage?)
     }
     
     public let postbox: Postbox
@@ -62,7 +61,6 @@ public final class EmojiStatusComponent: Component {
     public let content: Content
     public let particleColor: UIColor?
     public let size: CGSize?
-    public let roundMask: Bool
     public let isVisibleForAnimations: Bool
     public let useSharedAnimation: Bool
     public let action: (() -> Void)?
@@ -76,7 +74,6 @@ public final class EmojiStatusComponent: Component {
         content: Content,
         particleColor: UIColor? = nil,
         size: CGSize? = nil,
-        roundMask: Bool = false,
         isVisibleForAnimations: Bool,
         useSharedAnimation: Bool = false,
         action: (() -> Void)?,
@@ -94,7 +91,6 @@ public final class EmojiStatusComponent: Component {
             content: content,
             particleColor: particleColor,
             size: size,
-            roundMask: roundMask,
             isVisibleForAnimations: isVisibleForAnimations,
             useSharedAnimation: useSharedAnimation,
             action: action,
@@ -112,7 +108,6 @@ public final class EmojiStatusComponent: Component {
         content: Content,
         particleColor: UIColor? = nil,
         size: CGSize? = nil,
-        roundMask: Bool = false,
         isVisibleForAnimations: Bool,
         useSharedAnimation: Bool = false,
         action: (() -> Void)?,
@@ -127,7 +122,6 @@ public final class EmojiStatusComponent: Component {
         self.content = content
         self.particleColor = particleColor
         self.size = size
-        self.roundMask = roundMask
         self.isVisibleForAnimations = isVisibleForAnimations
         self.useSharedAnimation = useSharedAnimation
         self.action = action
@@ -145,7 +139,6 @@ public final class EmojiStatusComponent: Component {
             content: self.content,
             particleColor: self.particleColor,
             size: self.size,
-            roundMask: self.roundMask,
             isVisibleForAnimations: isVisibleForAnimations,
             useSharedAnimation: self.useSharedAnimation,
             action: self.action,
@@ -174,9 +167,6 @@ public final class EmojiStatusComponent: Component {
             return false
         }
         if lhs.size != rhs.size {
-            return false
-        }
-        if lhs.roundMask != rhs.roundMask {
             return false
         }
         if lhs.isVisibleForAnimations != rhs.isVisibleForAnimations {
@@ -234,10 +224,7 @@ public final class EmojiStatusComponent: Component {
         private weak var state: EmptyComponentState?
         private var component: EmojiStatusComponent?
         private var starsLayer: StarsEffectLayer?
-        
-        private var iconLayer: SimpleLayer?
-        private var iconLayerImage: UIImage?
-        
+        private var iconView: UIImageView?
         private var animationLayer: InlineStickerItemLayer?
         private var lottieAnimationView: AnimationView?
         private let hierarchyTrackingLayer: HierarchyTrackingLayer
@@ -279,10 +266,6 @@ public final class EmojiStatusComponent: Component {
             if case .ended = recognizer.state {
                 self.component?.action?()
             }
-        }
-        
-        public func playOnce() {
-            self.animationLayer?.playOnce()
         }
         
         func update(component: EmojiStatusComponent, availableSize: CGSize, state: EmptyComponentState, environment: Environment<EnvironmentType>, transition: ComponentTransition) -> CGSize {
@@ -327,7 +310,7 @@ public final class EmojiStatusComponent: Component {
                 case let .premium(color):
                     iconTintColor = color
                     
-                    if case .premium = self.component?.content, let image = self.iconLayerImage {
+                    if case .premium = self.component?.content, let image = self.iconView?.image {
                         iconImage = image
                     } else {
                         if let sourceImage = UIImage(bundleImageName: "Chat/Input/Media/EntityInputPremiumIcon") {
@@ -352,13 +335,12 @@ public final class EmojiStatusComponent: Component {
                     } else {
                         iconImage = nil
                     }
-                case let .image(image, tintColor):
+                case let .image(image):
                     iconImage = image
-                    iconTintColor = tintColor
                 case let .verified(fillColor, foregroundColor, sizeType):
                     let imageNamePrefix: String
                     switch sizeType {
-                    case .compact, .smaller:
+                    case .compact:
                         imageNamePrefix = "Chat List/PeerVerifiedIcon"
                     case .large:
                         imageNamePrefix = "Peer Info/VerifiedIcon"
@@ -458,7 +440,7 @@ public final class EmojiStatusComponent: Component {
                     }
                 }
             } else {
-                iconImage = self.iconLayerImage
+                iconImage = self.iconView?.image
                 if case let .animation(animationContent, size, placeholderColor, themeColor, loopMode) = component.content {
                     emojiFileId = animationContent.fileId.id
                     emojiPlaceholderColor = placeholderColor
@@ -475,28 +457,31 @@ public final class EmojiStatusComponent: Component {
             var size = CGSize()
             
             if let iconImage = iconImage {
-                let iconLayer: SimpleLayer
-                if let current = self.iconLayer {
-                    iconLayer = current
+                let iconView: UIImageView
+                if let current = self.iconView {
+                    iconView = current
                 } else {
-                    iconLayer = SimpleLayer()
-                    self.iconLayer = iconLayer
-                    self.layer.addSublayer(iconLayer)
+                    iconView = UIImageView()
+                    self.iconView = iconView
+                    self.addSubview(iconView)
                     
                     if !transition.animation.isImmediate {
-                        iconLayer.animateAlpha(from: 0.0, to: 1.0, duration: 0.2)
-                        iconLayer.animateSpring(from: 0.1 as NSNumber, to: 1.0 as NSNumber, keyPath: "transform.scale", duration: 0.5)
+                        iconView.layer.animateAlpha(from: 0.0, to: 1.0, duration: 0.2)
+                        iconView.layer.animateSpring(from: 0.1 as NSNumber, to: 1.0 as NSNumber, keyPath: "transform.scale", duration: 0.5)
                     }
                 }
-                if self.iconLayerImage !== iconImage {
-                    self.iconLayerImage = iconImage
-                    iconLayer.contents = iconImage.cgImage
+                if iconView.image !== iconImage {
+                    iconView.image = iconImage
                 }
                 
                 if let iconTintColor {
-                    transition.setTintColor(layer: iconLayer, color: iconTintColor)
+                    if transition.animation.isImmediate {
+                        iconView.tintColor = iconTintColor
+                    } else {
+                        transition.setTintColor(view: iconView, color: iconTintColor)
+                    }
                 } else {
-                    iconLayer.layerTintColor = nil
+                    iconView.tintColor = nil
                 }
                 
                 var useFit = false
@@ -510,25 +495,24 @@ public final class EmojiStatusComponent: Component {
                 }
                 if useFit {
                     size = CGSize(width: iconImage.size.width, height: availableSize.height)
-                    iconLayer.frame = CGRect(origin: CGPoint(x: floor((size.width - iconImage.size.width) / 2.0), y: floor((size.height - iconImage.size.height) / 2.0)), size: iconImage.size)
+                    iconView.frame = CGRect(origin: CGPoint(x: floor((size.width - iconImage.size.width) / 2.0), y: floor((size.height - iconImage.size.height) / 2.0)), size: iconImage.size)
                 } else {
                     size = iconImage.size.aspectFilled(availableSize)
-                    iconLayer.frame = CGRect(origin: CGPoint(), size: size)
+                    iconView.frame = CGRect(origin: CGPoint(), size: size)
                 }
             } else {
-                if let iconLayer = self.iconLayer {
-                    self.iconLayer = nil
+                if let iconView = self.iconView {
+                    self.iconView = nil
                     
                     if !transition.animation.isImmediate {
-                        iconLayer.animateAlpha(from: 1.0, to: 0.0, duration: 0.2, removeOnCompletion: false, completion: { [weak iconLayer] _ in
-                            iconLayer?.removeFromSuperlayer()
+                        iconView.layer.animateAlpha(from: 1.0, to: 0.0, duration: 0.2, removeOnCompletion: false, completion: { [weak iconView] _ in
+                            iconView?.removeFromSuperview()
                         })
-                        iconLayer.animateScale(from: 1.0, to: 0.01, duration: 0.2, removeOnCompletion: false)
+                        iconView.layer.animateScale(from: 1.0, to: 0.01, duration: 0.2, removeOnCompletion: false)
                     } else {
-                        iconLayer.removeFromSuperlayer()
+                        iconView.removeFromSuperview()
                     }
                 }
-                self.iconLayerImage = nil
             }
             
             let emojiFileUpdated = component.emojiFileUpdated
@@ -609,6 +593,44 @@ public final class EmojiStatusComponent: Component {
                     
                     animationLayer.frame = CGRect(origin: CGPoint(), size: size)
                     animationLayer.isVisibleForAnimations = component.isVisibleForAnimations
+                    /*} else {
+                        if self.emojiFileDataPathDisposable == nil {
+                            let account = component.context.account
+                            self.emojiFileDataPathDisposable = (Signal<AnimationFileProperties?, NoError> { subscriber in
+                                let disposable = MetaDisposable()
+                                
+                                let _ = (account.postbox.mediaBox.resourceData(emojiFile.resource)
+                                |> take(1)).start(next: { firstAttemptData in
+                                    if firstAttemptData.complete {
+                                        subscriber.putNext(AnimationFileProperties.load(from: firstAttemptData.path))
+                                        subscriber.putCompletion()
+                                    } else {
+                                        let fetchDisposable = freeMediaFileInteractiveFetched(account: account, fileReference: .standalone(media: emojiFile)).start()
+                                        let dataDisposable = account.postbox.mediaBox.resourceData(emojiFile.resource).start(next: { data in
+                                            if data.complete {
+                                                subscriber.putNext(AnimationFileProperties.load(from: data.path))
+                                                subscriber.putCompletion()
+                                            }
+                                        })
+                                        
+                                        disposable.set(ActionDisposable {
+                                            fetchDisposable.dispose()
+                                            dataDisposable.dispose()
+                                        })
+                                    }
+                                })
+                                
+                                return disposable
+                            }
+                            |> deliverOnMainQueue).start(next: { [weak self] properties in
+                                guard let strongSelf = self else {
+                                    return
+                                }
+                                strongSelf.emojiFileDataProperties = properties
+                                strongSelf.state?.updated(transition: transition)
+                            })
+                        }
+                    }*/
                 } else {
                     if self.emojiFileDisposable == nil {
                         self.emojiFileDisposable = (component.resolveInlineStickers([emojiFileId])

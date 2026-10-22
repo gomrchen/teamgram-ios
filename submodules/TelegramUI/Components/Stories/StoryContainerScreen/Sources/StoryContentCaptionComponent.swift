@@ -564,8 +564,7 @@ final class StoryContentCaptionComponent: Component {
                         TelegramTextAttributes.BotCommand,
                         TelegramTextAttributes.Hashtag,
                         TelegramTextAttributes.Timecode,
-                        TelegramTextAttributes.BankCard,
-                        TelegramTextAttributes.Date
+                        TelegramTextAttributes.BankCard
                     ]
                     for name in possibleNames {
                         if let _ = attributes[NSAttributedString.Key(rawValue: name)] {
@@ -617,13 +616,7 @@ final class StoryContentCaptionComponent: Component {
             var baseQuoteSecondaryTintColor: UIColor?
             var baseQuoteTertiaryTintColor: UIColor?
             if let nameColor = component.author.nameColor {
-                let resolvedColor: PeerNameColors.Colors
-                switch nameColor {
-                case let .preset(nameColor):
-                    resolvedColor = component.context.peerNameColors.get(nameColor)
-                case let .collectible(collectibleColor):
-                    resolvedColor = collectibleColor.peerNameColors(dark: false)
-                }
+                let resolvedColor = component.context.peerNameColors.get(nameColor)
                 if resolvedColor.secondary != nil {
                     baseQuoteSecondaryTintColor = .clear
                 }

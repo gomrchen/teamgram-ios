@@ -1,22 +1,20 @@
-#import <LegacyComponents/LegacyComponents.h>
-#import <LegacyComponents/TGMediaPickerGalleryModel.h>
+#import "TGMediaPickerGalleryModel.h"
 
-#import <LegacyComponents/TGMediaPickerGallerySelectedItemsModel.h>
+#import "TGMediaPickerGallerySelectedItemsModel.h"
 
 #import "LegacyComponentsInternal.h"
 
 #import <LegacyComponents/TGModernGalleryController.h>
 #import <LegacyComponents/TGModernGalleryItem.h>
-#import <LegacyComponents/TGModernGallerySelectableItem.h>
-#import <LegacyComponents/TGModernGalleryEditableItem.h>
-#import <LegacyComponents/TGModernGalleryEditableItemView.h>
-#import <LegacyComponents/TGMediaPickerGalleryItem.h>
+#import "TGModernGallerySelectableItem.h"
+#import "TGModernGalleryEditableItem.h"
+#import "TGModernGalleryEditableItemView.h"
+#import "TGMediaPickerGalleryItem.h"
 #import <LegacyComponents/TGModernGalleryZoomableItemView.h>
-#import <LegacyComponents/TGMediaPickerGalleryPhotoItem.h>
-#import <LegacyComponents/TGMediaPickerGalleryVideoItem.h>
-#import <LegacyComponents/TGMediaPickerGalleryVideoItemView.h>
+#import "TGMediaPickerGalleryVideoItem.h"
+#import "TGMediaPickerGalleryVideoItemView.h"
 
-#import <LegacyComponents/TGModernMediaListItem.h>
+#import "TGModernMediaListItem.h"
 #import "TGModernMediaListSelectableItem.h"
 
 #import <LegacyComponents/PGPhotoEditorValues.h>
@@ -197,15 +195,8 @@
                  return;
              
              __strong TGModernGalleryController *controller = strongSelf.controller;
-             if ([controller.currentItem conformsToProtocol:@protocol(TGModernGalleryEditableItem)]) {
-                 bool isPhoto = [controller.currentItem isKindOfClass:[TGMediaPickerGalleryPhotoItem class]] || ([controller.currentItem isKindOfClass:[TGMediaPickerGalleryFetchResultItem class]] && [((TGMediaPickerGalleryFetchResultItem *)controller.currentItem).backingItem isKindOfClass:[TGMediaPickerGalleryPhotoItem class]]);
-                 if (tab == TGPhotoEditorQualityTab && isPhoto) {
-                     [strongSelf->_editingContext setHighQualityPhoto:!strongSelf->_editingContext.isHighQualityPhoto];
-                     [strongSelf->_interfaceView showPhotoQualityTooltip:strongSelf->_editingContext.isHighQualityPhoto];
-                 } else {
-                     [strongSelf presentPhotoEditorForItem:(id<TGModernGalleryEditableItem>)controller.currentItem tab:tab];
-                 }
-             }
+             if ([controller.currentItem conformsToProtocol:@protocol(TGModernGalleryEditableItem)])
+                 [strongSelf presentPhotoEditorForItem:(id<TGModernGalleryEditableItem>)controller.currentItem tab:tab];
         }];
         _interfaceView.photoStripItemSelected = ^(NSInteger index)
         {
@@ -347,14 +338,6 @@
             }
         }
     }
-}
-
-- (void)beginEditingCaption {
-    [_interfaceView beginEditingCaption];
-}
-
-- (void)setupGifEditing {
-    [_interfaceView setupGifEditing];
 }
 
 - (void)presentPhotoEditorForItem:(id<TGModernGalleryEditableItem>)item tab:(TGPhotoEditorTab)tab

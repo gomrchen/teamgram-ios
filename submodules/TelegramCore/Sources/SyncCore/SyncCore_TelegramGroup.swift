@@ -47,18 +47,18 @@ public enum TelegramGroupRole: Equatable, PostboxCoding {
         switch flatBuffersObject.valueType {
         case .telegramgrouproleCreator:
             guard let creator = flatBuffersObject.value(type: TelegramCore_TelegramGroupRole_Creator.self) else {
-                throw FlatBuffersError.missingRequiredField()
+                throw FlatBuffersError.missingRequiredField(file: #file, line: #line)
             }
             self = .creator(rank: creator.rank)
         case .telegramgrouproleAdmin:
             guard let admin = flatBuffersObject.value(type: TelegramCore_TelegramGroupRole_Admin.self) else {
-                throw FlatBuffersError.missingRequiredField()
+                throw FlatBuffersError.missingRequiredField(file: #file, line: #line)
             }
             self = .admin(try TelegramChatAdminRights(flatBuffersObject: admin.rights), rank: admin.rank)
         case .telegramgrouproleMember:
             self = .member
         case .none_:
-            throw FlatBuffersError.missingRequiredField()
+            throw FlatBuffersError.missingRequiredField(file: #file, line: #line)
         }
     }
     
@@ -120,7 +120,6 @@ public struct TelegramGroupFlags: OptionSet {
     public static let hasVoiceChat = TelegramGroupFlags(rawValue: 1 << 2)
     public static let hasActiveVoiceChat = TelegramGroupFlags(rawValue: 1 << 3)
     public static let copyProtectionEnabled = TelegramGroupFlags(rawValue: 1 << 4)
-    public static let customRanksEnabled = TelegramGroupFlags(rawValue: 1 << 5)
 }
 
 public struct TelegramGroupToChannelMigrationReference: Equatable {
@@ -208,7 +207,7 @@ public final class TelegramGroup: Peer, Equatable {
         self.creationDate = decoder.decodeInt32ForKey("d", orElse: 0)
         self.version = Int(decoder.decodeInt32ForKey("v", orElse: 0))
         
-        #if DEBUG && false
+        #if DEBUG
         var builder = FlatBufferBuilder(initialSize: 1024)
         let offset = self.encodeToFlatBuffers(builder: &builder)
         builder.finish(offset: offset)
@@ -251,7 +250,7 @@ public final class TelegramGroup: Peer, Equatable {
         self.participantCount = Int(flatBuffersObject.participantCount)
         
         guard let role = flatBuffersObject.role else {
-            throw FlatBuffersError.missingRequiredField()
+            throw FlatBuffersError.missingRequiredField(file: #file, line: #line)
         }
         self.role = try TelegramGroupRole(flatBuffersObject: role)
         

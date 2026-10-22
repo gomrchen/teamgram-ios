@@ -29,9 +29,6 @@ public extension ComponentTransition.Animation.Curve {
             return .spring
         case let .custom(a, b, c, d):
             return .custom(a, b, c, d)
-        case .bounce:
-            assertionFailure()
-            return .spring
         }
     }
 }

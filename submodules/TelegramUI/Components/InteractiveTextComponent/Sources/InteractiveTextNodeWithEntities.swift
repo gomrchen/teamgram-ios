@@ -216,14 +216,9 @@ public final class InteractiveTextNodeWithEntities {
             return (layout, { applyArguments in
                 let animation: ListViewItemUpdateAnimation = applyArguments.applyArguments.animation
                 
-                var crossfadeSourceView: UIView?
-                if let maybeNode, applyArguments.applyArguments.animation.transition.isAnimated, let animator = applyArguments.applyArguments.animation.animator as? ControlledTransition.LegacyAnimator, animator.transition.isAnimated, maybeNode.textNode.bounds.size != layout.size {
-                    crossfadeSourceView = maybeNode.textNode.view.snapshotView(afterScreenUpdates: false)
-                }
-                
                 let result = apply(applyArguments.applyArguments)
                 
-                if let maybeNode {
+                if let maybeNode = maybeNode {
                     maybeNode.attributedString = arguments.attributedString
                     
                     maybeNode.updateInteractiveContents(
@@ -238,10 +233,6 @@ public final class InteractiveTextNodeWithEntities {
                         animation: animation,
                         applyArguments: applyArguments.applyArguments
                     )
-                    
-                    if let crossfadeSourceView {
-                        applyArguments.applyArguments.crossfadeContents?(crossfadeSourceView)
-                    }
                     
                     return maybeNode
                 } else {

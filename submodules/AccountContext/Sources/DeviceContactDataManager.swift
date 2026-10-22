@@ -5,8 +5,6 @@ import SwiftSignalKit
 
 public typealias DeviceContactStableId = String
 
-public var sharedDisableDeviceContactDataDiffing: Bool = false
-
 public protocol DeviceContactDataManager: AnyObject {
     func personNameDisplayOrder() -> Signal<PresentationPersonNameOrder, NoError>
     func basicData() -> Signal<[DeviceContactStableId: DeviceContactBasicData], NoError>

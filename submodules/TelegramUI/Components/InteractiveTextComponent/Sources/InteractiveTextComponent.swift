@@ -1018,75 +1018,6 @@ public final class InteractiveTextNodeLayout: NSObject {
         }
         return nil
     }
-    
-    public func layoutForGlyphCount(glyphCount: Int) -> TextNodeLayout.LayoutInfo {
-        var height: CGFloat = 0.0
-        if !self.segments.isEmpty, let line = self.segments[0].lines.first {
-            height = line.frame.maxY
-        }
-        var width: CGFloat = 0.0
-        var count = 0
-        var trailingLineWidth: CGFloat = 0.0
-        for segment in self.segments {
-            for line in segment.lines {
-                if count >= glyphCount {
-                    break
-                }
-                let lineWidth: CGFloat
-                let glyphRuns = CTLineGetGlyphRuns(line.line) as NSArray
-                var maxGlyphUpperIndex: CFIndex = 0
-                for run in glyphRuns {
-                    let run = run as! CTRun
-                    let rangeGlyphCount = CTRunGetGlyphCount(run)
-                    let stringRange = CTRunGetStringRange(run)
-                    if count + Int(rangeGlyphCount) > glyphCount {
-                        if count < glyphCount {
-                            let remainingGlyphCount = stringRange.location + glyphCount - count
-                            if remainingGlyphCount > 0 {
-                                var indices: [CFIndex] = Array(repeating: 0, count: remainingGlyphCount)
-                                CTRunGetStringIndices(run, CFRangeMake(stringRange.location, stringRange.location + glyphCount - count), &indices)
-                                if let maxIndex = indices.max() {
-                                    maxGlyphUpperIndex = max(maxIndex, maxGlyphUpperIndex)
-                                }
-                            } else {
-                                assertionFailure()
-                            }
-                        }
-                    } else {
-                        if stringRange.length != 0 {
-                            maxGlyphUpperIndex = max(stringRange.location + stringRange.length, maxGlyphUpperIndex)
-                        }
-                    }
-                    count += Int(rangeGlyphCount)
-                }
-                height = max(height, line.frame.maxY)
-                if maxGlyphUpperIndex != 0 {
-                    let lineRange = CTLineGetStringRange(line.line)
-                    if maxGlyphUpperIndex < lineRange.location + lineRange.length {
-                        let rightOffset = CTLineGetOffsetForStringIndex(line.line, maxGlyphUpperIndex + 1, nil)
-                        lineWidth = rightOffset
-                    } else {
-                        lineWidth = line.frame.width
-                    }
-                } else {
-                    lineWidth = line.frame.width
-                }
-                
-                width = max(width, lineWidth)
-                trailingLineWidth = lineWidth
-            }
-        }
-        let _ = width
-        height += self.insets.top + self.insets.bottom + 2.0
-        return TextNodeLayout.LayoutInfo(
-            size: CGSize(width: self.size.width, height: ceil(height)),
-            trailingLineWidth: trailingLineWidth
-        )
-    }
-    
-    public func sizeForGlyphCount(glyphCount: Int) -> CGSize {
-        return self.layoutForGlyphCount(glyphCount: glyphCount).size
-    }
 }
 
 private func addSpoiler(line: InteractiveTextNodeLine, ascent: CGFloat, descent: CGFloat, startIndex: Int, endIndex: Int) {
@@ -1168,22 +1099,19 @@ open class InteractiveTextNode: ASDisplayNode, TextNodeProtocol, UIGestureRecogn
         public let spoilerEffectColor: UIColor
         public let areContentAnimationsEnabled: Bool
         public let spoilerExpandRect: CGRect?
-        public var crossfadeContents: ((UIView) -> Void)?
         
         public init(
             animation: ListViewItemUpdateAnimation,
             spoilerTextColor: UIColor,
             spoilerEffectColor: UIColor,
             areContentAnimationsEnabled: Bool,
-            spoilerExpandRect: CGRect?,
-            crossfadeContents: ((UIView) -> Void)? = nil
+            spoilerExpandRect: CGRect?
         ) {
             self.animation = animation
             self.spoilerTextColor = spoilerTextColor
             self.spoilerEffectColor = spoilerEffectColor
             self.areContentAnimationsEnabled = areContentAnimationsEnabled
             self.spoilerExpandRect = spoilerExpandRect
-            self.crossfadeContents = crossfadeContents
         }
     }
     
@@ -1213,7 +1141,6 @@ open class InteractiveTextNode: ASDisplayNode, TextNodeProtocol, UIGestureRecogn
     }
     
     public internal(set) var cachedLayout: InteractiveTextNodeLayout?
-    public internal(set) var revealGlyphCount: Int?
     public var renderContentTypes: RenderContentTypes = .all
     private var contentItemLayers: [Int: TextContentItemLayer] = [:]
     
@@ -1231,7 +1158,7 @@ open class InteractiveTextNode: ASDisplayNode, TextNodeProtocol, UIGestureRecogn
     public func textRangeRects(in range: NSRange) -> (rects: [CGRect], start: TextRangeRectEdge, end: TextRangeRectEdge)? {
         return self.cachedLayout?.rangeRects(in: range)
     }
-        
+    
     override public init() {
         super.init()
         
@@ -1287,6 +1214,7 @@ open class InteractiveTextNode: ASDisplayNode, TextNodeProtocol, UIGestureRecogn
         if !canHandleTapAtPoint(point) {
             return nil
         }
+        
         guard let result = super.hitTest(point, with: event) else {
             return nil
         }
@@ -2018,7 +1946,7 @@ open class InteractiveTextNode: ASDisplayNode, TextNodeProtocol, UIGestureRecogn
                 }
             } else {
                 contentItemAnimation = .None
-                contentItemLayer = TextContentItemLayer(displaysAsynchronously: self.displaysAsynchronously)
+                contentItemLayer = TextContentItemLayer()
                 self.contentItemLayers[contentItem.id] = contentItemLayer
                 self.layer.addSublayer(contentItemLayer)
             }
@@ -2137,65 +2065,6 @@ open class InteractiveTextNode: ASDisplayNode, TextNodeProtocol, UIGestureRecogn
             })
         }
     }
-    
-    public func getGlyphCount() -> Int {
-        guard let cachedLayout = self.cachedLayout else {
-            return 0
-        }
-        
-        var count: Int = 0
-        
-        for segment in cachedLayout.segments {
-            for line in segment.lines {
-                let glyphRuns = CTLineGetGlyphRuns(line.line) as NSArray
-                for run in glyphRuns {
-                    let run = run as! CTRun
-                    let glyphCount = CTRunGetGlyphCount(run)
-                    count += Int(glyphCount)
-                }
-            }
-        }
-        
-        return count
-    }
-    
-    public func updateRevealGlyphCount(count: Int?) {
-        guard let cachedLayout = self.cachedLayout else {
-            return
-        }
-        
-        self.revealGlyphCount = count
-        
-        if let count {
-            var nextItemId = 0
-            var currentCount = 0
-            for segment in cachedLayout.segments {
-                let itemId = nextItemId
-                nextItemId += 1
-                
-                var segmentGlyphCount = 0
-                for line in segment.lines {
-                    let glyphRuns = CTLineGetGlyphRuns(line.line) as NSArray
-                    for run in glyphRuns {
-                        let run = run as! CTRun
-                        let glyphCount = CTRunGetGlyphCount(run)
-                        segmentGlyphCount += Int(glyphCount)
-                    }
-                }
-                
-                let segmentInnerCount = min(max(0, count - currentCount), segmentGlyphCount)
-                if let item = self.contentItemLayers[itemId] {
-                    item.updateMaxGlyphDrawCount(value: segmentInnerCount)
-                }
-                
-                currentCount += segmentGlyphCount
-            }
-        } else {
-            for (_, item) in self.contentItemLayers {
-                item.updateMaxGlyphDrawCount(value: nil)
-            }
-        }
-    }
 }
 
 final class TextContentItem {
@@ -2276,13 +2145,11 @@ final class TextContentItemLayer: SimpleLayer {
         let size: CGSize
         let item: TextContentItem
         let mask: RenderMask?
-        let maxGlyphDrawCount: Int?
         
-        init(size: CGSize, item: TextContentItem, mask: RenderMask?, maxGlyphDrawCount: Int?) {
+        init(size: CGSize, item: TextContentItem, mask: RenderMask?) {
             self.size = size
             self.item = item
             self.mask = mask
-            self.maxGlyphDrawCount = maxGlyphDrawCount
             
             super.init()
         }
@@ -2362,8 +2229,6 @@ final class TextContentItemLayer: SimpleLayer {
                 let offset = params.item.contentOffset
                 let alignment: NSTextAlignment = .left
                 
-                var drawnGlyphCount = 0
-                
                 for i in 0 ..< params.item.segment.lines.count {
                     let line = params.item.segment.lines[i]
                     
@@ -2393,15 +2258,6 @@ final class TextContentItemLayer: SimpleLayer {
                         for run in glyphRuns {
                             let run = run as! CTRun
                             let glyphCount = CTRunGetGlyphCount(run)
-                            
-                            var runDrawGlyphCount = glyphCount
-                            if let maxGlyphDrawCount = params.maxGlyphDrawCount {
-                                if drawnGlyphCount >= maxGlyphDrawCount {
-                                    break
-                                }
-                                runDrawGlyphCount = CFIndex(max(0, min(Int(glyphCount), maxGlyphDrawCount - drawnGlyphCount)))
-                            }
-                            
                             let attributes = CTRunGetAttributes(run) as NSDictionary
                             if attributes["Attribute__EmbeddedItem"] != nil {
                                 continue
@@ -2451,13 +2307,11 @@ final class TextContentItemLayer: SimpleLayer {
                                 let stringRange = CTRunGetStringRange(run)
                                 if line.attachments.contains(where: { $0.range.contains(stringRange.location) }) {
                                 } else {
-                                    CTRunDraw(run, context, CFRangeMake(0, runDrawGlyphCount))
+                                    CTRunDraw(run, context, CFRangeMake(0, glyphCount))
                                 }
                             } else {
-                                CTRunDraw(run, context, CFRangeMake(0, runDrawGlyphCount))
+                                CTRunDraw(run, context, CFRangeMake(0, glyphCount))
                             }
-                            
-                            drawnGlyphCount += Int(glyphCount)
                             
                             if fixDoubleEmoji {
                                 context.setBlendMode(.normal)
@@ -2607,11 +2461,8 @@ final class TextContentItemLayer: SimpleLayer {
     private var isAnimating: Bool = false
     private var currentContentMask: RenderMask?
     
-    private var maxGlyphDrawCount: Int?
-    
-    init(displaysAsynchronously: Bool) {
+    override init() {
         self.renderNode = RenderNode()
-        self.renderNode.displaysAsynchronously = displaysAsynchronously
         
         super.init()
         
@@ -2626,17 +2477,6 @@ final class TextContentItemLayer: SimpleLayer {
     
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
-    }
-    
-    func updateMaxGlyphDrawCount(value: Int?) {
-        if self.maxGlyphDrawCount != value {
-            self.maxGlyphDrawCount = value
-            
-            if let renderParams = self.renderNode.params {
-                self.renderNode.params = RenderParams(size: renderParams.size, item: renderParams.item, mask: renderParams.mask, maxGlyphDrawCount: self.maxGlyphDrawCount)
-                self.renderNode.displayImmediately()
-            }
-        }
     }
     
     func update(
@@ -2891,7 +2731,7 @@ final class TextContentItemLayer: SimpleLayer {
         
         self.currentContentMask = contentMask
         
-        self.renderNode.params = RenderParams(size: contentFrame.size, item: params.item, mask: staticContentMask, maxGlyphDrawCount: self.maxGlyphDrawCount)
+        self.renderNode.params = RenderParams(size: contentFrame.size, item: params.item, mask: staticContentMask)
         if synchronously {
             if let spoilerExpandRect, animation.isAnimated {
                 let localSpoilerExpandRect = spoilerExpandRect.offsetBy(dx: -self.renderNode.frame.minX, dy: -self.renderNode.frame.minY)

@@ -68,8 +68,7 @@ public func _internal_managedUpdatedRecentPeers(accountPeerId: PeerId, postbox: 
     |> mapToSignal { result -> Signal<Void, NoError> in
         return postbox.transaction { transaction -> Void in
             switch result {
-                case let .topPeers(topPeersData):
-                    let users = topPeersData.users
+                case let .topPeers(_, _, users):
                     let parsedPeers = AccumulatedPeers(users: users)
                     updatePeers(transaction: transaction, accountPeerId: accountPeerId, peers: parsedPeers)
 
@@ -152,24 +151,21 @@ func _internal_updateRecentPeersEnabled(postbox: Postbox, network: Network, enab
 
 func _internal_managedRecentlyUsedInlineBots(postbox: Postbox, network: Network, accountPeerId: PeerId) -> Signal<Void, NoError> {
     let remotePeers = network.request(Api.functions.contacts.getTopPeers(flags: 1 << 2, offset: 0, limit: 16, hash: 0))
-    |> retryRequestIfNotFrozen
+    |> retryRequest
     |> map { result -> (AccumulatedPeers, [(PeerId, Double)])? in
         switch result {
         case .topPeersDisabled:
             break
-        case let .topPeers(topPeersData):
-            let (categories, users) = (topPeersData.categories, topPeersData.users)
+        case let .topPeers(categories, _, users):
             let parsedPeers = AccumulatedPeers(users: users)
             
             var peersWithRating: [(PeerId, Double)] = []
             for category in categories {
                 switch category {
-                case let .topPeerCategoryPeers(topPeerCategoryPeersData):
-                    let (_, _, topPeers) = (topPeerCategoryPeersData.category, topPeerCategoryPeersData.count, topPeerCategoryPeersData.peers)
+                case let .topPeerCategoryPeers(_, _, topPeers):
                     for topPeer in topPeers {
                         switch topPeer {
-                        case let .topPeer(topPeerData):
-                            let (apiPeer, rating) = (topPeerData.peer, topPeerData.rating)
+                        case let .topPeer(apiPeer, rating):
                             peersWithRating.append((apiPeer.peerId, rating))
                         }
                     }
@@ -177,8 +173,6 @@ func _internal_managedRecentlyUsedInlineBots(postbox: Postbox, network: Network,
             }
             return (parsedPeers, peersWithRating)
         case .topPeersNotModified:
-            break
-        default:
             break
         }
         return (AccumulatedPeers(), [])
@@ -291,8 +285,7 @@ public func _internal_managedUpdatedRecentApps(accountPeerId: PeerId, postbox: P
     |> mapToSignal { result -> Signal<Void, NoError> in
         return postbox.transaction { transaction -> Void in
             switch result {
-            case let .topPeers(topPeersData):
-                let users = topPeersData.users
+            case let .topPeers(_, _, users):
                 let parsedPeers = AccumulatedPeers(users: users)
                 updatePeers(transaction: transaction, accountPeerId: accountPeerId, peers: parsedPeers)
                 

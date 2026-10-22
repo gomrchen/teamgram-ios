@@ -1,16 +1,16 @@
-#import <LegacyComponents/TGMediaPickerModernGalleryMixin.h>
+#import "TGMediaPickerModernGalleryMixin.h"
 
 #import "LegacyComponentsInternal.h"
 
 #import <LegacyComponents/LegacyComponents.h>
 
 #import <LegacyComponents/TGModernGalleryController.h>
-#import <LegacyComponents/TGMediaPickerGalleryItem.h>
-#import <LegacyComponents/TGMediaPickerGalleryPhotoItem.h>
-#import <LegacyComponents/TGMediaPickerGalleryVideoItem.h>
-#import <LegacyComponents/TGMediaPickerGalleryVideoItemView.h>
+#import "TGMediaPickerGalleryItem.h"
+#import "TGMediaPickerGalleryPhotoItem.h"
+#import "TGMediaPickerGalleryVideoItem.h"
+#import "TGMediaPickerGalleryVideoItemView.h"
 
-#import <LegacyComponents/TGMediaPickerSendActionSheetController.h>
+#import "TGMediaPickerSendActionSheetController.h"
 
 #import <LegacyComponents/TGMediaEditingContext.h>
 #import <LegacyComponents/TGMediaSelectionContext.h>
@@ -369,7 +369,32 @@
         count = MIN(count, _itemsLimit);
     
     for (NSUInteger i = 0; i < count; i++)
-    {        
+    {
+//        TGMediaAsset *asset = [fetchResult assetAtIndex:i];
+//
+//        TGMediaPickerGalleryItem<TGModernGallerySelectableItem, TGModernGalleryEditableItem> *galleryItem = nil;
+//        switch (asset.type)
+//        {
+//            case TGMediaAssetVideoType:
+//            {
+//                galleryItem = [[TGMediaPickerGalleryVideoItem alloc] initWithAsset:(id<TGMediaEditableItem,TGMediaSelectableItem>)asset];
+//            }
+//                break;
+//
+//            case TGMediaAssetGifType:
+//            {
+//                TGCameraCapturedVideo *convertedAsset = [[TGCameraCapturedVideo alloc] initWithAsset:asset livePhoto:false];
+//                galleryItem = [[TGMediaPickerGalleryVideoItem alloc] initWithAsset:convertedAsset];
+//            }
+//                break;
+//
+//            default:
+//            {
+//                galleryItem = [[TGMediaPickerGalleryPhotoItem alloc] initWithAsset:(id<TGMediaEditableItem,TGMediaSelectableItem>)asset];
+//            }
+//                break;
+//        }
+        
         TGMediaPickerGalleryFetchResultItem *galleryItem = [[TGMediaPickerGalleryFetchResultItem alloc] initWithFetchResult:fetchResult index:i];
         galleryItem.selectionContext = selectionContext;
         galleryItem.editingContext = editingContext;

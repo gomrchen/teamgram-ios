@@ -29,10 +29,6 @@ genrule(
         BUILD_ARCH="sim_arm64"
     elif [ "$(TARGET_CPU)" == "ios_x86_64" ]; then
         BUILD_ARCH="x86_64"
-    elif [ "$(TARGET_CPU)" == "k8" ] || [ "$(TARGET_CPU)" == "x86_64" ]; then
-        BUILD_ARCH="linux_x86_64"
-    elif [ "$(TARGET_CPU)" == "aarch64" ] || [ "$(TARGET_CPU)" == "arm64" ]; then
-        BUILD_ARCH="linux_arm64"
     else
         echo "Unsupported architecture $(TARGET_CPU)"
     fi
@@ -67,20 +63,6 @@ cc_library(
     srcs = [":Public/opus/lib/lib" + x + ".a" for x in libs],
 )
 
-cc_library(
-    name = "opus_cc",
-    hdrs = [":Public/opus/" + x for x in headers],
-    includes = [
-        "Public",
-    ],
-    deps = [
-        ":opus_lib",
-    ],
-    visibility = [
-        "//visibility:public",
-    ],
-)
-
 objc_library(
     name = "opus",
     module_name = "opus",
@@ -88,6 +70,7 @@ objc_library(
     hdrs = [":Public/opus/" + x for x in headers],
     includes = [
         "Public",
+        "Public/opus",
     ],
     deps = [
         ":opus_lib",

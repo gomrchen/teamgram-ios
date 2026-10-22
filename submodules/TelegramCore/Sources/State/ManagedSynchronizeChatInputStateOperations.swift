@@ -128,7 +128,7 @@ func managedSynchronizeChatInputStateOperations(postbox: Postbox, network: Netwo
 private func synchronizeChatInputState(transaction: Transaction, postbox: Postbox, network: Network, peerId: PeerId, threadId: Int64?, operation: SynchronizeChatInputStateOperation) -> Signal<Void, NoError> {
     var inputState: SynchronizeableChatInputState?
     let peerChatInterfaceState: StoredPeerChatInterfaceState?
-    if let threadId {
+    if let threadId = threadId {
         peerChatInterfaceState = transaction.getPeerChatThreadInterfaceState(peerId, threadId: threadId)
     } else {
         peerChatInterfaceState = transaction.getPeerChatInterfaceState(peerId)
@@ -146,13 +146,8 @@ private func synchronizeChatInputState(transaction: Transaction, postbox: Postbo
             }
         }
         var topMsgId: Int32?
-        var monoforumPeerId: Api.InputPeer?
-        if let threadId {
-            if let channel = peer as? TelegramChannel, channel.flags.contains(.isMonoforum) {
-                monoforumPeerId = transaction.getPeer(PeerId(threadId)).flatMap(apiInputPeer)
-            } else {
-                topMsgId = Int32(clamping: threadId)
-            }
+        if let threadId = threadId {
+            topMsgId = Int32(clamping: threadId)
         }
         
         var replyTo: Api.InputReplyTo?
@@ -160,12 +155,7 @@ private func synchronizeChatInputState(transaction: Transaction, postbox: Postbo
             flags |= 1 << 0
             
             var innerFlags: Int32 = 0
-            if topMsgId != nil {
-                innerFlags |= 1 << 0
-            } else if monoforumPeerId != nil {
-                innerFlags |= 1 << 5
-            }
-            
+            //inputReplyToMessage#73ec805 flags:# reply_to_msg_id:int top_msg_id:flags.0?int reply_to_peer_id:flags.1?InputPeer quote_text:flags.2?string quote_entities:flags.3?Vector<MessageEntity> = InputReplyTo;
             var replyToPeer: Api.InputPeer?
             var discard = false
             if replySubject.messageId.peerId != peerId {
@@ -197,8 +187,6 @@ private func synchronizeChatInputState(transaction: Transaction, postbox: Postbo
                 }
             }
             
-            let replyTodoItemId = replySubject.todoItemId
-            
             if replyToPeer != nil {
                 innerFlags |= 1 << 1
             }
@@ -211,35 +199,19 @@ private func synchronizeChatInputState(transaction: Transaction, postbox: Postbo
             if quoteOffset != nil {
                 innerFlags |= 1 << 4
             }
-            if let _ = replyTodoItemId {
-                innerFlags |= 1 << 6
-            }
+            
             if !discard {
-                replyTo = .inputReplyToMessage(.init(flags: innerFlags, replyToMsgId: replySubject.messageId.id, topMsgId: topMsgId, replyToPeerId: replyToPeer, quoteText: quoteText, quoteEntities: quoteEntities, quoteOffset: quoteOffset, monoforumPeerId: monoforumPeerId, todoItemId: replyTodoItemId))
+                replyTo = .inputReplyToMessage(flags: innerFlags, replyToMsgId: replySubject.messageId.id, topMsgId: topMsgId, replyToPeerId: replyToPeer, quoteText: quoteText, quoteEntities: quoteEntities, quoteOffset: quoteOffset)
             }
-        } else if let topMsgId {
+        } else if let topMsgId = topMsgId {
             flags |= 1 << 0
             
             var innerFlags: Int32 = 0
             innerFlags |= 1 << 0
-            replyTo = .inputReplyToMessage(.init(flags: innerFlags, replyToMsgId: topMsgId, topMsgId: topMsgId, replyToPeerId: nil, quoteText: nil, quoteEntities: nil, quoteOffset: nil, monoforumPeerId: nil, todoItemId: nil))
-        } else if let monoforumPeerId {
-            flags |= 1 << 0
-            replyTo = .inputReplyToMonoForum(.init(monoforumPeerId: monoforumPeerId))
+            replyTo = .inputReplyToMessage(flags: innerFlags, replyToMsgId: topMsgId, topMsgId: topMsgId, replyToPeerId: nil, quoteText: nil, quoteEntities: nil, quoteOffset: nil)
         }
         
-        let suggestedPost = inputState?.suggestedPost.flatMap { suggestedPost -> Api.SuggestedPost in
-            var flags: Int32 = 0
-            if suggestedPost.timestamp != nil {
-                flags |= 1 << 0
-            }
-            return .suggestedPost(.init(flags: flags, price: suggestedPost.price?.apiAmount ?? .starsAmount(.init(amount: 0, nanos: 0)), scheduleDate: suggestedPost.timestamp))
-        }
-        if suggestedPost != nil {
-            flags |= 1 << 8
-        }
-        
-        return network.request(Api.functions.messages.saveDraft(flags: flags, replyTo: replyTo, peer: inputPeer, message: inputState?.text ?? "", entities: apiEntitiesFromMessageTextEntities(inputState?.entities ?? [], associatedPeers: SimpleDictionary()), media: nil, effect: nil, suggestedPost: suggestedPost))
+        return network.request(Api.functions.messages.saveDraft(flags: flags, replyTo: replyTo, peer: inputPeer, message: inputState?.text ?? "", entities: apiEntitiesFromMessageTextEntities(inputState?.entities ?? [], associatedPeers: SimpleDictionary()), media: nil, effect: nil))
         |> delay(2.0, queue: Queue.concurrentDefaultQueue())
         |> `catch` { _ -> Signal<Api.Bool, NoError> in
             return .single(.boolFalse)

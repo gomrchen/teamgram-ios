@@ -107,14 +107,6 @@ public final class TelegramEngineUnauthorized {
     public lazy var localization: Localization = {
         return Localization(account: self.account)
     }()
-    
-    public lazy var payments: Payments = {
-        return Payments(account: self.account)
-    }()
-    
-    public lazy var itemCache: ItemCache = {
-        return ItemCache(account: self.account)
-    }()
 }
 
 public enum SomeTelegramEngine {

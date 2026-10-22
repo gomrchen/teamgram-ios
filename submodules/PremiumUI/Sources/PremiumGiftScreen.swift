@@ -22,6 +22,7 @@ import UniversalMediaPlayer
 import InstantPageCache
 import ScrollComponent
 import PremiumStarComponent
+import BotPaymentsUI
 
 extension PremiumGiftSource {
     var identifier: String? {
@@ -322,7 +323,12 @@ private final class PremiumGiftScreenContentComponent: CombinedComponent {
                 if let products = component.products {
                     let shortestOptionPrice: (Int64, NSDecimalNumber)
                     if let product = products.last {
-                        shortestOptionPrice = (Int64(Float(product.storeProduct.priceCurrencyAndAmount.amount) / Float(product.months)), product.storeProduct.priceValue.dividing(by: NSDecimalNumber(value: product.months)))
+                        if let storeProduct = product.storeProduct {
+                            shortestOptionPrice = (Int64(Float(storeProduct.priceCurrencyAndAmount.amount) / Float(product.months)), storeProduct.priceValue.dividing(by: NSDecimalNumber(value: product.months)))
+                        } else {
+                            let monthlyAmount = product.monthlyFiatAmount
+                            shortestOptionPrice = (monthlyAmount, NSDecimalNumber(value: monthlyAmount).dividing(by: 100))
+                        }
                     } else {
                         shortestOptionPrice = (1, NSDecimalNumber(decimal: 1))
                     }
@@ -335,7 +341,7 @@ private final class PremiumGiftScreenContentComponent: CombinedComponent {
                             giftTitle = strings.Premium_Gift_Months(product.months)
                         }
                         
-                        let discountValue = Int((1.0 - Float(product.storeProduct.priceCurrencyAndAmount.amount) / Float(product.months) / Float(shortestOptionPrice.0)) * 100.0)
+                        let discountValue = Int((1.0 - Float(product.monthlyFiatAmount) / Float(shortestOptionPrice.0)) * 100.0)
                         let discount: String
                         if discountValue > 0 {
                             discount = "-\(discountValue)%"
@@ -343,18 +349,18 @@ private final class PremiumGiftScreenContentComponent: CombinedComponent {
                             discount = ""
                         }
                         
-                        let defaultPrice = product.storeProduct.defaultPrice(shortestOptionPrice.1, monthsCount: Int(product.months))
+                        let defaultPrice = product.defaultPriceLabel(shortestMonthlyPrice: shortestOptionPrice.1)
                         
                         var subtitle = ""
                         var accessibilitySubtitle = ""
-                        var pricePerMonth = environment.strings.Premium_PricePerMonth(product.storeProduct.pricePerMonth(Int(product.months))).string
+                        var pricePerMonth = environment.strings.Premium_PricePerMonth(product.pricePerMonth).string
                         
                         var labelPrice = pricePerMonth
                         if component.peers.count > 1 {
-                            pricePerMonth = product.storeProduct.multipliedPrice(count: component.peers.count)
+                            pricePerMonth = product.multipliedPriceLabel(count: component.peers.count)
                             
                             subtitle = ""
-                            labelPrice = "\(product.storeProduct.price) x \(component.peers.count)"
+                            labelPrice = "\(product.price) x \(component.peers.count)"
                         } else {
                             if discountValue > 0 {
                                 subtitle = "**\(defaultPrice)** \(product.price)"
@@ -539,6 +545,8 @@ private final class PremiumGiftScreenContentComponent: CombinedComponent {
                             demoSubject = .messagePrivacy
                         case .messageEffects:
                             demoSubject = .messageEffects
+                        case .paidMessages:
+                            demoSubject = .paidMessages
                         case .business:
                             demoSubject = .business
                         default:
@@ -671,12 +679,25 @@ private final class PremiumGiftScreenContentComponent: CombinedComponent {
     }
 }
 
+private func formatPremiumGiftPrice(amount: Int64, currency: String) -> String {
+    let formatter = NumberFormatter()
+    formatter.numberStyle = .currency
+    formatter.currencyCode = currency
+    formatter.maximumFractionDigits = 2
+    let decimalAmount = NSDecimalNumber(value: amount).dividing(by: NSDecimalNumber(value: 100))
+    return formatter.string(from: decimalAmount) ?? "\(currency) \(Double(amount) / 100.0)"
+}
+
 private struct PremiumGiftProduct: Equatable {
     let giftOption: CachedPremiumGiftOption
-    let storeProduct: InAppPurchaseManager.Product
+    let storeProduct: InAppPurchaseManager.Product?
+    let serverPrice: String?
     
     var id: String {
-        return self.storeProduct.id
+        if let storeProduct = self.storeProduct {
+            return storeProduct.id
+        }
+        return "server.premium.gift.\(self.giftOption.months)"
     }
     
     var months: Int32 {
@@ -684,11 +705,45 @@ private struct PremiumGiftProduct: Equatable {
     }
     
     var price: String {
-        return self.storeProduct.price
+        if let storeProduct = self.storeProduct {
+            return storeProduct.price
+        }
+        return self.serverPrice ?? ""
     }
     
     var pricePerMonth: String {
-        return self.storeProduct.pricePerMonth(Int(self.months))
+        if let storeProduct = self.storeProduct {
+            return storeProduct.pricePerMonth(Int(self.months))
+        }
+        return self.serverPrice ?? self.price
+    }
+    
+    var fiatAmount: Int64 {
+        if let storeProduct = self.storeProduct {
+            return storeProduct.priceCurrencyAndAmount.amount
+        }
+        return self.giftOption.amount
+    }
+    
+    var monthlyFiatAmount: Int64 {
+        max(1, self.fiatAmount / Int64(self.months))
+    }
+    
+    func multipliedPriceLabel(count: Int) -> String {
+        if let storeProduct = self.storeProduct {
+            return storeProduct.multipliedPrice(count: count)
+        }
+        if count > 1 {
+            return "\(self.serverPrice ?? self.price) x \(count)"
+        }
+        return self.serverPrice ?? self.price
+    }
+    
+    func defaultPriceLabel(shortestMonthlyPrice: NSDecimalNumber) -> String {
+        if let storeProduct = self.storeProduct {
+            return storeProduct.defaultPrice(shortestMonthlyPrice, monthsCount: Int(self.months))
+        }
+        return self.serverPrice ?? self.price
     }
 }
 
@@ -828,7 +883,13 @@ private final class PremiumGiftScreenComponent: CombinedComponent {
                     var gifts: [PremiumGiftProduct] = []
                     for option in strongSelf.options {
                         if let product = products.first(where: { $0.id == option.storeProductId }), !product.isSubscription {
-                            gifts.append(PremiumGiftProduct(giftOption: option, storeProduct: product))
+                            gifts.append(PremiumGiftProduct(giftOption: option, storeProduct: product, serverPrice: nil))
+                        } else {
+                            gifts.append(PremiumGiftProduct(
+                                giftOption: option,
+                                storeProduct: nil,
+                                serverPrice: formatPremiumGiftPrice(amount: option.amount, currency: option.currency)
+                            ))
                         }
                     }
 
@@ -884,7 +945,7 @@ private final class PremiumGiftScreenComponent: CombinedComponent {
         }
         
         func buy() {
-            guard let inAppPurchaseManager = self.context.inAppPurchaseManager, !self.inProgress else {
+            guard !self.inProgress else {
                 return
             }
             
@@ -896,91 +957,99 @@ private final class PremiumGiftScreenComponent: CombinedComponent {
             guard let product = self.products?.first(where: { $0.id == self.selectedProductId }) else {
                 return
             }
-            let (currency, amount) = product.storeProduct.priceCurrencyAndAmount
+            let option = product.giftOption
             let duration = product.months
-                        
+            
             addAppLogEvent(postbox: self.context.account.postbox, type: "premium_gift.promo_screen_accept")
 
             self.inProgress = true
             self.updateInProgress(true)
             self.updated(transition: .immediate)
-                        
-            let purpose: AppStoreTransactionPurpose
-            var quantity: Int32 = 1
             
-            if self.source == .profile || self.source == .attachMenu, let peerId = self.peerIds.first {
-                purpose = .gift(peerId: peerId, currency: currency, amount: amount)
-            } else {
-                purpose = .giftCode(peerIds: self.peerIds, boostPeer: nil, currency: currency, amount: amount, text: nil, entities: nil)
-                quantity = Int32(self.peerIds.count)
-            }
+            let codeOption = PremiumGiftCodeOption(
+                users: Int32(self.peerIds.count),
+                months: option.months,
+                storeProductId: option.storeProductId,
+                storeQuantity: Int32(self.peerIds.count),
+                currency: option.currency,
+                amount: option.amount
+            )
+            let source: BotPaymentInvoiceSource = .giftCode(
+                users: self.peerIds,
+                currency: option.currency,
+                amount: option.amount,
+                option: codeOption,
+                text: nil,
+                entities: nil
+            )
+            let presentationData = self.context.sharedContext.currentPresentationData.with { $0 }
             
-            let _ = (self.context.engine.payments.canPurchasePremium(purpose: purpose)
-            |> deliverOnMainQueue).start(next: { [weak self] available in
-                if let strongSelf = self {
-                    let presentationData = strongSelf.context.sharedContext.currentPresentationData.with { $0 }
-                    if available {
-                        strongSelf.paymentDisposable.set((inAppPurchaseManager.buyProduct(product.storeProduct, quantity: quantity, purpose: purpose)
-                        |> deliverOnMainQueue).start(next: { [weak self] status in
-                            if let self, case .purchased = status {
-                                if case .settings = self.source {
-                                    self.inProgress = false
-                                    self.updateInProgress(false)
-                                    
-                                    self.isCompleted = true
-                                    
-                                    self.updated(transition: .easeInOut(duration: 0.25))
-                                    self.completion(duration)
-                                } else {
-                                    Queue.mainQueue().after(2.0) {
-                                        let _ = updatePremiumPromoConfigurationOnce(account: self.context.account).start()
-                                        self.inProgress = false
-                                        self.updateInProgress(false)
-                                        
-                                        self.updated(transition: .easeInOut(duration: 0.25))
-                                        self.completion(duration)
-                                    }
-                                }
-                            }
-                        }, error: { [weak self] error in
-                            if let strongSelf = self {
-                                strongSelf.inProgress = false
-                                strongSelf.updateInProgress(false)
-                                strongSelf.updated(transition: .immediate)
-
-                                var errorText: String?
-                                switch error {
-                                    case .generic:
-                                        errorText = presentationData.strings.Premium_Purchase_ErrorUnknown
-                                    case .network:
-                                        errorText = presentationData.strings.Premium_Purchase_ErrorNetwork
-                                    case .notAllowed:
-                                        errorText = presentationData.strings.Premium_Purchase_ErrorNotAllowed
-                                    case .cantMakePayments:
-                                        errorText = presentationData.strings.Premium_Purchase_ErrorCantMakePayments
-                                    case .assignFailed:
-                                        errorText = presentationData.strings.Premium_Purchase_ErrorUnknown
-                                    case .tryLater:
-                                        errorText = presentationData.strings.Premium_Purchase_ErrorUnknown
-                                    case .cancelled:
-                                        break
-                                }
-                                
-                                if let errorText = errorText {
-                                    addAppLogEvent(postbox: strongSelf.context.account.postbox, type: "premium_gift.promo_screen_fail")
-                                    
-                                    let alertController = textAlertController(context: strongSelf.context, title: nil, text: errorText, actions: [TextAlertAction(type: .defaultAction, title: presentationData.strings.Common_OK, action: {})])
-                                    strongSelf.present(alertController)
-                                }
-                            }
-                        }))
-                    } else {
-                        strongSelf.inProgress = false
-                        strongSelf.updateInProgress(false)
-                        strongSelf.updated(transition: .immediate)
-                    }
+            self.paymentDisposable.set((self.context.engine.payments.fetchBotPaymentInvoice(source: source)
+            |> deliverOnMainQueue).start(next: { [weak self] invoice in
+                guard let self else {
+                    return
                 }
-            })
+                let inputData = Promise<BotCheckoutController.InputData?>()
+                inputData.set(BotCheckoutController.InputData.fetch(context: self.context, source: source)
+                |> map { Optional.some($0) }
+                |> `catch` { _ -> Signal<BotCheckoutController.InputData?, NoError> in
+                    return .single(nil)
+                })
+                let controller = BotCheckoutController(
+                    context: self.context,
+                    invoice: invoice,
+                    source: source,
+                    inputData: inputData,
+                    completed: { [weak self] _, _ in
+                        guard let self else {
+                            return
+                        }
+                        if case .settings = self.source {
+                            self.inProgress = false
+                            self.updateInProgress(false)
+                            self.isCompleted = true
+                            self.updated(transition: .easeInOut(duration: 0.25))
+                            self.completion(duration)
+                        } else {
+                            Queue.mainQueue().after(2.0) {
+                                let _ = updatePremiumPromoConfigurationOnce(account: self.context.account).start()
+                                self.inProgress = false
+                                self.updateInProgress(false)
+                                self.updated(transition: .easeInOut(duration: 0.25))
+                                self.completion(duration)
+                            }
+                        }
+                    },
+                    cancelled: { [weak self] in
+                        guard let self else {
+                            return
+                        }
+                        self.inProgress = false
+                        self.updateInProgress(false)
+                        self.updated(transition: .immediate)
+                    },
+                    failed: { [weak self] in
+                        guard let self else {
+                            return
+                        }
+                        self.inProgress = false
+                        self.updateInProgress(false)
+                        self.updated(transition: .immediate)
+                    }
+                )
+                self.present(controller)
+            }, error: { [weak self] _ in
+                guard let self else {
+                    return
+                }
+                self.inProgress = false
+                self.updateInProgress(false)
+                self.updated(transition: .immediate)
+                
+                addAppLogEvent(postbox: self.context.account.postbox, type: "premium_gift.promo_screen_fail")
+                let alertController = textAlertController(context: self.context, title: nil, text: presentationData.strings.Premium_Purchase_ErrorNetwork, actions: [TextAlertAction(type: .defaultAction, title: presentationData.strings.Common_OK, action: {})])
+                self.present(alertController)
+            }))
         }
         
         func updateIsFocused(_ isFocused: Bool) {
@@ -1204,7 +1273,7 @@ private final class PremiumGiftScreenComponent: CombinedComponent {
                                 
             let price: String?
             if let products = state.products, let selectedProductId = state.selectedProductId, let product = products.first(where: { $0.id == selectedProductId }) {
-                price = product.storeProduct.multipliedPrice(count: context.component.peerIds.count)
+                price = product.multipliedPriceLabel(count: context.component.peerIds.count)
             } else {
                 price = nil
             }

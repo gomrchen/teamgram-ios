@@ -36,10 +36,6 @@ import MultiAnimationRenderer
 import PremiumUI
 import AvatarNode
 import StoryContainerScreen
-import ChatListSearchFiltersContainerNode
-import EdgeEffect
-import ComponentFlow
-import ComponentDisplayAdapters
 
 private enum ChatListTokenId: Int32 {
     case archive
@@ -66,9 +62,9 @@ final class ChatListSearchInteraction {
     let openStories: ((PeerId, ASDisplayNode) -> Void)?
     let switchToFilter: (ChatListSearchPaneKey) -> Void
     let dismissSearch: () -> Void
-    let openAdInfo: (ASDisplayNode, AdPeer) -> Void
+    let openAdInfo: (ASDisplayNode) -> Void
     
-    init(openPeer: @escaping (EnginePeer, EnginePeer?, Int64?, Bool) -> Void, openDisabledPeer: @escaping (EnginePeer, Int64?, ChatListDisabledPeerReason) -> Void, openMessage: @escaping (EnginePeer, Int64?, EngineMessage.Id, Bool) -> Void, openUrl: @escaping (String) -> Void, clearRecentSearch: @escaping () -> Void, addContact: @escaping (String) -> Void, toggleMessageSelection: @escaping (EngineMessage.Id, Bool) -> Void, messageContextAction: @escaping ((EngineMessage, ASDisplayNode?, CGRect?, UIGestureRecognizer?, ChatListSearchPaneKey, (id: String, size: Int64, isFirstInList: Bool)?) -> Void), mediaMessageContextAction: @escaping ((EngineMessage, ASDisplayNode?, CGRect?, UIGestureRecognizer?) -> Void), peerContextAction: ((EnginePeer, ChatListSearchContextActionSource, ASDisplayNode, ContextGesture?, CGPoint?) -> Void)?, present: @escaping (ViewController, Any?) -> Void, dismissInput: @escaping () -> Void, getSelectedMessageIds: @escaping () -> Set<EngineMessage.Id>?, openStories: ((PeerId, ASDisplayNode) -> Void)?, switchToFilter: @escaping (ChatListSearchPaneKey) -> Void, dismissSearch: @escaping () -> Void, openAdInfo: @escaping (ASDisplayNode, AdPeer) -> Void) {
+    init(openPeer: @escaping (EnginePeer, EnginePeer?, Int64?, Bool) -> Void, openDisabledPeer: @escaping (EnginePeer, Int64?, ChatListDisabledPeerReason) -> Void, openMessage: @escaping (EnginePeer, Int64?, EngineMessage.Id, Bool) -> Void, openUrl: @escaping (String) -> Void, clearRecentSearch: @escaping () -> Void, addContact: @escaping (String) -> Void, toggleMessageSelection: @escaping (EngineMessage.Id, Bool) -> Void, messageContextAction: @escaping ((EngineMessage, ASDisplayNode?, CGRect?, UIGestureRecognizer?, ChatListSearchPaneKey, (id: String, size: Int64, isFirstInList: Bool)?) -> Void), mediaMessageContextAction: @escaping ((EngineMessage, ASDisplayNode?, CGRect?, UIGestureRecognizer?) -> Void), peerContextAction: ((EnginePeer, ChatListSearchContextActionSource, ASDisplayNode, ContextGesture?, CGPoint?) -> Void)?, present: @escaping (ViewController, Any?) -> Void, dismissInput: @escaping () -> Void, getSelectedMessageIds: @escaping () -> Set<EngineMessage.Id>?, openStories: ((PeerId, ASDisplayNode) -> Void)?, switchToFilter: @escaping (ChatListSearchPaneKey) -> Void, dismissSearch: @escaping () -> Void, openAdInfo: @escaping (ASDisplayNode) -> Void) {
         self.openPeer = openPeer
         self.openDisabledPeer = openDisabledPeer
         self.openMessage = openMessage
@@ -109,11 +105,10 @@ public final class ChatListSearchContainerNode: SearchDisplayControllerContentNo
     private let navigationController: NavigationController?
     
     var dismissSearch: (() -> Void)?
-    var openAdInfo: ((ASDisplayNode, AdPeer) -> Void)?
+    var openAdInfo: ((ASDisplayNode) -> Void)?
     
-    private let edgeEffectView: EdgeEffectView
-    
-    private let filterContainerNode: ChatListSearchFiltersContainerNode
+    private let dimNode: ASDisplayNode
+    let filterContainerNode: ChatListSearchFiltersContainerNode
     private let paneContainerNode: ChatListSearchPaneContainerNode
     private var selectionPanelNode: ChatListSearchMessageSelectionPanelNode?
     
@@ -136,7 +131,6 @@ public final class ChatListSearchContainerNode: SearchDisplayControllerContentNo
     private var forumPeer: EnginePeer?
     private var hasPublicPostsTab = false
     private var showPublicPostsTab = false
-    public var displayGlobalPostsNewBadge = false
     
     private var shareStatusDisposable: MetaDisposable?
     
@@ -163,7 +157,6 @@ public final class ChatListSearchContainerNode: SearchDisplayControllerContentNo
     
     private let sharedOpenStoryDisposable = MetaDisposable()
     private var recentAppsDisposable: Disposable?
-    private var refreshedGlobalPostSearchStateDisposable: Disposable?
     
     public init(context: AccountContext, animationCache: AnimationCache, animationRenderer: MultiAnimationRenderer, updatedPresentationData: (initial: PresentationData, signal: Signal<PresentationData, NoError>)? = nil, filter: ChatListNodePeersFilter, requestPeerType: [ReplyMarkupButtonRequestPeerType]?, location: ChatListControllerLocation, displaySearchFilters: Bool, hasDownloads: Bool, initialFilter: ChatListSearchFilter = .chats, openPeer originalOpenPeer: @escaping (EnginePeer, EnginePeer?, Int64?, Bool) -> Void, openDisabledPeer: @escaping (EnginePeer, Int64?, ChatListDisabledPeerReason) -> Void, openRecentPeerOptions: @escaping (EnginePeer) -> Void, openMessage originalOpenMessage: @escaping (EnginePeer, Int64?, EngineMessage.Id, Bool) -> Void, addContact: ((String) -> Void)?, peerContextAction: ((EnginePeer, ChatListSearchContextActionSource, ASDisplayNode, ContextGesture?, CGPoint?) -> Void)?, present: @escaping (ViewController, Any?) -> Void, presentInGlobalOverlay: @escaping (ViewController, Any?) -> Void, navigationController: NavigationController?, parentController: @escaping () -> ViewController?) {
         var initialFilter = initialFilter
@@ -186,8 +179,9 @@ public final class ChatListSearchContainerNode: SearchDisplayControllerContentNo
         self.openMessage = originalOpenMessage
         self.present = present
         self.presentInGlobalOverlay = presentInGlobalOverlay
-        
-        self.edgeEffectView = EdgeEffectView()
+    
+        self.dimNode = ASDisplayNode()
+        self.dimNode.backgroundColor = UIColor.black.withAlphaComponent(0.5)
         
         self.filterContainerNode = ChatListSearchFiltersContainerNode()
         self.paneContainerNode = ChatListSearchPaneContainerNode(context: context, animationCache: animationCache, animationRenderer: animationRenderer, updatedPresentationData: updatedPresentationData, peersFilter: self.peersFilter, requestPeerType: self.requestPeerType, location: location, searchQuery: self.searchQuery.get(), searchOptions: self.searchOptions.get(), navigationController: navigationController, parentController: parentController())
@@ -197,6 +191,7 @@ public final class ChatListSearchContainerNode: SearchDisplayControllerContentNo
                 
         self.backgroundColor = filter.contains(.excludeRecent) ? nil : self.presentationData.theme.chatList.backgroundColor
         
+//        self.addSubnode(self.dimNode)
         self.addSubnode(self.paneContainerNode)
                 
         let interaction = ChatListSearchInteraction(openPeer: { peer, chatPeer, threadId, value in
@@ -312,8 +307,8 @@ public final class ChatListSearchContainerNode: SearchDisplayControllerContentNo
             }
         }, dismissSearch: { [weak self] in
             self?.dismissSearch?()
-        }, openAdInfo: { [weak self] node, adPeer in
-            self?.openAdInfo?(node, adPeer)
+        }, openAdInfo: { [weak self] node in
+            self?.openAdInfo?(node)
         })
         self.paneContainerNode.interaction = interaction
         
@@ -328,9 +323,6 @@ public final class ChatListSearchContainerNode: SearchDisplayControllerContentNo
             parentController()?.view.endEditing(true)
         }
         
-        self.view.addSubview(self.edgeEffectView)
-        
-        self.addSubnode(self.filterContainerNode)
         self.filterContainerNode.filterPressed = { [weak self] filter in
             guard let strongSelf = self else {
                 return
@@ -353,8 +345,6 @@ public final class ChatListSearchContainerNode: SearchDisplayControllerContentNo
                 key = .channels
             case .apps:
                 key = .apps
-            case .globalPosts:
-                key = .globalPosts
             case .media:
                 key = .media
             case .downloads:
@@ -367,8 +357,6 @@ public final class ChatListSearchContainerNode: SearchDisplayControllerContentNo
                 key = .music
             case .voice:
                 key = .voice
-            case .instantVideo:
-                key = .instantVideo
             case .publicPosts:
                 key = .publicPosts
             case let .date(minDate, maxDate, title):
@@ -398,7 +386,7 @@ public final class ChatListSearchContainerNode: SearchDisplayControllerContentNo
                 switch filter {
                 case let .filter(filter):
                     switch filter {
-                    case .downloads, .channels, .apps, .globalPosts:
+                    case .downloads, .channels, .apps:
                         return false
                     default:
                         return true
@@ -539,7 +527,6 @@ public final class ChatListSearchContainerNode: SearchDisplayControllerContentNo
         }
         
         self.recentAppsDisposable = context.engine.peers.managedUpdatedRecentApps().startStrict()
-        self.refreshedGlobalPostSearchStateDisposable = context.engine.messages.refreshGlobalPostSearchState().startStrict()
         
         self._ready.set(self.paneContainerNode.isReady.get()
         |> map { _ in Void() })
@@ -552,13 +539,15 @@ public final class ChatListSearchContainerNode: SearchDisplayControllerContentNo
         self.shareStatusDisposable?.dispose()
         self.sharedOpenStoryDisposable.dispose()
         self.recentAppsDisposable?.dispose()
-        self.refreshedGlobalPostSearchStateDisposable?.dispose()
         
         self.copyProtectionTooltipController?.dismiss()
     }
     
     public override func didLoad() {
         super.didLoad()
+        
+        
+        self.dimNode.view.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(self.dimTapGesture(_:))))
     }
     
     public override var hasDim: Bool {
@@ -581,12 +570,6 @@ public final class ChatListSearchContainerNode: SearchDisplayControllerContentNo
         self.selectionPanelNode?.selectedMessages = self.stateValue.selectedMessageIds ?? []
     }
 
-    public func removeAds() {
-        for pane in self.paneContainerNode.currentPanes.values {
-            pane.node.removeAds()
-        }
-    }
-    
     private var currentSearchOptions: ChatListSearchOptions {
         return self.searchOptionsValue ?? ChatListSearchOptions(peer: nil, date: nil)
     }
@@ -684,8 +667,6 @@ public final class ChatListSearchContainerNode: SearchDisplayControllerContentNo
             filterKey = .channels
         case .apps:
             filterKey = .apps
-        case .globalPosts:
-            filterKey = .globalPosts
         case .media:
             filterKey = .media
         case .downloads:
@@ -698,8 +679,6 @@ public final class ChatListSearchContainerNode: SearchDisplayControllerContentNo
             filterKey = .music
         case .voice:
             filterKey = .voice
-        case .instantVideo:
-            filterKey = .instantVideo
         case .publicPosts:
             filterKey = .publicPosts
         }
@@ -708,7 +687,18 @@ public final class ChatListSearchContainerNode: SearchDisplayControllerContentNo
         self.transitionFraction = transitionFraction
         
         if let (layout, _) = self.validLayout {
-            self.updateFilterContainerNode(layout: layout, transition: transition)
+            let filters: [ChatListSearchFilter]
+            if let suggestedFilters = self.suggestedFilters, !suggestedFilters.isEmpty {
+                filters = suggestedFilters
+            } else {
+                var isForum = false
+                if case .forum = self.location {
+                    isForum = true
+                }
+                
+                filters = defaultAvailableSearchPanes(isForum: isForum, hasDownloads: !isForum && self.hasDownloads, hasPublicPosts: self.showPublicPostsTab).map(\.filter)
+            }
+            self.filterContainerNode.update(size: CGSize(width: layout.size.width - 40.0, height: 38.0), sideInset: layout.safeInsets.left - 20.0, filters: filters.map { .filter($0) }, selectedFilter: self.selectedFilter?.id, transitionFraction: self.transitionFraction, presentationData: self.presentationData, transition: transition)
         }
     }
     
@@ -729,8 +719,6 @@ public final class ChatListSearchContainerNode: SearchDisplayControllerContentNo
             key = .music
         case .voice:
             key = .voice
-        case .instantVideo:
-            key = .instantVideo
         case .downloads:
             key = .downloads
         default:
@@ -754,8 +742,18 @@ public final class ChatListSearchContainerNode: SearchDisplayControllerContentNo
             self.cancel?()
         }
     }
-    
-    private func updateFilterContainerNode(layout: ContainerViewLayout, transition: ContainedViewLayoutTransition) {
+
+    override public func containerLayoutUpdated(_ layout: ContainerViewLayout, navigationBarHeight: CGFloat, transition: ContainedViewLayoutTransition) {
+        super.containerLayoutUpdated(layout, navigationBarHeight: navigationBarHeight, transition: transition)
+        
+        let isFirstTime = self.validLayout == nil
+        self.validLayout = (layout, navigationBarHeight)
+        
+        let topInset = navigationBarHeight
+        
+        transition.updateFrame(node: self.dimNode, frame: CGRect(origin: CGPoint(x: 0.0, y: topInset), size: CGSize(width: layout.size.width, height: layout.size.height - topInset)))
+        transition.updateFrame(node: self.filterContainerNode, frame: CGRect(origin: CGPoint(x: 0.0, y: navigationBarHeight + 6.0), size: CGSize(width: layout.size.width, height: 38.0)))
+        
         var isForum = false
         if case .forum = self.location {
             isForum = true
@@ -768,46 +766,8 @@ public final class ChatListSearchContainerNode: SearchDisplayControllerContentNo
             filters = defaultAvailableSearchPanes(isForum: isForum, hasDownloads: self.hasDownloads, hasPublicPosts: self.showPublicPostsTab).map(\.filter)
         }
         
-        var filtersInsets = UIEdgeInsets(top: 0.0, left: 12.0, bottom: layout.insets(options: [.input]).bottom + 34.0, right: 12.0)
-        if layout.insets(options: [.input]).bottom <= 30.0 {
-            filtersInsets = ContainerViewLayout.concentricInsets(bottomInset: layout.insets(options: [.input]).bottom, innerDiameter: 40.0, sideInset: 32.0)
-        } else if layout.insets(options: [.input]).bottom <= 84.0 {
-            filtersInsets.left = 20.0
-            filtersInsets.right = filtersInsets.left
-        }
-        
-        self.filterContainerNode.update(size: CGSize(width: layout.size.width - (layout.safeInsets.left + filtersInsets.left) * 2.0, height: 40.0), sideInset: 0.0, filters: filters.map { .filter($0) }, displayGlobalPostsNewBadge: self.displayGlobalPostsNewBadge, selectedFilter: self.selectedFilter?.id, transitionFraction: self.transitionFraction, presentationData: self.presentationData, transition: .animated(duration: 0.4, curve: .spring))
-    }
-
-    override public func containerLayoutUpdated(_ layout: ContainerViewLayout, navigationBarHeight: CGFloat, transition: ContainedViewLayoutTransition) {
-        super.containerLayoutUpdated(layout, navigationBarHeight: navigationBarHeight, transition: transition)
-        
-        let isFirstTime = self.validLayout == nil
-        self.validLayout = (layout, navigationBarHeight)
-        
-        let topInset = navigationBarHeight
-        
-        var filtersInsets = UIEdgeInsets(top: 0.0, left: 12.0, bottom: layout.insets(options: [.input]).bottom, right: 12.0)
-        if filtersInsets.bottom == 84.0 {
-            filtersInsets.bottom -= 6.0
-        }
-        if layout.insets(options: [.input]).bottom <= 30.0 {
-            filtersInsets = ContainerViewLayout.concentricInsets(bottomInset: layout.insets(options: [.input]).bottom, innerDiameter: 40.0, sideInset: 32.0)
-        } else if layout.insets(options: [.input]).bottom <= 84.0 {
-            filtersInsets.left = 20.0
-            filtersInsets.right = filtersInsets.left
-        } else {
-            if let inputHeight = layout.inputHeight, filtersInsets.bottom == inputHeight {
-                filtersInsets.bottom += 8.0
-            }
-            filtersInsets.bottom = max(8.0, filtersInsets.bottom)
-        }
-        if self.stateValue.selectedMessageIds != nil {
-            filtersInsets.bottom += 48.0
-        }
-        
-        transition.updateFrame(node: self.filterContainerNode, frame: CGRect(origin: CGPoint(x: layout.safeInsets.left + filtersInsets.left, y: layout.size.height - filtersInsets.bottom - 40.0), size: CGSize(width: layout.size.width - (layout.safeInsets.left + filtersInsets.left) * 2.0, height: 40.0)))
-        self.updateFilterContainerNode(layout: layout, transition: transition)
+        let overflowInset: CGFloat = 20.0
+        self.filterContainerNode.update(size: CGSize(width: layout.size.width - overflowInset * 2.0, height: 38.0), sideInset: layout.safeInsets.left - overflowInset, filters: filters.map { .filter($0) }, selectedFilter: self.selectedFilter?.id, transitionFraction: self.transitionFraction, presentationData: self.presentationData, transition: .animated(duration: 0.4, curve: .spring))
         
         if isFirstTime {
             self.filterContainerNode.layer.animateAlpha(from: 0.0, to: 1.0, duration: 0.2)
@@ -815,13 +775,13 @@ public final class ChatListSearchContainerNode: SearchDisplayControllerContentNo
         }
         
         var bottomIntrinsicInset = layout.intrinsicInsets.bottom
-        /*if case .chatList(.root) = self.location {
-            if layout.safeInsets.left > 20.0 {
+        if case .chatList(.root) = self.location {
+            if layout.safeInsets.left > overflowInset {
                 bottomIntrinsicInset -= 34.0
             } else {
                 bottomIntrinsicInset -= 49.0
             }
-        }*/
+        }
         
         if let selectedMessageIds = self.stateValue.selectedMessageIds {
             var wasAdded = false
@@ -867,7 +827,7 @@ public final class ChatListSearchContainerNode: SearchDisplayControllerContentNo
                         return
                     }
                     strongSelf.forwardMessages(messageIds: nil)
-                }, displayCopyProtectionTip: { [weak self] view, save in
+                }, displayCopyProtectionTip: { [weak self] node, save in
                     guard let strongSelf = self, let messageIds = strongSelf.stateValue.selectedMessageIds, !messageIds.isEmpty else {
                         return
                     }
@@ -930,7 +890,7 @@ public final class ChatListSearchContainerNode: SearchDisplayControllerContentNo
                             }
                             strongSelf.present?(tooltipController, TooltipControllerPresentationArguments(sourceNodeAndRect: {
                                 if let strongSelf = self {
-                                    let rect = view.convert(view.bounds, to: strongSelf.view).offsetBy(dx: 0.0, dy: 3.0)
+                                    let rect = node.view.convert(node.view.bounds, to: strongSelf.view).offsetBy(dx: 0.0, dy: 3.0)
                                     return (strongSelf, rect)
                                 }
                                 return nil
@@ -947,7 +907,7 @@ public final class ChatListSearchContainerNode: SearchDisplayControllerContentNo
                     return strongSelf.context.sharedContext.chatAvailableMessageActions(engine: strongSelf.context.engine, accountPeerId: strongSelf.context.account.peerId, messageIds: messageIds, messages: messages, peers: peers)
                 }
                 self.selectionPanelNode = selectionPanelNode
-                self.insertSubnode(selectionPanelNode, aboveSubnode: self.filterContainerNode)
+                self.addSubnode(selectionPanelNode)
             }
             selectionPanelNode.selectedMessages = selectedMessageIds
             
@@ -968,36 +928,25 @@ public final class ChatListSearchContainerNode: SearchDisplayControllerContentNo
             })
         }
         
-        transition.updateFrame(node: self.paneContainerNode, frame: CGRect(x: 0.0, y: 0.0, width: layout.size.width, height: layout.size.height))
+        transition.updateFrame(node: self.paneContainerNode, frame: CGRect(x: 0.0, y: topInset, width: layout.size.width, height: layout.size.height - topInset))
         
         var bottomInset = layout.intrinsicInsets.bottom
         if let inputHeight = layout.inputHeight {
             bottomInset = inputHeight
         } else if let _ = self.selectionPanelNode {
             bottomInset = bottomIntrinsicInset
+        } else if case .chatList(.root) = self.location {
+            bottomInset -= bottomIntrinsicInset
         }
-        bottomInset += 10.0
         
         let availablePanes: [ChatListSearchPaneKey]
-        var isForum = false
-        if case .forum = self.location {
-            isForum = true
-        }
         if self.displaySearchFilters {
             availablePanes = defaultAvailableSearchPanes(isForum: isForum, hasDownloads: self.hasDownloads, hasPublicPosts: self.hasPublicPostsTab)
         } else {
             availablePanes = isForum ? [.topics] : [.chats]
         }
-        
-        bottomInset += 44.0
-        
-        let edgeEffectHeight: CGFloat = bottomInset + 8.0
-        let edgeEffectFrame = CGRect(origin: CGPoint(x: 0.0, y: layout.size.height - edgeEffectHeight), size: CGSize(width: layout.size.width, height: edgeEffectHeight))
-        transition.updateFrame(view: self.edgeEffectView, frame: edgeEffectFrame)
-        self.edgeEffectView.update(content: self.presentationData.theme.list.plainBackgroundColor, rect: edgeEffectFrame, edge: .bottom, edgeSize: min(edgeEffectHeight, 50.0), transition: ComponentTransition(transition))
-        transition.updateAlpha(layer: self.edgeEffectView.layer, alpha: edgeEffectHeight > 21.0 ? 1.0 : 0.0)
 
-        self.paneContainerNode.update(size: CGSize(width: layout.size.width, height: layout.size.height), sideInset: layout.safeInsets.left, topInset: topInset, bottomInset: bottomInset, visibleHeight: layout.size.height, presentationData: self.presentationData, availablePanes: availablePanes, transition: transition)
+        self.paneContainerNode.update(size: CGSize(width: layout.size.width, height: layout.size.height - topInset), sideInset: layout.safeInsets.left, bottomInset: bottomInset, visibleHeight: layout.size.height - topInset, presentationData: self.presentationData, availablePanes: availablePanes, transition: transition)
     }
     
     private var currentMessages: ([EnginePeer.Id: EnginePeer], [EngineMessage.Id: EngineMessage]) {
@@ -1174,7 +1123,7 @@ public final class ChatListSearchContainerNode: SearchDisplayControllerContentNo
                 return items
             }
             
-            let controller = makeContextController(presentationData: self.presentationData, source: .extracted(MessageContextExtractedContentSource(sourceNode: node, shouldBeDismissed: shouldBeDismissed)), items: items |> map { ContextController.Items(content: .list($0)) }, recognizer: nil, gesture: gesture)
+            let controller = ContextController(presentationData: self.presentationData, source: .extracted(MessageContextExtractedContentSource(sourceNode: node, shouldBeDismissed: shouldBeDismissed)), items: items |> map { ContextController.Items(content: .list($0)) }, recognizer: nil, gesture: gesture)
             self.presentInGlobalOverlay?(controller, nil)
             
             return
@@ -1248,7 +1197,7 @@ public final class ChatListSearchContainerNode: SearchDisplayControllerContentNo
             return items
         }
         
-        let controller = makeContextController(presentationData: self.presentationData, source: .extracted(MessageContextExtractedContentSource(sourceNode: node)), items: items |> map { ContextController.Items(content: .list($0)) }, recognizer: nil, gesture: gesture)
+        let controller = ContextController(presentationData: self.presentationData, source: .extracted(MessageContextExtractedContentSource(sourceNode: node)), items: items |> map { ContextController.Items(content: .list($0)) }, recognizer: nil, gesture: gesture)
         self.presentInGlobalOverlay?(controller, nil)
     }
     
@@ -1312,7 +1261,7 @@ public final class ChatListSearchContainerNode: SearchDisplayControllerContentNo
                     switch previewData {
                         case let .gallery(gallery):
                             gallery.setHintWillBePresentedInPreviewingContext(true)
-                            let contextController = makeContextController(presentationData: strongSelf.presentationData, source: .controller(ContextControllerContentSourceImpl(controller: gallery, sourceNode: node)), items: items |> map { ContextController.Items(content: .list($0)) }, gesture: gesture)
+                            let contextController = ContextController(presentationData: strongSelf.presentationData, source: .controller(ContextControllerContentSourceImpl(controller: gallery, sourceNode: node)), items: items |> map { ContextController.Items(content: .list($0)) }, gesture: gesture)
                             strongSelf.presentInGlobalOverlay?(contextController, nil)
                         case .instantPage:
                             break
@@ -1356,7 +1305,7 @@ public final class ChatListSearchContainerNode: SearchDisplayControllerContentNo
                     title = strongSelf.presentationData.strings.DownloadList_RemoveFileAlertTitle(Int32(messages.count))
                     text = strongSelf.presentationData.strings.DownloadList_RemoveFileAlertText(Int32(messages.count))
                     
-                    strongSelf.present?(textAlertController(context: strongSelf.context, title: title, text: text, actions: [
+                    strongSelf.present?(standardTextAlertController(theme: AlertControllerTheme(presentationData: strongSelf.presentationData), title: title, text: text, actions: [
                         TextAlertAction(type: .genericAction, title: strongSelf.presentationData.strings.Common_Cancel, action: {
                         }),
                         TextAlertAction(type: .defaultAction, title: strongSelf.presentationData.strings.DownloadList_RemoveFileAlertRemove, action: {

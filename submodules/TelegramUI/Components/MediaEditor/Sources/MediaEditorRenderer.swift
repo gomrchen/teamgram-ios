@@ -5,12 +5,12 @@ import MetalKit
 import Photos
 import SwiftSignalKit
 
-public final class VideoPixelBuffer {
+final class VideoPixelBuffer {
     let pixelBuffer: CVPixelBuffer
     let rotation: TextureRotation
     let timestamp: CMTime
     
-    public init(
+    init(
         pixelBuffer: CVPixelBuffer,
         rotation: TextureRotation,
         timestamp: CMTime
@@ -18,6 +18,19 @@ public final class VideoPixelBuffer {
         self.pixelBuffer = pixelBuffer
         self.rotation = rotation
         self.timestamp = timestamp
+    }
+}
+
+final class RenderingContext {
+    let device: MTLDevice
+    let commandBuffer: MTLCommandBuffer
+    
+    init(
+        device: MTLDevice,
+        commandBuffer: MTLCommandBuffer
+    ) {
+        self.device = device
+        self.commandBuffer = commandBuffer
     }
 }
 
@@ -112,7 +125,7 @@ final class MediaEditorRenderer {
     
     func addRenderPass(_ renderPass: RenderPass) {
         self.renderPasses.append(renderPass)
-        if let device = self.effectiveDevice, let library = self.library {
+        if let device = self.renderTarget?.mtlDevice, let library = self.library {
             renderPass.setup(device: device, library: library)
         }
     }
@@ -147,14 +160,6 @@ final class MediaEditorRenderer {
         self.renderPasses.forEach { $0.setup(device: device, library: library) }
     }
     
-    var effectiveDevice: MTLDevice? {
-        if let device = self.renderTarget?.mtlDevice {
-            return device
-        } else {
-            return self.device
-        }
-    }
-    
     private func setup() {
         guard let device = self.renderTarget?.mtlDevice else {
             return
@@ -171,11 +176,6 @@ final class MediaEditorRenderer {
         guard let device = composer.device else {
             return
         }
-        self.device = device
-        self.commonSetup(device: device)
-    }
-    
-    func setupForStandaloneDevice(device: MTLDevice) {
         self.device = device
         self.commonSetup(device: device)
     }
@@ -240,7 +240,15 @@ final class MediaEditorRenderer {
     }
     
     func renderFrame() {
-        guard let device = self.effectiveDevice,
+        let device: MTLDevice?
+        if let renderTarget = self.renderTarget {
+            device = renderTarget.mtlDevice
+        } else if let currentDevice = self.device {
+            device = currentDevice
+        } else {
+            device = nil
+        }
+        guard let device = device,
               let commandQueue = self.commandQueue,
               let textureCache = self.textureCache,
               let commandBuffer = commandQueue.makeCommandBuffer(),
@@ -358,7 +366,7 @@ final class MediaEditorRenderer {
     }
     
     func finalRenderedImage(mirror: Bool = false) -> UIImage? {
-        if let finalTexture = self.resultTexture, let device = self.effectiveDevice {
+        if let finalTexture = self.resultTexture, let device = self.renderTarget?.mtlDevice {
             return getTextureImage(device: device, texture: finalTexture, mirror: mirror)
         } else {
             return nil

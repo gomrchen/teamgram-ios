@@ -10,7 +10,7 @@ import PresentationDataUtils
 import AccountContext
 import UndoUI
 
-public enum EnergySavingItemType: CaseIterable {
+enum ItemType: CaseIterable {
     case autoplayVideo
     case autoplayGif
     case loopStickers
@@ -88,10 +88,10 @@ public enum EnergySavingItemType: CaseIterable {
 
 private final class EnergeSavingSettingsScreenArguments {
     let updateThreshold: (Int32) -> Void
-    let toggleItem: (EnergySavingItemType) -> Void
+    let toggleItem: (ItemType) -> Void
     let displayDisabledTooltip: () -> Void
     
-    init(updateThreshold: @escaping (Int32) -> Void, toggleItem: @escaping (EnergySavingItemType) -> Void, displayDisabledTooltip: @escaping () -> Void) {
+    init(updateThreshold: @escaping (Int32) -> Void, toggleItem: @escaping (ItemType) -> Void, displayDisabledTooltip: @escaping () -> Void) {
         self.updateThreshold = updateThreshold
         self.toggleItem = toggleItem
         self.displayDisabledTooltip = displayDisabledTooltip
@@ -103,31 +103,19 @@ private enum EnergeSavingSettingsScreenSection: Int32 {
     case items
 }
 
-public enum EnergySavingEntryTag: ItemListItemTag, Equatable {
-    case item(EnergySavingItemType)
-    
-    public func isEqual(to other: ItemListItemTag) -> Bool {
-        if let other = other as? EnergySavingEntryTag, self == other {
-            return true
-        } else {
-            return false
-        }
-    }
-}
-
 private enum EnergeSavingSettingsScreenEntry: ItemListNodeEntry {
     enum StableId: Hashable {
         case allHeader
         case all
         case allFooter
         case itemsHeader
-        case item(EnergySavingItemType)
+        case item(ItemType)
     }
     
     case allHeader(Bool?)
     case all(Int32)
     case allFooter(String)
-    case item(index: Int, type: EnergySavingItemType, value: Bool, enabled: Bool)
+    case item(index: Int, type: ItemType, value: Bool, enabled: Bool)
     case itemsHeader
     
     var section: ItemListSectionId {
@@ -190,7 +178,6 @@ private enum EnergeSavingSettingsScreenEntry: ItemListNodeEntry {
             return ItemListSectionHeaderItem(presentationData: presentationData, text: text, sectionId: self.section)
         case let .all(value):
             return EnergyUsageBatteryLevelItem(
-                systemStyle: .glass,
                 theme: presentationData.theme,
                 strings: presentationData.strings,
                 value: value,
@@ -205,11 +192,11 @@ private enum EnergeSavingSettingsScreenEntry: ItemListNodeEntry {
             return ItemListSectionHeaderItem(presentationData: presentationData, text: presentationData.strings.PowerSavingScreen_OptionsHeader, sectionId: self.section)
         case let .item(_, type, value, enabled):
             let (iconName, title, text) = type.title(strings: presentationData.strings)
-            return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, icon: UIImage(bundleImageName: iconName)?.precomposed(), title: title, text: text, value: value, enableInteractiveChanges: true, enabled: enabled, sectionId: self.section, style: .blocks, updated: { value in
+            return ItemListSwitchItem(presentationData: presentationData, icon: UIImage(bundleImageName: iconName)?.precomposed(), title: title, text: text, value: value, enableInteractiveChanges: true, enabled: enabled, sectionId: self.section, style: .blocks, updated: { value in
                 arguments.toggleItem(type)
             }, activatedWhileDisabled: {
                 arguments.displayDisabledTooltip()
-            }, tag: EnergySavingEntryTag.item(type))
+            })
         }
     }
 }
@@ -253,14 +240,14 @@ private func energeSavingSettingsScreenEntries(
     }
     
     entries.append(.itemsHeader)
-    for type in EnergySavingItemType.allCases {
+    for type in ItemType.allCases {
         entries.append(.item(index: entries.count, type: type, value: settings.energyUsageSettings[keyPath: type.settingsKeyPath] && itemsEnabled, enabled: itemsEnabled))
     }
     
     return entries
 }
 
-public func energySavingSettingsScreen(context: AccountContext, focusOnItemTag: EnergySavingEntryTag? = nil) -> ViewController {
+public func energySavingSettingsScreen(context: AccountContext) -> ViewController {
     var pushControllerImpl: ((ViewController) -> Void)?
     let _ = pushControllerImpl
     
@@ -312,7 +299,7 @@ public func energySavingSettingsScreen(context: AccountContext, focusOnItemTag: 
                 backNavigationButton: ItemListBackButton(title: presentationData.strings.Common_Back),
                 animateChanges: false
             )
-            let listState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: energeSavingSettingsScreenEntries(presentationData: presentationData, settings: automaticMediaDownloadSettings), style: .blocks, ensureVisibleItemTag: focusOnItemTag, emptyStateItem: nil, animateChanges: true)
+            let listState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: energeSavingSettingsScreenEntries(presentationData: presentationData, settings: automaticMediaDownloadSettings), style: .blocks, emptyStateItem: nil, animateChanges: true)
             
             return (controllerState, (listState, arguments))
     }
@@ -329,20 +316,5 @@ public func energySavingSettingsScreen(context: AccountContext, focusOnItemTag: 
             controller.present(UndoOverlayController(presentationData: presentationData, content: c, elevatedLayout: false, action: { _ in return false }), in: .current)
         }
     }
-    
-    if let focusOnItemTag {
-        var didFocusOnItem = false
-        controller.afterTransactionCompleted = { [weak controller] in
-            if !didFocusOnItem, let controller {
-                controller.forEachItemNode { itemNode in
-                    if let itemNode = itemNode as? ItemListItemNode, let tag = itemNode.tag, tag.isEqual(to: focusOnItemTag) {
-                        didFocusOnItem = true
-                        itemNode.displayHighlight()
-                    }
-                }
-            }
-        }
-    }
-    
     return controller
 }

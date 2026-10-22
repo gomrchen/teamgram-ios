@@ -4,7 +4,6 @@ import Display
 import ComponentFlow
 import ListSectionComponent
 import TelegramPresentationData
-import PresentationDataUtils
 import AppBundle
 import AccountContext
 import ViewControllerComponent
@@ -186,7 +185,7 @@ final class BusinessLinksSetupScreenComponent: Component {
                     errorText = presentationData.strings.Business_Links_ErrorTooManyLinks
                 }
                 
-                environment.controller()?.present(textAlertController(context: component.context, title: nil, text: errorText, actions: [
+                environment.controller()?.present(standardTextAlertController(theme: AlertControllerTheme(presentationData: presentationData), title: nil, text: errorText, actions: [
                     TextAlertAction(type: .defaultAction, title: presentationData.strings.Common_OK, action: {
                     })
                 ]), in: .window(.root))
@@ -405,7 +404,6 @@ final class BusinessLinksSetupScreenComponent: Component {
             var createLinkSectionItems: [AnyComponentWithIdentity<Empty>] = []
             createLinkSectionItems.append(AnyComponentWithIdentity(id: 0, component: AnyComponent(ListActionItemComponent(
                 theme: environment.theme,
-                style: .glass,
                 title: AnyComponent(VStack([
                     AnyComponentWithIdentity(id: AnyHashable(0), component: AnyComponent(MultilineTextComponent(
                         text: .plain(NSAttributedString(
@@ -443,7 +441,6 @@ final class BusinessLinksSetupScreenComponent: Component {
                 transition: transition,
                 component: AnyComponent(ListSectionComponent(
                     theme: environment.theme,
-                    style: .glass,
                     header: nil,
                     footer: footerText.isEmpty ? nil : AnyComponent(MultilineTextComponent(
                         text: .markdown(text: footerText, attributes: MarkdownAttributes(
@@ -577,7 +574,7 @@ final class BusinessLinksSetupScreenComponent: Component {
                         ))
                         let items = ContextController.Items(content: .list(itemList))
                         
-                        let controller = makeContextController(
+                        let controller = ContextController(
                             presentationData: presentationData,
                             source: .extracted(BusineesLinkListContextExtractedContentSource(contentView: sourceView)), items: .single(items), recognizer: nil, gesture: gesture)
                         
@@ -595,7 +592,6 @@ final class BusinessLinksSetupScreenComponent: Component {
                 transition: transition,
                 component: AnyComponent(ListSectionComponent(
                     theme: environment.theme,
-                    style: .glass,
                     header: AnyComponent(MultilineTextComponent(
                         text: .plain(NSAttributedString(
                             string: environment.strings.Business_Links_LinksSectionHeader,
@@ -634,8 +630,8 @@ final class BusinessLinksSetupScreenComponent: Component {
                 self.scrollView.contentSize = contentSize
             }
             let scrollInsets = UIEdgeInsets(top: environment.navigationHeight, left: 0.0, bottom: 0.0, right: 0.0)
-            if self.scrollView.verticalScrollIndicatorInsets != scrollInsets {
-                self.scrollView.verticalScrollIndicatorInsets = scrollInsets
+            if self.scrollView.scrollIndicatorInsets != scrollInsets {
+                self.scrollView.scrollIndicatorInsets = scrollInsets
             }
                         
             if !previousBounds.isEmpty, !transition.animation.isImmediate {

@@ -6,12 +6,11 @@ import TelegramCore
 public enum ChatListControllerLocation: Equatable {
     case chatList(groupId: EngineChatList.Group)
     case forum(peerId: EnginePeer.Id)
-    case savedMessagesChats(peerId: EnginePeer.Id)
+    case savedMessagesChats
 }
 
 public protocol ChatListController: ViewController {
     var context: AccountContext { get }
-    var location: ChatListControllerLocation { get }
     var lockViewFrame: CGRect? { get }
     
     var isSearchActive: Bool { get }
@@ -26,9 +25,4 @@ public protocol ChatListController: ViewController {
     
     func openStories(peerId: EnginePeer.Id)
     func openStoriesFromNotification(peerId: EnginePeer.Id, storyId: Int32)
-    
-    func resetForumStackIfOpen()
-    
-    func activateEdit()
-    func openEmojiStatusSetup()
 }

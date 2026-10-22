@@ -99,7 +99,7 @@ class IncreaseLimitHeaderItemNode: ListViewItemNode {
         self.textNode.contentMode = .left
         self.textNode.contentsScale = UIScreen.main.scale
                                 
-        super.init(layerBacked: false)
+        super.init(layerBacked: false, dynamicBounce: false)
         
         self.addSubnode(self.titleNode)
         self.addSubnode(self.textNode)

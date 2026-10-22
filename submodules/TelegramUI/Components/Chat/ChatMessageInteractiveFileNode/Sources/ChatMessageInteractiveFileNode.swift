@@ -35,7 +35,6 @@ import TelegramStringFormatting
 import AnimatedCountLabelNode
 import AudioWaveform
 import DeviceProximity
-import ShimmeringLinkNode
 
 private struct FetchControls {
     let fetch: (Bool) -> Void
@@ -124,7 +123,6 @@ public final class ChatMessageInteractiveFileNode: ASDisplayNode {
     public let fetchingTextNode: ImmediateTextNode
     public let fetchingCompactTextNode: ImmediateTextNode
     private let countNode: ImmediateAnimatedCountLabelNode
-    private var shimmeringNodes: [ShimmeringLinkNode] = []
     
     public var waveformView: ComponentHostView<Empty>?
     
@@ -625,15 +623,15 @@ public final class ChatMessageInteractiveFileNode: ASDisplayNode {
                         |> map { resourceStatus, actualFetchStatus -> (FileMediaResourceStatus, MediaResourceStatus?) in
                             return (resourceStatus, actualFetchStatus)
                         }
-                        updatedAudioLevelEventsSignal = messageFileMediaPlaybackAudioLevelEvents(context: arguments.context, file: arguments.file, message: EngineMessage(arguments.message), isRecentActions: arguments.isRecentActions, isGlobalSearch: false, isDownloadList: false, isSavedMusic: false)
+                        updatedAudioLevelEventsSignal = messageFileMediaPlaybackAudioLevelEvents(context: arguments.context, file: arguments.file, message: EngineMessage(arguments.message), isRecentActions: arguments.isRecentActions, isGlobalSearch: false, isDownloadList: false)
                     } else {
                         updatedStatusSignal = messageFileMediaResourceStatus(context: arguments.context, file: arguments.file, message: EngineMessage(arguments.message), isRecentActions: arguments.isRecentActions)
                         |> map { resourceStatus -> (FileMediaResourceStatus, MediaResourceStatus?) in
                             return (resourceStatus, nil)
                         }
-                        updatedAudioLevelEventsSignal = messageFileMediaPlaybackAudioLevelEvents(context: arguments.context, file: arguments.file, message: EngineMessage(arguments.message), isRecentActions: arguments.isRecentActions, isGlobalSearch: false, isDownloadList: false, isSavedMusic: false)
+                        updatedAudioLevelEventsSignal = messageFileMediaPlaybackAudioLevelEvents(context: arguments.context, file: arguments.file, message: EngineMessage(arguments.message), isRecentActions: arguments.isRecentActions, isGlobalSearch: false, isDownloadList: false)
                     }
-                    updatedPlaybackStatusSignal = messageFileMediaPlaybackStatus(context: arguments.context, file: arguments.file, message: EngineMessage(arguments.message), isRecentActions: arguments.isRecentActions, isGlobalSearch: false, isDownloadList: false, isSavedMusic: false)
+                    updatedPlaybackStatusSignal = messageFileMediaPlaybackStatus(context: arguments.context, file: arguments.file, message: EngineMessage(arguments.message), isRecentActions: arguments.isRecentActions, isGlobalSearch: false, isDownloadList: false)
                 }
                                 
                 var isAudio = false
@@ -811,28 +809,23 @@ public final class ChatMessageInteractiveFileNode: ASDisplayNode {
                 
                 var displayTrailingAnimatedDots = false
                 
-                var isTranslating = false
                 if let transcribedText = transcribedText, case .expanded = effectiveAudioTranscriptionState {
                     switch transcribedText {
                     case let .success(text, isPending):
                         textString = NSAttributedString(string: text, font: textFont, textColor: messageTheme.primaryTextColor)
+                        
+                        /*#if DEBUG
+                        var isPending = isPending
+                        if "".isEmpty {
+                            isPending = true
+                        }
+                        #endif*/
                         
                         if isPending {
                             let modifiedString = NSMutableAttributedString(attributedString: textString!)
                             modifiedString.append(NSAttributedString(string: "...", font: textFont, textColor: .clear))
                             displayTrailingAnimatedDots = true
                             textString = modifiedString
-                        } else {
-                            if let translateToLanguage = arguments.associatedData.translateToLanguage, !text.isEmpty && arguments.incoming {
-                                isTranslating = true
-                                for attribute in arguments.message.attributes {
-                                    if let attribute = attribute as? TranslationMessageAttribute, !attribute.text.isEmpty, attribute.toLang == translateToLanguage {
-                                        textString = NSAttributedString(string: attribute.text, font: textFont, textColor: messageTheme.primaryTextColor)
-                                        isTranslating = false
-                                        break
-                                    }
-                                }
-                            }
                         }
                     case let .error(error):
                         let errorTextFont = Font.regular(floor(arguments.presentationData.fontSize.baseDisplaySize * 15.0 / 17.0))
@@ -905,7 +898,6 @@ public final class ChatMessageInteractiveFileNode: ASDisplayNode {
                     }
                     var viewCount: Int?
                     var dateReplies = 0
-                    var starsCount: Int64?
                     var dateReactionsAndPeers = mergedMessageReactionsAndPeers(accountPeerId: arguments.context.account.peerId, accountPeer: arguments.associatedData.accountPeer, message: arguments.topMessage)
                     if arguments.topMessage.isRestricted(platform: "ios", contentSettings: arguments.context.currentContentSettings.with { $0 }) || arguments.presentationData.isPreview {
                         dateReactionsAndPeers = ([], [])
@@ -919,8 +911,6 @@ public final class ChatMessageInteractiveFileNode: ASDisplayNode {
                             if let channel = arguments.message.peers[arguments.message.id.peerId] as? TelegramChannel, case .group = channel.info {
                                 dateReplies = Int(attribute.count)
                             }
-                        } else if let attribute = attribute as? PaidStarsMessageAttribute, arguments.message.id.peerId.namespace == Namespaces.Peer.CloudChannel {
-                            starsCount = attribute.stars.value
                         }
                     }
                     if arguments.forcedIsEdited {
@@ -964,10 +954,8 @@ public final class ChatMessageInteractiveFileNode: ASDisplayNode {
                         reactionPeers: dateReactionsAndPeers.peers,
                         displayAllReactionPeers: arguments.message.id.peerId.namespace == Namespaces.Peer.CloudUser,
                         areReactionsTags: arguments.message.areReactionsTags(accountPeerId: arguments.context.account.peerId),
-                        areStarReactionsEnabled: arguments.associatedData.areStarReactionsEnabled,
                         messageEffect: arguments.message.messageEffect(availableMessageEffects: arguments.associatedData.availableMessageEffects),
                         replyCount: dateReplies,
-                        starsCount: starsCount,
                         isPinned: arguments.isPinned && !arguments.associatedData.isInPinnedListMode,
                         hasAutoremove: arguments.message.isSelfExpiring,
                         canViewReactionList: canViewMessageReactionList(message: arguments.topMessage),
@@ -1545,52 +1533,10 @@ public final class ChatMessageInteractiveFileNode: ASDisplayNode {
                             } else {
                                 strongSelf.dateAndStatusNode.pressed = nil
                             }
-                            
-                            strongSelf.updateIsTranslating(isTranslating)
                         }
                     })
                 })
             })
-        }
-    }
-    
-    private func updateIsTranslating(_ isTranslating: Bool) {
-        guard let arguments = self.arguments else {
-            return
-        }
-        var rects: [[CGRect]] = []
-        let titleRects = (self.textNode.rangeRects(in: NSRange(location: 0, length: self.textNode.cachedLayout?.attributedString?.length ?? 0))?.rects ?? []).map { self.textNode.view.convert($0, to: self.textClippingNode.view) }
-        rects.append(titleRects)
-        
-        if isTranslating, !rects.isEmpty {
-            if self.shimmeringNodes.isEmpty {
-                let color: UIColor
-                let isIncoming = arguments.message.effectivelyIncoming(arguments.context.account.peerId)
-                if arguments.presentationData.theme.theme.overallDarkAppearance {
-                    color = isIncoming ? arguments.presentationData.theme.theme.chat.message.incoming.primaryTextColor.withAlphaComponent(0.1) : arguments.presentationData.theme.theme.chat.message.outgoing.primaryTextColor.withAlphaComponent(0.1)
-                } else {
-                    color = isIncoming ? arguments.presentationData.theme.theme.chat.message.incoming.accentTextColor.withAlphaComponent(0.1) : arguments.presentationData.theme.theme.chat.message.outgoing.secondaryTextColor.withAlphaComponent(0.1)
-                }
-                for rects in rects {
-                    let shimmeringNode = ShimmeringLinkNode(color: color)
-                    shimmeringNode.updateRects(rects)
-                    shimmeringNode.frame = self.bounds
-                    shimmeringNode.updateLayout(self.bounds.size)
-                    shimmeringNode.layer.animateAlpha(from: 0.0, to: 1.0, duration: 0.2)
-                    self.shimmeringNodes.append(shimmeringNode)
-                    self.textClippingNode.insertSubnode(shimmeringNode, belowSubnode: self.textNode)
-                }
-            }
-        } else if !self.shimmeringNodes.isEmpty {
-            let shimmeringNodes = self.shimmeringNodes
-            self.shimmeringNodes = []
-            
-            for shimmeringNode in shimmeringNodes {
-                shimmeringNode.alpha = 0.0
-                shimmeringNode.layer.animateAlpha(from: 1.0, to: 0.0, duration: 0.2, completion: { [weak shimmeringNode] _ in
-                    shimmeringNode?.removeFromSupernode()
-                })
-            }
         }
     }
     
@@ -1695,7 +1641,7 @@ public final class ChatMessageInteractiveFileNode: ASDisplayNode {
         
         if let updatingMedia = arguments.attributes.updatingMedia, case .update = updatingMedia.media {
             let adjustedProgress = max(CGFloat(updatingMedia.progress), 0.027)
-            state = .progress(value: CGFloat(adjustedProgress), cancelEnabled: true, appearance: nil, animateRotation: true)
+            state = .progress(value: CGFloat(adjustedProgress), cancelEnabled: true, appearance: nil)
         } else {
             switch resourceStatus.mediaStatus {
             case var .fetchStatus(fetchStatus):
@@ -1718,7 +1664,7 @@ public final class ChatMessageInteractiveFileNode: ASDisplayNode {
                         if message.groupingKey != nil, adjustedProgress.isEqual(to: 1.0), (message.flags.contains(.Unsent) || wasCheck) {
                             state = .check(appearance: nil)
                         } else {
-                            state = .progress(value: CGFloat(adjustedProgress), cancelEnabled: true, appearance: nil, animateRotation: true)
+                            state = .progress(value: CGFloat(adjustedProgress), cancelEnabled: true, appearance: nil)
                         }
                     }
                 case .Local:
@@ -1762,7 +1708,7 @@ public final class ChatMessageInteractiveFileNode: ASDisplayNode {
                 switch resourceStatus.fetchStatus {
                 case let .Fetching(_, progress):
                     let adjustedProgress = max(progress, 0.027)
-                    streamingState = .progress(value: CGFloat(adjustedProgress), cancelEnabled: true, appearance: .init(inset: 1.0, lineWidth: 2.0), animateRotation: true)
+                    streamingState = .progress(value: CGFloat(adjustedProgress), cancelEnabled: true, appearance: .init(inset: 1.0, lineWidth: 2.0))
                 case .Local:
                     streamingState = .none
                 case .Remote, .Paused:
@@ -1780,7 +1726,7 @@ public final class ChatMessageInteractiveFileNode: ASDisplayNode {
             } else if case .check = state {
             } else {
                 let adjustedProgress: CGFloat = 0.027
-                state = .progress(value: CGFloat(adjustedProgress), cancelEnabled: true, appearance: .init(inset: 1.0, lineWidth: 2.0), animateRotation: true)
+                state = .progress(value: CGFloat(adjustedProgress), cancelEnabled: true, appearance: .init(inset: 1.0, lineWidth: 2.0))
             }
         }
         

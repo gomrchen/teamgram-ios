@@ -44,9 +44,8 @@ public final class ListMessageItemInteraction {
     })
 }
 
-public final class ListMessageItem: ListViewItem, ItemListItem {
+public final class ListMessageItem: ListViewItem {
     let presentationData: ChatPresentationData
-    let systemStyle: ItemListSystemStyle
     let context: AccountContext
     let chatLocation: ChatLocation
     let interaction: ListMessageItemInteraction
@@ -56,22 +55,16 @@ public final class ListMessageItem: ListViewItem, ItemListItem {
     let hintIsLink: Bool
     let isGlobalSearchResult: Bool
     let isDownloadList: Bool
-    let isSavedMusic: Bool
-    let isStoryMusic: Bool
     let displayFileInfo: Bool
     let displayBackground: Bool
-    let canReorder: Bool
     let style: ItemListStyle
     
     let header: ListViewItemHeader?
     
-    public var sectionId: ItemListSectionId
-    
     public let selectable: Bool = true
     
-    public init(presentationData: ChatPresentationData, systemStyle: ItemListSystemStyle = .legacy, context: AccountContext, chatLocation: ChatLocation, interaction: ListMessageItemInteraction, message: Message?, translateToLanguage: String? = nil, selection: ChatHistoryMessageSelection, displayHeader: Bool, customHeader: ListViewItemHeader? = nil, hintIsLink: Bool = false, isGlobalSearchResult: Bool = false, isDownloadList: Bool = false, isSavedMusic: Bool = false, isStoryMusic: Bool = false, displayFileInfo: Bool = true, displayBackground: Bool = false, canReorder: Bool = false, style: ItemListStyle = .plain, sectionId: ItemListSectionId = 0) {
+    public init(presentationData: ChatPresentationData, context: AccountContext, chatLocation: ChatLocation, interaction: ListMessageItemInteraction, message: Message?, translateToLanguage: String? = nil, selection: ChatHistoryMessageSelection, displayHeader: Bool, customHeader: ListViewItemHeader? = nil, hintIsLink: Bool = false, isGlobalSearchResult: Bool = false, isDownloadList: Bool = false, displayFileInfo: Bool = true, displayBackground: Bool = false, style: ItemListStyle = .plain) {
         self.presentationData = presentationData
-        self.systemStyle = systemStyle
         self.context = context
         self.chatLocation = chatLocation
         self.interaction = interaction
@@ -88,13 +81,9 @@ public final class ListMessageItem: ListViewItem, ItemListItem {
         self.hintIsLink = hintIsLink
         self.isGlobalSearchResult = isGlobalSearchResult
         self.isDownloadList = isDownloadList
-        self.isSavedMusic = isSavedMusic
-        self.isStoryMusic = isStoryMusic
         self.displayFileInfo = displayFileInfo
         self.displayBackground = displayBackground
-        self.canReorder = canReorder
         self.style = style
-        self.sectionId = sectionId
     }
     
     public func nodeConfiguredForParams(async: @escaping (@escaping () -> Void) -> Void, params: ListViewItemLayoutParams, synchronousLoads: Bool, previousItem: ListViewItem?, nextItem: ListViewItem?, completion: @escaping (ListViewItemNode, @escaping () -> (Signal<Void, NoError>?, (ListViewItemApply) -> Void)) -> Void) {
@@ -125,23 +114,7 @@ public final class ListMessageItem: ListViewItem, ItemListItem {
             node.setupItem(self)
             
             let nodeLayout = node.asyncLayout()
-            
-            var topMerged = false
-            if let previousItem {
-                if let previousItem = previousItem as? ItemListItem, previousItem.sectionId == self.sectionId && !previousItem.isAlwaysPlain {
-                    topMerged = true
-                }
-            }
-            
-            var bottomMerged = false
-            if let nextItem {
-                if let nextItem = nextItem as? ItemListItem, nextItem.sectionId == self.sectionId && !nextItem.isAlwaysPlain {
-                    bottomMerged = true
-                }
-            }
-            
-            
-            let (top, bottom, dateAtBottom) = (topMerged, bottomMerged, self.getDateAtBottom(top: previousItem, bottom: nextItem))
+            let (top, bottom, dateAtBottom) = (previousItem != nil && !(previousItem is ItemListItem), nextItem != nil, self.getDateAtBottom(top: previousItem, bottom: nextItem))
             let (layout, apply) = nodeLayout(self, params, top, bottom, dateAtBottom)
             
             node.updateSelectionState(animated: false)
@@ -173,22 +146,9 @@ public final class ListMessageItem: ListViewItem, ItemListItem {
                 
                 let nodeLayout = nodeValue.asyncLayout()
                 
-                var topMerged = false
-                if let previousItem {
-                    if let previousItem = previousItem as? ItemListItem, previousItem.sectionId == self.sectionId && !previousItem.isAlwaysPlain {
-                        topMerged = true
-                    }
-                }
-                
-                var bottomMerged = false
-                if let nextItem {
-                    if let nextItem = nextItem as? ItemListItem, nextItem.sectionId == self.sectionId && !nextItem.isAlwaysPlain {
-                        bottomMerged = true
-                    }
-                }
-                
                 async {
-                    let (top, bottom, dateAtBottom) = (topMerged, bottomMerged, self.getDateAtBottom(top: previousItem, bottom: nextItem))
+                    let (top, bottom, dateAtBottom) = (previousItem != nil && !(previousItem is ItemListItem), nextItem != nil, self.getDateAtBottom(top: previousItem, bottom: nextItem))
+                    
                     let (layout, apply) = nodeLayout(self, params, top, bottom, dateAtBottom)
                     Queue.mainQueue().async {
                         completion(layout, { _ in

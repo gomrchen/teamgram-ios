@@ -33,10 +33,6 @@ import RasterizedCompositionComponent
 import BadgeComponent
 import ComponentFlow
 import ComponentDisplayAdapters
-import ToastComponent
-import MultilineTextComponent
-import BundleIconComponent
-import VideoPlaybackControlsComponent
 
 public enum UniversalVideoGalleryItemContentInfo {
     case message(Message, Int?)
@@ -101,14 +97,32 @@ public class UniversalVideoGalleryItem: GalleryItem {
     public func node(synchronous: Bool) -> GalleryItemNode {
         let node = UniversalVideoGalleryItemNode(context: self.context, presentationData: self.presentationData, performAction: self.performAction, openActionOptions: self.openActionOptions, present: self.present)
         
+        if let indexData = self.indexData {
+            node._title.set(.single(self.presentationData.strings.Items_NOfM("\(indexData.position + 1)", "\(indexData.totalCount)").string))
+        } else if case let .message(message, _) = self.contentInfo, let _ = message.adAttribute {
+            node._title.set(.single(self.presentationData.strings.Gallery_Ad))
+        }
+        
         node.setupItem(self)
+        
+        if self.displayInfoOnTop, case let .message(message, _) = self.contentInfo {
+            node.titleContentView?.setMessage(message, presentationData: self.presentationData, accountPeerId: self.context.account.peerId)
+        }
         
         return node
     }
     
     public func updateNode(node: GalleryItemNode, synchronous: Bool) {
         if let node = node as? UniversalVideoGalleryItemNode {
+            if let indexData = self.indexData {
+                node._title.set(.single(self.presentationData.strings.Items_NOfM("\(indexData.position + 1)", "\(indexData.totalCount)").string))
+            }
+            
             node.setupItem(self)
+            
+            if self.displayInfoOnTop, case let .message(message, _) = self.contentInfo {
+                node.titleContentView?.setMessage(message, presentationData: self.presentationData, accountPeerId: self.context.account.peerId)
+            }
         }
     }
     
@@ -206,199 +220,85 @@ private final class UniversalVideoGalleryItemPictureInPictureNode: ASDisplayNode
     }
 }
 
-private final class UniversalVideoGalleryItemOverlayNode: GalleryOverlayContentNode {
-    private var context: AccountContext?
-        
-    private var adView = ComponentView<Empty>()
-    
-    private var message: Message?
-    private var adContext: AdMessagesHistoryContext?
-    private var adState: (startDelay: Int32?, betweenDelay: Int32?, messages: [Message])?
-    private let adDisposable = MetaDisposable()
-    
-    private var adSchedule: [(Int32, Message?)] = []
+private let fullscreenImage = generateTintedImage(image: UIImage(bundleImageName: "Media Gallery/Fullscreen"), color: .white)
+private let minimizeImage = generateTintedImage(image: UIImage(bundleImageName: "Media Gallery/Minimize"), color: .white)
 
-    var performAction: ((GalleryControllerInteractionTapAction) -> Void)?
-    var presentPremiumDemo: (() -> Void)?
-    var openMoreMenu: ((UIView, Message) -> Void)?
+private final class UniversalVideoGalleryItemOverlayNode: GalleryOverlayContentNode {
+    private let wrapperNode: ASDisplayNode
+    private let fullscreenNode: HighlightableButtonNode
+    private var validLayout: (CGSize, LayoutMetrics, UIEdgeInsets)?
     
-    private var validLayout: (size: CGSize, metrics: LayoutMetrics, insets: UIEdgeInsets)?
+    var action: ((Bool) -> Void)?
+    
+    override init() {
+        self.wrapperNode = ASDisplayNode()
+        self.wrapperNode.alpha = 0.0
         
-    deinit {
-        self.adDisposable.dispose()
-    }
+        self.fullscreenNode = HighlightableButtonNode()
+        self.fullscreenNode.setImage(fullscreenImage, for: .normal)
+        self.fullscreenNode.setImage(minimizeImage, for: .selected)
+        self.fullscreenNode.setImage(minimizeImage, for: [.selected, .highlighted])
     
-    func setMessage(context: AccountContext, message: Message) {
-        self.context = context
-        guard self.message?.id != message.id else {
-            return
-        }
-        self.message = message
+        super.init()
         
-        let adContext = context.engine.messages.adMessages(peerId: message.id.peerId, messageId: message.id)
-        self.adContext = adContext
-        self.adDisposable.set((adContext.state
-        |> deliverOnMainQueue).start(next: { [weak self] state in
-            guard let self else {
-                return
-            }
-            if !state.messages.isEmpty {
-                self.adState = (state.startDelay, state.betweenDelay, state.messages)
-                
-                var startTime = Int32(CFAbsoluteTimeGetCurrent()) + (state.startDelay ?? 0)
-                var schedule: [(Int32, Message?)] = []
-                var maxDisplayDuration: Int32 = 30
-                for message in state.messages {
-                    if !schedule.isEmpty {
-                        schedule.append((startTime, nil))
-                        startTime += (state.betweenDelay ?? 0)
-                    }
-                    schedule.append((startTime, message))
-                    
-                    if let adAttribute = message.adAttribute {
-                        maxDisplayDuration = adAttribute.maxDisplayDuration ?? 30
-                        startTime += maxDisplayDuration
-                    }
-                }
-                schedule.append((startTime + maxDisplayDuration, nil))
-                self.adSchedule = schedule
-            } else {
-                self.adState = nil
-                
-                self.adSchedule = []
-            }
-            
-            if let validLayout = self.validLayout {
-                self.updateLayout(size: validLayout.size, metrics: validLayout.metrics, insets: validLayout.insets, isHidden: false, transition: .immediate)
-            }
-        }))
+        self.addSubnode(self.wrapperNode)
+        self.wrapperNode.addSubnode(self.fullscreenNode)
+        
+        self.fullscreenNode.addTarget(self, action: #selector(self.toggleFullscreenPressed), forControlEvents: .touchUpInside)
     }
-    
-    var timer: SwiftSignalKit.Timer?
-    var hiddenMessages = Set<MessageId>()
-    var isAnimatingOut = false
-    var reportedMessages = Set<Data>()
     
     override func updateLayout(size: CGSize, metrics: LayoutMetrics, insets: UIEdgeInsets, isHidden: Bool, transition: ContainedViewLayoutTransition) {
         self.validLayout = (size, metrics, insets)
         
-        if self.timer == nil {
-            self.timer = SwiftSignalKit.Timer(timeout: 0.5, repeat: true, completion: { [weak self] progress in
-                guard let self else {
-                    return
-                }
-                if let validLayout = self.validLayout {
-                    self.updateLayout(size: validLayout.size, metrics: validLayout.metrics, insets: validLayout.insets, isHidden: false, transition: .immediate)
-                }
-            }, queue: Queue.mainQueue())
-            self.timer?.start()
-        }
-        
         let isLandscape = size.width > size.height
-        let _ = isLandscape
-                
-        let currentTime = Int32(CFAbsoluteTimeGetCurrent())
-        var currentAd: (Int32, Message?)?
+        self.fullscreenNode.isSelected = isLandscape
         
-        for (time, maybeMessage) in adSchedule {
-            if currentTime > time {
-                currentAd = (time, maybeMessage)
-            }
-        }
-        
-        if let context = self.context, let (initialTimestamp, maybeMessage) = currentAd, let adMessage = maybeMessage, !self.hiddenMessages.contains(adMessage.id) {
-            if let adAttribute = adMessage.adAttribute {
-                if !self.reportedMessages.contains(adAttribute.opaqueId) {
-                    self.reportedMessages.insert(adAttribute.opaqueId)
-                    context.engine.messages.markAdAsSeen(opaqueId: adAttribute.opaqueId)
-                }
-            }
-                        
-            let sideInset: CGFloat = 16.0
-                                    
-            var maxWidth = min(size.width, size.height) - sideInset * 2.0
-            if case .regular = metrics.widthClass {
-                maxWidth = 414.0
-            }
-            
-            let presentationData = context.sharedContext.currentPresentationData.with { $0 }
-            let adSize = self.adView.update(
-                transition: .immediate,
-                component: AnyComponent(
-                    VideoAdComponent(
-                        context: context,
-                        theme: presentationData.theme,
-                        strings: presentationData.strings,
-                        message: EngineMessage(adMessage),
-                        initialTimestamp: initialTimestamp,
-                        action: { [weak self] available in
-                            guard let self else {
-                                return
-                            }
-                            if available {
-                                self.hiddenMessages.insert(adMessage.id)
-                                if let validLayout = self.validLayout {
-                                    self.updateLayout(size: validLayout.size, metrics: validLayout.metrics, insets: validLayout.insets, isHidden: false, transition: .immediate)
-                                }
-                            } else {
-                                self.presentPremiumDemo?()
-                            }
-                        },
-                        adAction: { [weak self] in
-                            if let self, let ad = adMessage.adAttribute {
-                                self.hiddenMessages.insert(adMessage.id)
-                                if let validLayout = self.validLayout {
-                                    self.updateLayout(size: validLayout.size, metrics: validLayout.metrics, insets: validLayout.insets, isHidden: false, transition: .immediate)
-                                }
-                                context.engine.messages.markAdAction(opaqueId: ad.opaqueId, media: false, fullscreen: false)
-                                self.performAction?(.url(url: ad.url, concealed: false, forceExternal: true, dismiss: false))
-                            }
-                        },
-                        moreAction: { [weak self] sourceNode in
-                            if let self {
-                                self.openMoreMenu?(sourceNode.view, adMessage)
-                            }
-                        }
-                    )
-                ),
-                environment: {},
-                containerSize: CGSize(width: maxWidth, height: 200.0)
-            )
-            if let adView = self.adView.view {
-                if adView.superview == nil {
-                    self.view.addSubview(adView)
-                    
-                    adView.layer.animateAlpha(from: 0.0, to: 1.0, duration: 0.25)
-                    adView.layer.animatePosition(from: CGPoint(x: 0.0, y: 64.0), to: .zero, duration: 0.4, timingFunction: kCAMediaTimingFunctionSpring, additive: true)
-                }
-                transition.updateFrame(view: adView, frame: CGRect(origin: CGPoint(x: floor((size.width - adSize.width) / 2.0), y: size.height - adSize.height - insets.bottom), size: adSize))
-            }
-        } else if let adView = self.adView.view, !self.isAnimatingOut {
-            self.isAnimatingOut = true
-            adView.layer.animateAlpha(from: 1.0, to: 0.0, duration: 0.25, removeOnCompletion: false)
-            adView.layer.animatePosition(from: .zero, to: CGPoint(x: 0.0, y: 64.0), duration: 0.4, timingFunction: kCAMediaTimingFunctionSpring, removeOnCompletion: false, additive: true, completion: { _ in
-                adView.removeFromSuperview()
-                Queue.mainQueue().after(0.1) {
-                    adView.layer.removeAllAnimations()
-                }
-                self.isAnimatingOut = false
-            })
-        }
+        let iconSize: CGFloat = 42.0
+        let inset: CGFloat = 4.0
+        let buttonFrame = CGRect(origin: CGPoint(x: size.width - iconSize - inset - insets.right, y: size.height - iconSize - inset - insets.bottom), size: CGSize(width: iconSize, height: iconSize))
+        transition.updateFrame(node: self.wrapperNode, frame: buttonFrame)
+        transition.updateFrame(node: self.fullscreenNode, frame: CGRect(origin: CGPoint(), size: buttonFrame.size))
     }
     
     override func animateIn(previousContentNode: GalleryOverlayContentNode?, transition: ContainedViewLayoutTransition) {
-
+        if !self.visibilityAlpha.isZero {
+            transition.updateAlpha(node: self.wrapperNode, alpha: 1.0)
+        }
     }
     
     override func animateOut(nextContentNode: GalleryOverlayContentNode?, transition: ContainedViewLayoutTransition, completion: @escaping () -> Void) {
+        transition.updateAlpha(node: self.wrapperNode, alpha: 0.0)
+    }
+    
+    override func setVisibilityAlpha(_ alpha: CGFloat) {
+        super.setVisibilityAlpha(alpha)
+        self.updateFullscreenButtonVisibility()
+    }
+    
+    func updateFullscreenButtonVisibility() {
+        self.wrapperNode.alpha = self.visibilityAlpha
         
+        if let validLayout = self.validLayout {
+            self.updateLayout(size: validLayout.0, metrics: validLayout.1, insets: validLayout.2, isHidden: false, transition: .animated(duration: 0.3, curve: .easeInOut))
+        }
+    }
+    
+    @objc func toggleFullscreenPressed() {
+        var toLandscape = false
+        if let (size, _, _) = self.validLayout, size.width < size.height {
+            toLandscape = true
+        }
+        if toLandscape {
+            self.wrapperNode.alpha = 0.0
+        }
+        self.action?(toLandscape)
     }
     
     override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
-        if let adView = self.adView.view, adView.frame.contains(point) {
-            return super.hitTest(point, with: event)
+        if !self.wrapperNode.frame.contains(point) {
+            return nil
         }
-        return nil
+        return super.hitTest(point, with: event)
     }
 }
 
@@ -417,18 +317,14 @@ func optionsBackgroundImage(dark: Bool) -> UIImage? {
 }
 
 func optionsCircleImage(dark: Bool) -> UIImage? {
-    return generateImage(CGSize(width: 44.0, height: 44.0), contextGenerator: { size, context in
+    return generateImage(CGSize(width: 22.0, height: 22.0), contextGenerator: { size, context in
         context.clear(CGRect(origin: CGPoint(), size: size))
 
-        context.setFillColor(UIColor.white.cgColor)
-        
-        let spacing: CGFloat = 3.66
-        let width: CGFloat = 4.33
-        for i in 0 ..< 3 {
-            let x: CGFloat = floorToScreenPixels((size.width - width * 3.0 - spacing * 2.0) * 0.5) + CGFloat(i) * (width + spacing)
-            let y: CGFloat = floorToScreenPixels((size.height - width) * 0.5)
-            context.fillEllipse(in: CGRect(origin: CGPoint(x: x, y: y), size: CGSize(width: width, height: width)))
-        }
+        context.setStrokeColor(UIColor.white.cgColor)
+        let lineWidth: CGFloat = 1.3
+        context.setLineWidth(lineWidth)
+
+        context.strokeEllipse(in: CGRect(origin: CGPoint(), size: size).insetBy(dx: lineWidth, dy: lineWidth))
     })
 }
 
@@ -478,6 +374,7 @@ final class MoreHeaderButton: HighlightableButtonNode {
     let referenceNode: ContextReferenceContentNode
     let containerNode: ContextControllerSourceNode
     private let iconNode: ASImageNode
+    private var animationNode: AnimationNode?
 
     var contextAction: ((ASDisplayNode, ContextGesture?) -> Void)?
 
@@ -513,17 +410,29 @@ final class MoreHeaderButton: HighlightableButtonNode {
             strongSelf.contextAction?(strongSelf.containerNode, gesture)
         }
 
-        self.containerNode.frame = CGRect(origin: CGPoint(), size: CGSize(width: 44.0, height: 44.0))
+        self.containerNode.frame = CGRect(origin: CGPoint(), size: CGSize(width: 26.0, height: 44.0))
         self.referenceNode.frame = self.containerNode.bounds
 
         self.iconNode.image = optionsCircleImage(dark: false)
         if let image = self.iconNode.image {
             self.iconNode.frame = CGRect(origin: CGPoint(x: floor((self.containerNode.bounds.width - image.size.width) / 2.0), y: floor((self.containerNode.bounds.height - image.size.height) / 2.0)), size: image.size)
         }
+
+        self.hitTestSlop = UIEdgeInsets(top: 0.0, left: -4.0, bottom: 0.0, right: -4.0)
     }
 
     private var content: Content?
     func setContent(_ content: Content, animated: Bool = false) {
+        if case .more = content, self.animationNode == nil {
+            let iconColor = UIColor(rgb: 0xffffff)
+            let animationNode = AnimationNode(animation: "anim_profilemore", colors: ["Point 2.Group 1.Fill 1": iconColor,
+                                                                                      "Point 3.Group 1.Fill 1": iconColor,
+                                                                                      "Point 1.Group 1.Fill 1": iconColor], scale: 1.0)
+            let animationSize = CGSize(width: 22.0, height: 22.0)
+            animationNode.frame = CGRect(origin: CGPoint(x: floor((self.containerNode.bounds.width - animationSize.width) / 2.0), y: floor((self.containerNode.bounds.height - animationSize.height) / 2.0)), size: animationSize)
+            self.addSubnode(animationNode)
+            self.animationNode = animationNode
+        }
         if animated {
             if let snapshotView = self.referenceNode.view.snapshotContentTree() {
                 snapshotView.frame = self.referenceNode.frame
@@ -536,6 +445,9 @@ final class MoreHeaderButton: HighlightableButtonNode {
 
                 self.iconNode.layer.animateAlpha(from: 0.0, to: 1.0, duration: 0.3)
                 self.iconNode.layer.animateScale(from: 0.1, to: 1.0, duration: 0.3)
+
+                self.animationNode?.layer.animateAlpha(from: 0.0, to: 1.0, duration: 0.3)
+                self.animationNode?.layer.animateScale(from: 0.1, to: 1.0, duration: 0.3)
             }
 
             switch content {
@@ -546,6 +458,7 @@ final class MoreHeaderButton: HighlightableButtonNode {
 
                     self.iconNode.image = image
                     self.iconNode.isHidden = false
+                    self.animationNode?.isHidden = true
                 case let .more(image):
                     if let image = image {
                         self.iconNode.frame = CGRect(origin: CGPoint(x: floor((self.containerNode.bounds.width - image.size.width) / 2.0), y: floor((self.containerNode.bounds.height - image.size.height) / 2.0)), size: image.size)
@@ -553,6 +466,7 @@ final class MoreHeaderButton: HighlightableButtonNode {
 
                     self.iconNode.image = image
                     self.iconNode.isHidden = false
+                    self.animationNode?.isHidden = false
             }
         } else {
             self.content = content
@@ -564,6 +478,7 @@ final class MoreHeaderButton: HighlightableButtonNode {
 
                     self.iconNode.image = image
                     self.iconNode.isHidden = false
+                    self.animationNode?.isHidden = true
                 case let .more(image):
                     if let image = image {
                         self.iconNode.frame = CGRect(origin: CGPoint(x: floor((self.containerNode.bounds.width - image.size.width) / 2.0), y: floor((self.containerNode.bounds.height - image.size.height) / 2.0)), size: image.size)
@@ -571,6 +486,7 @@ final class MoreHeaderButton: HighlightableButtonNode {
 
                     self.iconNode.image = image
                     self.iconNode.isHidden = false
+                    self.animationNode?.isHidden = false
             }
         }
     }
@@ -581,13 +497,236 @@ final class MoreHeaderButton: HighlightableButtonNode {
     }
 
     override func calculateSizeThatFits(_ constrainedSize: CGSize) -> CGSize {
-        return CGSize(width: 44.0, height: 44.0)
+        return CGSize(width: wide ? 32.0 : 22.0, height: 44.0)
     }
 
     func onLayout() {
     }
 
     func play() {
+        self.animationNode?.playOnce()
+    }
+}
+
+final class SettingsHeaderButton: HighlightableButtonNode {
+    let referenceNode: ContextReferenceContentNode
+    let containerNode: ContextControllerSourceNode
+    
+    private let iconLayer: RasterizedCompositionMonochromeLayer
+    
+    private let gearsLayer: RasterizedCompositionImageLayer
+    private let dotLayer: RasterizedCompositionImageLayer
+    
+    private var speedBadge: ComponentView<Empty>?
+    private var qualityBadge: ComponentView<Empty>?
+    
+    private var speedBadgeText: String?
+    private var qualityBadgeText: String?
+    
+    private let badgeFont: UIFont
+    
+    private var isMenuOpen: Bool = false
+
+    var contextAction: ((ASDisplayNode, ContextGesture?) -> Void)?
+
+    private let wide: Bool
+
+    init(wide: Bool = false) {
+        self.wide = wide
+
+        self.referenceNode = ContextReferenceContentNode()
+        self.containerNode = ContextControllerSourceNode()
+        self.containerNode.animateScale = false
+        
+        self.iconLayer = RasterizedCompositionMonochromeLayer()
+        //self.iconLayer.backgroundColor = UIColor.green.cgColor
+        
+        self.gearsLayer = RasterizedCompositionImageLayer()
+        self.gearsLayer.image = generateTintedImage(image: UIImage(bundleImageName: "Media Gallery/NavigationSettingsNoDot"), color: .white)
+        
+        self.dotLayer = RasterizedCompositionImageLayer()
+        self.dotLayer.image = generateFilledCircleImage(diameter: 4.0, color: .white)
+        
+        self.iconLayer.contentsLayer.addSublayer(self.gearsLayer)
+        self.iconLayer.contentsLayer.addSublayer(self.dotLayer)
+        
+        self.badgeFont = Font.with(size: 8.0, design: .round, weight: .bold)
+
+        super.init()
+
+        self.containerNode.addSubnode(self.referenceNode)
+        self.referenceNode.layer.addSublayer(self.iconLayer)
+        self.addSubnode(self.containerNode)
+
+        self.containerNode.shouldBegin = { [weak self] location in
+            guard let strongSelf = self, let _ = strongSelf.contextAction else {
+                return false
+            }
+            return true
+        }
+        self.containerNode.activated = { [weak self] gesture, _ in
+            guard let strongSelf = self else {
+                return
+            }
+            strongSelf.contextAction?(strongSelf.containerNode, gesture)
+        }
+
+        self.containerNode.frame = CGRect(origin: CGPoint(), size: CGSize(width: 26.0, height: 44.0))
+        self.referenceNode.frame = self.containerNode.bounds
+
+        self.hitTestSlop = UIEdgeInsets(top: 0.0, left: -4.0, bottom: 0.0, right: -4.0)
+        
+        if let image = self.gearsLayer.image {
+            let iconInnerInsets = UIEdgeInsets(top: 4.0, left: 8.0, bottom: 4.0, right: 6.0)
+            let iconSize = CGSize(width: image.size.width + iconInnerInsets.left + iconInnerInsets.right, height: image.size.height + iconInnerInsets.top + iconInnerInsets.bottom)
+            let iconFrame = CGRect(origin: CGPoint(x: floor((self.containerNode.bounds.width - iconSize.width) / 2.0), y: floor((self.containerNode.bounds.height - iconSize.height) / 2.0)), size: iconSize)
+            self.iconLayer.position = iconFrame.center
+            self.iconLayer.bounds = CGRect(origin: CGPoint(), size: iconFrame.size)
+            
+            self.iconLayer.contentsLayer.position = CGRect(origin: CGPoint(), size: iconFrame.size).center
+            self.iconLayer.contentsLayer.bounds = CGRect(origin: CGPoint(), size: iconFrame.size)
+            
+            self.iconLayer.maskedLayer.position = CGRect(origin: CGPoint(), size: iconFrame.size).center
+            self.iconLayer.maskedLayer.bounds = CGRect(origin: CGPoint(), size: iconFrame.size)
+            self.iconLayer.maskedLayer.backgroundColor = UIColor.white.cgColor
+            
+            let gearsFrame = CGRect(origin: CGPoint(x: floor((iconSize.width - image.size.width) * 0.5), y: floor((iconSize.height - image.size.height) * 0.5)), size: image.size)
+            self.gearsLayer.position = gearsFrame.center
+            self.gearsLayer.bounds = CGRect(origin: CGPoint(), size: gearsFrame.size)
+            
+            if let dotImage = self.dotLayer.image {
+                let dotFrame = CGRect(origin: CGPoint(x: gearsFrame.minX + floorToScreenPixels((gearsFrame.width - dotImage.size.width) * 0.5), y: gearsFrame.minY + floorToScreenPixels((gearsFrame.height - dotImage.size.height) * 0.5)), size: dotImage.size)
+                self.dotLayer.position = dotFrame.center
+                self.dotLayer.bounds = CGRect(origin: CGPoint(), size: dotFrame.size)
+            }
+        }
+    }
+
+    override func didLoad() {
+        super.didLoad()
+        self.view.isOpaque = false
+    }
+
+    override func calculateSizeThatFits(_ constrainedSize: CGSize) -> CGSize {
+        return CGSize(width: wide ? 32.0 : 22.0, height: 44.0)
+    }
+
+    func onLayout() {
+    }
+    
+    func setIsMenuOpen(isMenuOpen: Bool) {
+        if self.isMenuOpen == isMenuOpen {
+            return
+        }
+        self.isMenuOpen = isMenuOpen
+        
+        let rotationTransition: ContainedViewLayoutTransition = .animated(duration: 0.35, curve: .spring)
+        rotationTransition.updateTransform(layer: self.gearsLayer, transform: CGAffineTransformMakeRotation(isMenuOpen ? (CGFloat.pi * 2.0 / 6.0) : 0.0))
+        self.gearsLayer.animateScale(from: 1.0, to: 1.07, duration: 0.1, removeOnCompletion: false, completion: { [weak self] finished in
+            guard let self, finished else {
+                return
+            }
+            self.gearsLayer.animateScale(from: 1.07, to: 1.0, duration: 0.1, removeOnCompletion: true)
+        })
+        
+        self.dotLayer.animateScale(from: 1.0, to: 0.8, duration: 0.1, removeOnCompletion: false, completion: { [weak self] finished in
+            guard let self, finished else {
+                return
+            }
+            self.dotLayer.animateScale(from: 0.8, to: 1.0, duration: 0.1, removeOnCompletion: true)
+        })
+    }
+    
+    func setBadges(speed: String?, quality: String?, transition: ComponentTransition) {
+        if self.speedBadgeText == speed && self.qualityBadgeText == quality {
+            return
+        }
+        self.speedBadgeText = speed
+        self.qualityBadgeText = quality
+        
+        if let badgeText = speed {
+            var badgeTransition = transition
+            let speedBadge: ComponentView<Empty>
+            if let current = self.speedBadge {
+                speedBadge = current
+            } else {
+                speedBadge = ComponentView()
+                self.speedBadge = speedBadge
+                badgeTransition = badgeTransition.withAnimation(.none)
+            }
+            let badgeSize = speedBadge.update(
+                transition: badgeTransition,
+                component: AnyComponent(BadgeComponent(
+                    text: badgeText,
+                    font: self.badgeFont,
+                    cornerRadius: 3.0,
+                    insets: UIEdgeInsets(top: 1.33, left: 1.66, bottom: 1.33, right: 1.66),
+                    outerInsets: UIEdgeInsets(top: 1.0, left: 1.0, bottom: 1.0, right: 1.0)
+                )),
+                environment: {},
+                containerSize: CGSize(width: 100.0, height: 100.0)
+            )
+            if let speedBadgeView = speedBadge.view {
+                if speedBadgeView.layer.superlayer == nil {
+                    self.iconLayer.contentsLayer.addSublayer(speedBadgeView.layer)
+                    
+                    transition.animateAlpha(layer: speedBadgeView.layer, from: 0.0, to: 1.0)
+                    transition.animateScale(layer: speedBadgeView.layer, from: 0.001, to: 1.0)
+                }
+                badgeTransition.setFrame(layer: speedBadgeView.layer, frame: CGRect(origin: CGPoint(x: 0.0, y: 0.0), size: badgeSize))
+            }
+        } else if let speedBadge = self.speedBadge {
+            self.speedBadge = nil
+            if let speedBadgeView = speedBadge.view {
+                let speedBadgeLayer = speedBadgeView.layer
+                transition.setAlpha(layer: speedBadgeLayer, alpha: 0.0, completion: { [weak speedBadgeLayer] _ in
+                    speedBadgeLayer?.removeFromSuperlayer()
+                })
+                transition.setScale(layer: speedBadgeLayer, scale: 0.001)
+            }
+        }
+        
+        if let badgeText = quality {
+            var badgeTransition = transition
+            let qualityBadge: ComponentView<Empty>
+            if let current = self.qualityBadge {
+                qualityBadge = current
+            } else {
+                qualityBadge = ComponentView()
+                self.qualityBadge = qualityBadge
+                badgeTransition = badgeTransition.withAnimation(.none)
+            }
+            let badgeSize = qualityBadge.update(
+                transition: badgeTransition,
+                component: AnyComponent(BadgeComponent(
+                    text: badgeText,
+                    font: self.badgeFont,
+                    cornerRadius: 3.0,
+                    insets: UIEdgeInsets(top: 1.33, left: 1.66, bottom: 1.33, right: 1.66),
+                    outerInsets: UIEdgeInsets(top: 1.0, left: 1.0, bottom: 1.0, right: 1.0)
+                )),
+                environment: {},
+                containerSize: CGSize(width: 100.0, height: 100.0)
+            )
+            if let qualityBadgeView = qualityBadge.view {
+                if qualityBadgeView.layer.superlayer == nil {
+                    self.iconLayer.contentsLayer.addSublayer(qualityBadgeView.layer)
+                    
+                    transition.animateAlpha(layer: qualityBadgeView.layer, from: 0.0, to: 1.0)
+                    transition.animateScale(layer: qualityBadgeView.layer, from: 0.001, to: 1.0)
+                }
+                badgeTransition.setFrame(layer: qualityBadgeView.layer, frame: CGRect(origin: CGPoint(x: self.iconLayer.bounds.width - badgeSize.width, y: self.iconLayer.bounds.height - badgeSize.height), size: badgeSize))
+            }
+        } else if let qualityBadge = self.qualityBadge {
+            self.qualityBadge = nil
+            if let qualityBadgeView = qualityBadge.view {
+                let qualityBadgeLayer = qualityBadgeView.layer
+                transition.setAlpha(layer: qualityBadgeLayer, alpha: 0.0, completion: { [weak qualityBadgeLayer] _ in
+                    qualityBadgeLayer?.removeFromSuperlayer()
+                })
+                transition.setScale(layer: qualityBadgeLayer, scale: 0.001)
+            }
+        }
     }
 }
 
@@ -861,7 +1000,7 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
     
     fileprivate let _ready = Promise<Void>()
     fileprivate let _title = Promise<String>()
-    fileprivate let _titleContent = Promise<GalleryTitleView.Content?>(nil)
+    fileprivate let _titleView = Promise<UIView?>()
     fileprivate let _rightBarButtonItems = Promise<[UIBarButtonItem]?>()
     
     fileprivate var titleContentView: GalleryTitleView?
@@ -873,6 +1012,8 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
     private var moreBarButtonRate: Double = 1.0
     private var moreBarButtonRateTimestamp: Double?
     
+    private let settingsBarButton: SettingsHeaderButton
+    
     private var videoNode: UniversalVideoNode?
     private var videoNodeUserInteractionEnabled: Bool = false
     private var videoFramePreview: FramePreview?
@@ -881,8 +1022,6 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
     private let statusButtonNode: HighlightableButtonNode
     private let statusNode: RadialStatusNode
     private var statusNodeShouldBeHidden = true
-    
-    private let playbackControls = ComponentView<Empty>()
     
     private var isCentral: Bool?
     private var _isVisible: Bool?
@@ -897,8 +1036,6 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
     private var dismissOnOrientationChange = false
     private var keepSoundOnDismiss = false
     private var hasPictureInPicture = false
-    private var displayStickersButton: Bool = false
-    private var settingsButtonState: ChatItemGalleryFooterContentNode.SettingsButtonState?
 
     private var pictureInPictureButton: UIBarButtonItem?
     
@@ -914,8 +1051,9 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
     private let statusDisposable = MetaDisposable()
     
     private let moreButtonStateDisposable = MetaDisposable()
+    private let settingsButtonStateDisposable = MetaDisposable()
     private let mediaPlaybackStateDisposable = MetaDisposable()
-    
+
     private let fetchDisposable = MetaDisposable()
     private var fetchStatus: MediaResourceStatus?
     private var fetchControls: FetchControls?
@@ -927,11 +1065,9 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
     private var isPlaying = false
     private let isPlayingPromise = ValuePromise<Bool>(false, ignoreRepeated: true)
     private let isInteractingPromise = ValuePromise<Bool>(false, ignoreRepeated: true)
-    private var areControlsVisible: Bool = true
     private let controlsVisiblePromise = ValuePromise<Bool>(true, ignoreRepeated: true)
     private let isShowingContextMenuPromise = ValuePromise<Bool>(false, ignoreRepeated: true)
     private let isShowingSettingsMenuPromise = ValuePromise<Bool>(false, ignoreRepeated: true)
-    private let isShowingAdMenuPromise = ValuePromise<Bool>(false, ignoreRepeated: true)
     private let hasExpandedCaptionPromise = Promise<Bool>()
     private var hideControlsDisposable: Disposable?
     private var automaticPictureInPictureDisposable: Disposable?
@@ -973,6 +1109,9 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
         self.moreBarButton.isUserInteractionEnabled = true
         self.moreBarButton.setContent(.more(optionsCircleImage(dark: false)))
         
+        self.settingsBarButton = SettingsHeaderButton()
+        self.settingsBarButton.isUserInteractionEnabled = true
+        
         super.init()
 
         self.clipsToBounds = true
@@ -1002,13 +1141,24 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
         }
         
         self.moreBarButton.addTarget(self, action: #selector(self.moreButtonPressed), forControlEvents: .touchUpInside)
+        self.settingsBarButton.addTarget(self, action: #selector(self.settingsButtonPressed), forControlEvents: .touchUpInside)
         
         self.footerContentNode.interacting = { [weak self] value in
             self?.isInteractingPromise.set(value)
         }
-                
+        
+        self.overlayContentNode.action = { [weak self] toLandscape in
+            guard let self else {
+                return
+            }
+            self.updateControlsVisibility(!toLandscape)
+            self.updateOrientation(toLandscape ? .landscapeRight : .portrait)
+        }
+        
         self.statusButtonNode.addSubnode(self.statusNode)
         self.statusButtonNode.addTarget(self, action: #selector(self.statusButtonPressed), forControlEvents: .touchUpInside)
+        
+        self.addSubnode(self.statusButtonNode)
         
         self.footerContentNode.playbackControl = { [weak self] in
             if let strongSelf = self {
@@ -1034,7 +1184,7 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
                         let nextTimestamp = timestamp + delta
                         if nextTimestamp > duration {
                             strongVideoNode.seek(0.0)
-                            strongVideoNode.play()
+                            strongVideoNode.pause()
                         } else {
                             strongVideoNode.seek(min(duration, timestamp + delta))
                         }
@@ -1085,15 +1235,15 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
             guard let strongSelf = self else {
                 return
             }
-            if let result = result, strongSelf.scrubbingFrames, let item = strongSelf.item {
+            if let result = result, strongSelf.scrubbingFrames {
                 switch result {
                 case .waitingForData:
                     strongSelf.footerContentNode.setFramePreviewImageIsLoading()
                 case let .image(image):
-                    strongSelf.footerContentNode.setFramePreviewImage(image: image, isSecret: item.isSecret)
+                    strongSelf.footerContentNode.setFramePreviewImage(image: image)
                 }
             } else {
-                strongSelf.footerContentNode.setFramePreviewImage(image: nil, isSecret: false)
+                strongSelf.footerContentNode.setFramePreviewImage(image: nil)
             }
         }).strict()
         
@@ -1109,16 +1259,15 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
             guard let self else {
                 return
             }
-            var adMessage: Message?
-            if case let .message(message, _) = self.item?.contentInfo, let _ = message.adAttribute {
-                adMessage = message
-            }
-            self.openMoreMenu(sourceView: self.moreBarButton.referenceNode.view, gesture: gesture, adMessage: adMessage, isSettings: false)
+            self.openMoreMenu(sourceNode: self.moreBarButton.referenceNode, gesture: gesture, isSettings: false)
         }
         
-        let shouldHideControlsSignal: Signal<Void, NoError> = combineLatest(self.isPlayingPromise.get(), self.isInteractingPromise.get(), self.controlsVisiblePromise.get(), self.isShowingContextMenuPromise.get(), self.isShowingSettingsMenuPromise.get(), self.isShowingAdMenuPromise.get(), self.hasExpandedCaptionPromise.get())
-        |> mapToSignal { isPlaying, isInteracting, controlsVisible, isShowingContextMenu, isShowingSettingsMenu, isShowingAdMenu, hasExpandedCaptionPromise -> Signal<Void, NoError> in
-            if isShowingContextMenu || isShowingSettingsMenu || isShowingAdMenu || hasExpandedCaptionPromise {
+        self.titleContentView = GalleryTitleView(frame: CGRect())
+        self._titleView.set(.single(self.titleContentView))
+        
+        let shouldHideControlsSignal: Signal<Void, NoError> = combineLatest(self.isPlayingPromise.get(), self.isInteractingPromise.get(), self.controlsVisiblePromise.get(), self.isShowingContextMenuPromise.get(), self.isShowingSettingsMenuPromise.get(), self.hasExpandedCaptionPromise.get())
+        |> mapToSignal { isPlaying, isInteracting, controlsVisible, isShowingContextMenu, isShowingSettingsMenu, hasExpandedCaptionPromise -> Signal<Void, NoError> in
+            if isShowingContextMenu || isShowingSettingsMenu || hasExpandedCaptionPromise {
                 return .complete()
             }
             if isPlaying && !isInteracting && controlsVisible {
@@ -1140,6 +1289,7 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
     deinit {
         self.statusDisposable.dispose()
         self.moreButtonStateDisposable.dispose()
+        self.settingsButtonStateDisposable.dispose()
         self.mediaPlaybackStateDisposable.dispose()
         self.scrubbingFrameDisposable?.dispose()
         self.hideControlsDisposable?.dispose()
@@ -1156,24 +1306,6 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
             self.item?.performAction(.ad(message.id))
             return true
         }
-        return false
-    }
-    
-    override func contentDoubleTapAction(location: CGPoint) -> Bool {
-        if case let .message(message, _) = self.item?.contentInfo, let _ = message.adAttribute {
-            self.item?.performAction(.ad(message.id))
-            return true
-        }
-        
-        if case let .playback(_, seekable) = self.footerContentNode.content, seekable {
-            if location.x >= self.bounds.width * 0.3 {
-                self.footerContentNode.seekForward?(15.0)
-            } else {
-                self.footerContentNode.seekBackward?(15.0)
-            }
-            return true
-        }
-        
         return false
     }
     
@@ -1204,60 +1336,6 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
         let statusFrame = CGRect(origin: CGPoint(x: floor((layout.size.width - statusDiameter) / 2.0), y: floor((layout.size.height - statusDiameter) / 2.0)), size: CGSize(width: statusDiameter, height: statusDiameter))
         transition.updateFrame(node: self.statusButtonNode, frame: statusFrame)
         transition.updateFrame(node: self.statusNode, frame: CGRect(origin: CGPoint(), size: statusFrame.size))
-        
-        let hideControls = self.item?.hideControls ?? true
-        
-        var playbackControlsIsPlaying: Bool = false
-        var playbackControlsIsSeekable: Bool = false
-        var playbackControlsIsVisible: Bool = false
-        if case let .playback(paused, seekable) = self.footerContentNode.content {
-            playbackControlsIsVisible = true
-            playbackControlsIsSeekable = seekable
-            playbackControlsIsPlaying = !paused
-        }
-        if !self.areControlsVisible || hideControls {
-            playbackControlsIsVisible = false
-        }
-        
-        let playbackControlsSize = self.playbackControls.update(
-            transition: ComponentTransition(transition),
-            component: AnyComponent(VideoPlaybackControlsComponent(
-                layoutParams: VideoPlaybackControlsComponent.LayoutParams(
-                    sideButtonSize: 64.0,
-                    centerButtonSize: 92.0,
-                    spacing: 30.0
-                ),
-                isVisible: playbackControlsIsVisible,
-                isPlaying: playbackControlsIsPlaying,
-                displaySeekControls: playbackControlsIsSeekable,
-                togglePlayback: { [weak self] in
-                    guard let self else {
-                        return
-                    }
-                    self.footerContentNode.playbackControlPressed()
-                },
-                seek: { [weak self] isForward in
-                    guard let self else {
-                        return
-                    }
-                    if isForward {
-                        self.footerContentNode.seekForward?(15.0)
-                    } else {
-                        self.footerContentNode.seekBackward?(15.0)
-                    }
-                }
-            )),
-            environment: {},
-            containerSize: CGSize(width: 1000.0, height: 1000.0)
-        )
-        let playbackControlsFrame = CGRect(origin: CGPoint(x: floor((layout.size.width - playbackControlsSize.width) / 2.0), y: floor((layout.size.height - playbackControlsSize.height) / 2.0)), size: playbackControlsSize)
-        if let playbackControlsView = self.playbackControls.view {
-            if playbackControlsView.superview == nil {
-                self.view.addSubview(playbackControlsView)
-            }
-            let transition = ComponentTransition(transition)
-            transition.setFrame(view: playbackControlsView, frame: playbackControlsFrame)
-        }
         
         if let pictureInPictureNode = self.pictureInPictureNode {
             if let item = self.item {
@@ -1313,7 +1391,7 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
             self.dismiss()
         }
     }
-
+    
     func setupItem(_ item: UniversalVideoGalleryItem) {
         if self.item?.content.id != item.content.id {            
             var chapters = parseMediaPlayerChapters(item.caption)
@@ -1376,10 +1454,6 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
             if let content = item.content as? NativeVideoContent {
                 isAnimated = content.fileReference.media.isAnimated
                 self.videoFramePreview = MediaPlayerFramePreview(postbox: item.context.account.postbox, userLocation: content.userLocation, userContentType: .video, fileReference: content.fileReference)
-                if content.fileReference.media.isLivePhoto {
-                    disablePlayerControls = true
-                    isAnimated = false
-                }
             } else if let _ = item.content as? SystemVideoContent {
                 self._title.set(.single(item.presentationData.strings.Message_Video))
             } else if let content = item.content as? WebEmbedVideoContent {
@@ -1404,49 +1478,32 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
                 isAdaptive = true
                 
                 if let qualitySet = HLSQualitySet(baseFile: content.fileReference, codecConfiguration: HLSCodecConfiguration(isHardwareAv1Supported: false, isSoftwareAv1Supported: true)), let (quality, playlistFile) = qualitySet.playlistFiles.sorted(by: { $0.key < $1.key }).first, let dataFile = qualitySet.qualityFiles[quality] {
-                    if !qualitySet.thumbnails.isEmpty {
-                        var selectedThumbnails: (file: FileMediaReference, fileMap: FileMediaReference)?
-                        let thumbnailQualities = qualitySet.thumbnails.keys.sorted()
-                        for quality in thumbnailQualities.reversed() {
-                            if quality <= 230 {
-                                selectedThumbnails = qualitySet.thumbnails[quality]
-                                break
-                            }
+                    var alternativeQualities: [(playlist: FileMediaReference, dataFile: FileMediaReference)] = []
+                    for (otherQuality, otherPlaylistFile) in qualitySet.playlistFiles {
+                        if otherQuality != quality, let otherDataFile = qualitySet.qualityFiles[otherQuality] {
+                            alternativeQualities.append((otherPlaylistFile, dataFile: otherDataFile))
                         }
-                        if selectedThumbnails == nil, let quality = thumbnailQualities.last {
-                            selectedThumbnails = qualitySet.thumbnails[quality]
-                        }
-                        
-                        if let selectedThumbnails {
-                            self.videoFramePreview = MediaPlayerFramePreviewHLSThumbnails(
-                                postbox: item.context.account.postbox,
-                                userLocation: content.userLocation,
-                                userContentType: .video,
-                                file: selectedThumbnails.file,
-                                fileMap: selectedThumbnails.fileMap
-                            )
-                        }
-                    } else {
-                        var alternativeQualities: [(playlist: FileMediaReference, dataFile: FileMediaReference)] = []
-                        for (otherQuality, otherPlaylistFile) in qualitySet.playlistFiles {
-                            if otherQuality != quality, let otherDataFile = qualitySet.qualityFiles[otherQuality] {
-                                alternativeQualities.append((otherPlaylistFile, dataFile: otherDataFile))
-                            }
-                        }
-                        self.videoFramePreview = MediaPlayerFramePreviewHLS(
-                            postbox: item.context.account.postbox,
-                            userLocation: content.userLocation,
-                            userContentType: .video,
-                            playlistFile: playlistFile,
-                            mainDataFile: dataFile,
-                            alternativeQualities: alternativeQualities
-                        )
                     }
+                    self.videoFramePreview = MediaPlayerFramePreviewHLS(
+                        postbox: item.context.account.postbox,
+                        userLocation: content.userLocation,
+                        userContentType: .video,
+                        playlistFile: playlistFile,
+                        mainDataFile: dataFile,
+                        alternativeQualities: alternativeQualities
+                    )
                 }
             }
             
             let _ = isAdaptive
-               
+            
+            let dimensions = item.content.dimensions
+            if dimensions.height > 0.0 {
+                if dimensions.width / dimensions.height < 1.33 || isAnimated {
+                    self.overlayContentNode.isHidden = true
+                }
+            }
+            
             if let videoNode = self.videoNode {
                 videoNode.canAttachContent = false
                 videoNode.removeFromSupernode()
@@ -1476,43 +1533,14 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
                         strongSelf.playOnContentOwnership = false
                         strongSelf.initiallyActivated = true
                         strongSelf.skipInitialPause = true
-                        
-                        var seek = MediaPlayerSeek.start
-                        if let item = strongSelf.item {
-                            if let contentInfo = item.contentInfo, case let .message(message, _) = contentInfo {
-                                for attribute in message.attributes {
-                                    if let attribute = attribute as? ForwardVideoTimestampAttribute {
-                                        seek = .timecode(Double(attribute.timestamp))
-                                    }
-                                }
-                            }
-                            if let content = item.content as? NativeVideoContent {
-                                isAnimated = content.fileReference.media.isAnimated
-                                if let time = item.timecode {
-                                    seek = .timecode(time)
-                                }
-                            } else if let content = item.content as? HLSVideoContent {
-                                isAnimated = content.fileReference.media.isAnimated
-                                if let time = item.timecode {
-                                    seek = .timecode(time)
-                                }
-                            } else if let _ = item.content as? WebEmbedVideoContent {
-                                if let time = item.timecode {
-                                    seek = .timecode(time)
-                                }
-                            }
-                        }
-                        
                         if let item = strongSelf.item, let _ = item.content as? PlatformVideoContent {
                             strongSelf.videoNode?.play()
                         } else {
-                            strongSelf.videoNode?.playOnceWithSound(playAndRecord: false, seek: seek, actionAtEnd: isAnimated ? .loop : strongSelf.actionAtEnd)
+                            strongSelf.videoNode?.playOnceWithSound(playAndRecord: false, seek: .none, actionAtEnd: isAnimated ? .loop : strongSelf.actionAtEnd)
                         }
 
-                        Queue.mainQueue().after(0.1) {
-                            if let playbackRate = strongSelf.playbackRate {
-                                strongSelf.videoNode?.setBaseRate(playbackRate)
-                            }
+                        if let playbackRate = strongSelf.playbackRate {
+                            strongSelf.videoNode?.setBaseRate(playbackRate)
                         }
                     }
                 }
@@ -1634,29 +1662,17 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
                     }
                 }
 
-                if self.settingsButtonState != nil {
-                    let settingsButtonState = ChatItemGalleryFooterContentNode.SettingsButtonState(
-                        speed: rateString,
-                        quality: qualityString
-                    )
-                    if self.settingsButtonState != settingsButtonState {
-                        self.settingsButtonState = settingsButtonState
-                        if let validLayout = self.validLayout {
-                            if let contentInfo = item.contentInfo {
-                                switch contentInfo {
-                                    case let .message(message, _):
-                                    self.footerContentNode.setMessage(message, displayInfo: !item.displayInfoOnTop, peerIsCopyProtected: item.peerIsCopyProtected, displayPictureInPictureButton: self.hasPictureInPicture, settingsButtonState: self.settingsButtonState, displayStickersButton: self.displayStickersButton, animated: true)
-                                    case let .webPage(webPage, media, _):
-                                        self.footerContentNode.setWebPage(webPage, media: media)
-                                }
-                            }
-                            
-                            self.containerLayoutUpdated(validLayout.layout, navigationBarHeight: validLayout.navigationBarHeight, transition: .animated(duration: 0.4, curve: .spring))
-                        }
-                    }
-                }
+                self.settingsBarButton.setBadges(speed: rateString, quality: qualityString, transition: .spring(duration: 0.35))
             }))
             
+            self.settingsButtonStateDisposable.set((self.isShowingSettingsMenuPromise.get()
+            |> deliverOnMainQueue).start(next: { [weak self] isShowingSettingsMenu in
+                guard let self else {
+                    return
+                }
+                self.settingsBarButton.setIsMenuOpen(isMenuOpen: isShowingSettingsMenu)
+            }))
+
             self.statusDisposable.set((combineLatest(queue: .mainQueue(), videoNode.status, mediaFileStatus)
             |> deliverOnMainQueue).start(next: { [weak self] value, fetchStatus in
                 if let strongSelf = self {
@@ -1718,13 +1734,11 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
                                         isPaused = false
                                     }
                                 } else if strongSelf.actionAtEnd == .stop {
-                                    if strongSelf.isPlaying {
-                                        strongSelf.isPlayingPromise.set(false)
-                                        strongSelf.isPlaying = false
-                                        if strongSelf.isCentral == true {
-                                            if !item.isSecret && !strongSelf.playOnDismiss {
-                                                strongSelf.updateControlsVisibility(true)
-                                            }
+                                    strongSelf.isPlayingPromise.set(false)
+                                    strongSelf.isPlaying = false
+                                    if strongSelf.isCentral == true {
+                                        if !item.isSecret {
+                                            strongSelf.updateControlsVisibility(true)
                                         }
                                     }
                                 }
@@ -1779,56 +1793,44 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
                         strongSelf.statusButtonNode.isHidden = strongSelf.hideStatusNodeUntilCentrality || strongSelf.statusNodeShouldBeHidden
                     }
                     
-                    let footerContent: ChatItemGalleryFooterContent
                     if isAnimated || disablePlayerControls {
-                        footerContent = .info
+                        strongSelf.footerContentNode.content = .info
                     } else if isPaused && !strongSelf.ignorePauseStatus && strongSelf.isCentral == true {
                         if hasStarted || strongSelf.didPause {
-                            footerContent = .playback(paused: true, seekable: seekable)
+                            strongSelf.footerContentNode.content = .playback(paused: true, seekable: seekable)
                         } else if let fetchStatus = fetchStatus, !strongSelf.requiresDownload {
                             if item.content is HLSVideoContent {
-                                footerContent = .playback(paused: true, seekable: seekable)
+                                strongSelf.footerContentNode.content = .playback(paused: true, seekable: seekable)
                             } else {
-                                footerContent = .fetch(status: fetchStatus, seekable: seekable)
+                                strongSelf.footerContentNode.content = .fetch(status: fetchStatus, seekable: seekable)
                             }
-                        } else {
-                            footerContent = .info
                         }
                     } else {
-                        footerContent = .playback(paused: false, seekable: seekable)
-                    }
-                    
-                    if strongSelf.footerContentNode.content != footerContent {
-                        strongSelf.footerContentNode.content = footerContent
-                        
-                        if let validLayout = strongSelf.validLayout {
-                            strongSelf.containerLayoutUpdated(validLayout.layout, navigationBarHeight: validLayout.navigationBarHeight, transition: .animated(duration: 0.2, curve: .easeInOut))
-                        }
+                        strongSelf.footerContentNode.content = .playback(paused: false, seekable: seekable)
                     }
                 }
             }))
             
             self.zoomableContent = (videoSize, videoNode)
-            
-            var hasSettingsButton = false
                         
             var barButtonItems: [UIBarButtonItem] = []
             if hasLinkedStickers {
-                self.displayStickersButton = true
+                let rightBarButtonItem = UIBarButtonItem(image: generateTintedImage(image: UIImage(bundleImageName: "Media Gallery/Stickers"), color: .white), style: .plain, target: self, action: #selector(self.openStickersButtonPressed))
+                rightBarButtonItem.accessibilityLabel = self.presentationData.strings.Gallery_VoiceOver_Stickers
+                barButtonItems.append(rightBarButtonItem)
             }
             
             if forceEnablePiP || (!isAnimated && !disablePlayerControls && !disablePictureInPicture) {
-                /*let rightBarButtonItem = UIBarButtonItem(image: pictureInPictureButtonImage, style: .plain, target: self, action: #selector(self.pictureInPictureButtonPressed))
+                let rightBarButtonItem = UIBarButtonItem(image: pictureInPictureButtonImage, style: .plain, target: self, action: #selector(self.pictureInPictureButtonPressed))
                 rightBarButtonItem.accessibilityLabel = self.presentationData.strings.Gallery_VoiceOver_PictureInPicture
                 self.pictureInPictureButton = rightBarButtonItem
-                barButtonItems.append(rightBarButtonItem)*/
+                barButtonItems.append(rightBarButtonItem)
                 self.hasPictureInPicture = true
             } else {
                 self.hasPictureInPicture = false
             }
-            
+
             if let contentInfo = item.contentInfo, case let .message(message, mediaIndex) = contentInfo {
-                var hasMoreButton = false
                 var file: TelegramMediaFile?
                 for m in message.media {
                     if let m = m as? TelegramMediaFile, m.isVideo {
@@ -1847,6 +1849,7 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
                     }
                 }
 
+                var hasMoreButton = false
                 if isEnhancedWebPlayer {
                     hasMoreButton = true
                 } else if let file = file, !file.isAnimated {
@@ -1862,7 +1865,9 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
                 }
                 
                 if !isAnimated && !disablePlayerControls {
-                    hasSettingsButton = true
+                    let settingsMenuItem = UIBarButtonItem(customDisplayNode: self.settingsBarButton)!
+                    settingsMenuItem.accessibilityLabel = self.presentationData.strings.Settings_Title
+                    barButtonItems.append(settingsMenuItem)
                 }
                 
                 if hasMoreButton {
@@ -1872,12 +1877,6 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
                 }
             }
 
-            if hasSettingsButton {
-                self.settingsButtonState = ChatItemGalleryFooterContentNode.SettingsButtonState(
-                    speed: nil,
-                    quality: nil
-                )
-            }
             self._rightBarButtonItems.set(.single(barButtonItems))
         
             videoNode.playbackCompleted = { [weak self, weak videoNode] in
@@ -1932,66 +1931,19 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
             switch contentInfo {
                 case let .message(message, _):
                     isAd = message.adAttribute != nil
-                    self.footerContentNode.setMessage(message, displayInfo: !item.displayInfoOnTop, peerIsCopyProtected: item.peerIsCopyProtected, displayPictureInPictureButton: self.hasPictureInPicture, settingsButtonState: self.settingsButtonState, displayStickersButton: self.displayStickersButton)
+                    self.footerContentNode.setMessage(message, displayInfo: !item.displayInfoOnTop, peerIsCopyProtected: item.peerIsCopyProtected)
                 case let .webPage(webPage, media, _):
                     self.footerContentNode.setWebPage(webPage, media: media)
             }
         }
         self.footerContentNode.setup(origin: item.originData, caption: item.caption, isAd: isAd)
-        
-        if let contentInfo = item.contentInfo, case let .message(message, _) = contentInfo {
-            self.overlayContentNode.performAction = { [weak self] action in
-                guard let self, let item = self.item else {
-                    return
-                }
-                if case .url = action {
-                    self.pictureInPictureButtonPressed()
-                    Queue.mainQueue().after(0.3) {
-                        item.performAction(action)
-                    }
-                } else {
-                    item.performAction(action)
-                }
-            }
-            self.overlayContentNode.presentPremiumDemo = { [weak self] in
-                self?.presentPremiumDemo()
-            }
-            self.overlayContentNode.openMoreMenu = { [weak self] sourceView, adMessage in
-                self?.openMoreMenu(sourceView: sourceView, gesture: nil, adMessage: adMessage, isSettings: false, actionsOnTop: true)
-            }
-            self.overlayContentNode.setMessage(context: item.context, message: message)
-        }
-        
-        var title: String?
-        if let indexData = item.indexData {
-            title = self.presentationData.strings.Items_NOfM("\(indexData.position + 1)", "\(indexData.totalCount)").string
-        } else if case let .message(message, _) = item.contentInfo, let _ = message.adAttribute {
-            title = self.presentationData.strings.Gallery_Ad
-        }
-        
-        if case let .message(message, _) = item.contentInfo {
-            self._titleContent.set(.single(GalleryTitleView.Content(message: EngineMessage(message), title: title, action: message.adAttribute == nil ? { [weak self] in
-                guard let self else {
-                    return
-                }
-                guard let controller = self.galleryController() as? GalleryController else {
-                    return
-                }
-                controller.dismissAndNavigateToMessageContext(message: message)
-            } : nil)))
-        }
     }
     
-    override func controlsVisibilityUpdated(isVisible: Bool, animated: Bool) {
-        self.areControlsVisible = isVisible
+    override func controlsVisibilityUpdated(isVisible: Bool) {
         self.controlsVisiblePromise.set(isVisible)
         
         self.videoNode?.isUserInteractionEnabled = isVisible ? self.videoNodeUserInteractionEnabled : false
         self.videoNode?.notifyPlaybackControlsHidden(!isVisible)
-        
-        if let validLayout = self.validLayout {
-            self.containerLayoutUpdated(validLayout.layout, navigationBarHeight: validLayout.navigationBarHeight, transition: animated ? .animated(duration: 0.2, curve: .easeInOut) : .immediate)
-        }
     }
     
     private func updateDisplayPlaceholder() {
@@ -2411,12 +2363,6 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
             self.statusButtonNode.layer.animatePosition(from: CGPoint(x: transformedSuperFrame.midX, y: transformedSuperFrame.midY), to: self.statusButtonNode.position, duration: 0.25, timingFunction: kCAMediaTimingFunctionSpring)
             self.statusButtonNode.layer.animateAlpha(from: 0.0, to: 1.0, duration: 0.25, timingFunction: kCAMediaTimingFunctionSpring)
             self.statusButtonNode.layer.animateScale(from: 0.5, to: 1.0, duration: 0.25, timingFunction: kCAMediaTimingFunctionSpring)
-            
-            if let playbackControlsView = self.playbackControls.view {
-                playbackControlsView.layer.animatePosition(from: CGPoint(x: transformedSuperFrame.midX, y: transformedSuperFrame.midY), to: playbackControlsView.layer.position, duration: 0.25, timingFunction: kCAMediaTimingFunctionSpring)
-                playbackControlsView.layer.animateAlpha(from: 0.0, to: 1.0, duration: 0.2, timingFunction: kCAMediaTimingFunctionSpring)
-                playbackControlsView.layer.animateScale(from: 0.2, to: 1.0, duration: 0.25, timingFunction: kCAMediaTimingFunctionSpring)
-            }
         }
     }
     
@@ -2507,13 +2453,6 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
         })
         self.statusButtonNode.layer.animateAlpha(from: 1.0, to: 0.0, duration: 0.25, removeOnCompletion: false)
         self.statusButtonNode.layer.animateScale(from: 1.0, to: 0.2, duration: 0.25, removeOnCompletion: false)
-        
-        if let playbackControlsView = self.playbackControls.view {
-            playbackControlsView.layer.animatePosition(from: playbackControlsView.layer.position, to: CGPoint(x: transformedSelfFrame.midX, y: transformedSelfFrame.midY), duration: 0.25, timingFunction: kCAMediaTimingFunctionSpring, removeOnCompletion: false, completion: { _ in
-            })
-            playbackControlsView.layer.animateAlpha(from: 1.0, to: 0.0, duration: 0.25, removeOnCompletion: false)
-            playbackControlsView.layer.animateScale(from: 1.0, to: 0.2, duration: 0.25, removeOnCompletion: false)
-        }
         
         let fromTransform: CATransform3D
         let toTransform: CATransform3D
@@ -2777,8 +2716,8 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
         return self._title.get()
     }
     
-    override func titleContent() -> Signal<GalleryTitleView.Content?, NoError> {
-        return self._titleContent.get()
+    override func titleView() -> Signal<UIView?, NoError> {
+        return self._titleView.get()
     }
     
     override func rightBarButtonItems() -> Signal<[UIBarButtonItem]?, NoError> {
@@ -2914,7 +2853,7 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
             switch contentInfo {
             case let .message(message, _):
                 isAd = message.adAttribute != nil
-                self.footerContentNode.setMessage(message, displayInfo: !item.displayInfoOnTop, peerIsCopyProtected: item.peerIsCopyProtected, displayPictureInPictureButton: self.hasPictureInPicture, settingsButtonState: self.settingsButtonState, displayStickersButton: self.displayStickersButton)
+                self.footerContentNode.setMessage(message, displayInfo: !item.displayInfoOnTop, peerIsCopyProtected: item.peerIsCopyProtected)
             case let .webPage(webPage, media, _):
                 self.footerContentNode.setWebPage(webPage, media: media)
             }
@@ -3114,16 +3053,15 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
         self.moreBarButton.contextAction?(self.moreBarButton.containerNode, nil)
     }
 
-    private var playOnDismiss = false
-    private func openMoreMenu(sourceView: UIView, gesture: ContextGesture?, adMessage: Message?, isSettings: Bool, actionsOnTop: Bool = false) {
+    private func openMoreMenu(sourceNode: ContextReferenceContentNode, gesture: ContextGesture?, isSettings: Bool) {
         guard let controller = self.baseNavigationController()?.topViewController as? ViewController else {
             return
         }
-                
+        
         var dismissImpl: (() -> Void)?
         let items: Signal<(items: [ContextMenuItem], topItems: [ContextMenuItem]), NoError>
-        if let adMessage {
-            items = self.adMenuMainItems(message: adMessage) |> map { items in
+        if case let .message(message, _) = self.item?.contentInfo, let _ = message.adAttribute {
+            items = self.adMenuMainItems() |> map { items in
                 return (items, [])
             }
         } else {
@@ -3132,28 +3070,14 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
             })
         }
         
-        var sourceView = sourceView
-        if !isSettings {
-            if let value = self.galleryController()?.navigationBar?.navigationButtonContextContainer(sourceView: sourceView) {
-                sourceView = value
-            }
-        }
-        
-        let contextController = makeContextController(presentationData: self.presentationData.withUpdated(theme: defaultDarkColorPresentationTheme), source: .reference(HeaderContextReferenceContentSource(controller: controller, sourceView: sourceView, actionsOnTop: actionsOnTop)), items: items |> map { items in
+        let contextController = ContextController(presentationData: self.presentationData.withUpdated(theme: defaultDarkColorPresentationTheme), source: .reference(HeaderContextReferenceContentSource(controller: controller, sourceNode: sourceNode)), items: items |> map { items in
             if !items.topItems.isEmpty {
                 return ContextController.Items(id: AnyHashable(0), content: .twoLists(items.items, items.topItems))
             } else {
                 return ContextController.Items(id: AnyHashable(0), content: .list(items.items))
             }
         }, gesture: gesture)
-        
-        if let _ = adMessage {
-            if self.isPlaying {
-                self.playOnDismiss = true
-                self.videoNode?.pause()
-            }
-            self.isShowingAdMenuPromise.set(true)
-        } else if isSettings {
+        if isSettings {
             self.isShowingSettingsMenuPromise.set(true)
         } else {
             self.isShowingContextMenuPromise.set(true)
@@ -3164,19 +3088,10 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
         }
         contextController.dismissed = { [weak self] in
             Queue.mainQueue().after(isSettings ? 0.0 : 0.1, {
-                guard let self else {
-                    return
-                }
-                if let _ = adMessage {
-                    if self.playOnDismiss {
-                        self.playOnDismiss = false
-                        self.videoNode?.play()
-                    }
-                    self.isShowingAdMenuPromise.set(false)
-                } else if isSettings {
-                    self.isShowingSettingsMenuPromise.set(false)
+                if isSettings {
+                    self?.isShowingSettingsMenuPromise.set(false)
                 } else {
-                    self.isShowingContextMenuPromise.set(false)
+                    self?.isShowingContextMenuPromise.set(false)
                 }
             })
         }
@@ -3193,22 +3108,8 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
         return speedList
     }
     
-    private func presentPremiumDemo() {
-        var replaceImpl: ((ViewController) -> Void)?
-        let controller = self.context.sharedContext.makePremiumDemoController(context: self.context, subject: .noAds, forceDark: true, action: {
-            let controller = self.context.sharedContext.makePremiumIntroController(context: self.context, source: .ads, forceDark: true, dismissed: nil)
-            replaceImpl?(controller)
-        }, dismissed: nil)
-        replaceImpl = { [weak controller] c in
-            controller?.replace(with: c)
-        }
-        if let navigationController = self.baseNavigationController() {
-            navigationController.pushViewController(controller)
-        }
-    }
-    
-    private func adMenuMainItems(message: Message) -> Signal<[ContextMenuItem], NoError> {
-        guard let adAttribute = message.adAttribute else {
+    private func adMenuMainItems() -> Signal<[ContextMenuItem], NoError> {
+        guard case let .message(message, _) = self.item?.contentInfo, let adAttribute = message.adAttribute else {
             return .single([])
         }
         
@@ -3230,13 +3131,14 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
             }, iconSource: nil, action: { [weak self] _, f in
                 f(.default)
                 
-                let _ = (context.engine.messages.reportAdMessage(opaqueId: adAttribute.opaqueId, option: nil)
+                let _ = (context.engine.messages.reportAdMessage(peerId: message.id.peerId, opaqueId: adAttribute.opaqueId, option: nil)
                 |> deliverOnMainQueue).start(next: { [weak self] result in
                     if case let .options(title, options) = result {
                         if let navigationController = self?.baseNavigationController() as? NavigationController {
                             navigationController.pushViewController(
                                 AdsReportScreen(
                                     context: context,
+                                    peerId: message.id.peerId,
                                     opaqueId: adAttribute.opaqueId,
                                     title: title,
                                     options: options,
@@ -3287,8 +3189,18 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
                 actions.append(.action(ContextMenuActionItem(text: presentationData.strings.SponsoredMessageMenu_Hide, textColor: .primary, textLayout: .twoLinesMax, textFont: .custom(font: Font.regular(presentationData.listsFontSize.baseDisplaySize - 1.0), height: nil, verticalOffset: nil), badge: nil, icon: { theme in
                     return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Clear"), color: theme.actionSheet.primaryTextColor)
                 }, iconSource: nil, action: { [weak self] c, _ in
-                    c?.dismiss(completion: { [weak self] in
-                        self?.presentPremiumDemo()
+                    c?.dismiss(completion: {
+                        var replaceImpl: ((ViewController) -> Void)?
+                        let controller = context.sharedContext.makePremiumDemoController(context: context, subject: .noAds, forceDark: true, action: {
+                            let controller = context.sharedContext.makePremiumIntroController(context: context, source: .ads, forceDark: true, dismissed: nil)
+                            replaceImpl?(controller)
+                        }, dismissed: nil)
+                        replaceImpl = { [weak controller] c in
+                            controller?.replace(with: c)
+                        }
+                        if let navigationController = self?.baseNavigationController() as? NavigationController {
+                            navigationController.pushViewController(controller)
+                        }
                     })
                 })))
             }
@@ -3372,7 +3284,7 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
                             if isSelected && value == nil {
                                 return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Check"), color: .white)
                             } else {
-                                return UIImage()
+                                return nil
                             }
                         }), action: { _, f in
                             f(.default)
@@ -3405,7 +3317,7 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
                             if isSelected {
                                 return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Check"), color: .white)
                             } else {
-                                return UIImage()
+                                return nil
                             }
                         }, action: { [weak strongSelf] _, f in
                             f(.default)
@@ -3459,7 +3371,7 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
                                 if isSelected {
                                     return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Check"), color: .white)
                                 } else {
-                                    return UIImage()
+                                    return nil
                                 }
                             }, action: { [weak self] _, f in
                                 f(.default)
@@ -3797,8 +3709,8 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
         })
     }
     
-    func settingsButtonPressed(sourceView: UIView) {
-        self.openMoreMenu(sourceView: sourceView, gesture: nil, adMessage: nil, isSettings: true, actionsOnTop: true)
+    @objc private func settingsButtonPressed() {
+        self.openMoreMenu(sourceNode: self.settingsBarButton.referenceNode, gesture: nil, isSettings: true)
     }
     
     override func adjustForPreviewing() {
@@ -3808,7 +3720,7 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
     }
     
     override func footerContent() -> Signal<(GalleryFooterContentNode?, GalleryOverlayContentNode?), NoError> {
-        return .single((self.footerContentNode, self.overlayContentNode))
+        return .single((self.footerContentNode, nil))
     }
 
     func updatePlaybackRate(_ playbackRate: Double?) {
@@ -3972,17 +3884,15 @@ final class UniversalVideoGalleryItemNode: ZoomableContentGalleryItemNode {
 
 final class HeaderContextReferenceContentSource: ContextReferenceContentSource {
     private let controller: ViewController
-    private let sourceView: UIView
-    private let actionsOnTop: Bool
-    
-    init(controller: ViewController, sourceView: UIView, actionsOnTop: Bool) {
+    private let sourceNode: ContextReferenceContentNode
+
+    init(controller: ViewController, sourceNode: ContextReferenceContentNode) {
         self.controller = controller
-        self.sourceView = sourceView
-        self.actionsOnTop = actionsOnTop
+        self.sourceNode = sourceNode
     }
 
     func transitionInfo() -> ContextControllerReferenceViewInfo? {
-        return ContextControllerReferenceViewInfo(referenceView: self.sourceView, contentAreaInScreenSpace: UIScreen.main.bounds, actionsPosition: self.actionsOnTop ? .top : .bottom)
+        return ContextControllerReferenceViewInfo(referenceView: self.sourceNode.view, contentAreaInScreenSpace: UIScreen.main.bounds)
     }
 }
 

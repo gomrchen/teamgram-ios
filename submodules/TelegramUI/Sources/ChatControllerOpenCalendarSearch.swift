@@ -43,7 +43,7 @@ extension ChatControllerImpl {
                 strongSelf.alwaysShowSearchResultsAsList = false
                 strongSelf.chatDisplayNode.alwaysShowSearchResultsAsList = false
                 strongSelf.updateChatPresentationInterfaceState(animated: false, interactive: false, { state in
-                    return state.updatedDisplayHistoryFilterAsList(false).updatedSearch(nil)
+                    return state.updatedDisplayHistoryFilterAsList(false)
                 })
 
                 c.dismiss()
@@ -133,7 +133,7 @@ extension ChatControllerImpl {
                 
                 strongSelf.chatDisplayNode.messageTransitionNode.dismissMessageReactionContexts()
                 
-                let contextController = makeContextController(presentationData: strongSelf.presentationData, source: .controller(ChatContextControllerContentSourceImpl(controller: chatController, sourceNode: sourceNode, sourceRect: sourceRect, passthroughTouches: true)), items: .single(ContextController.Items(content: .list(items))), gesture: gesture)
+                let contextController = ContextController(presentationData: strongSelf.presentationData, source: .controller(ChatContextControllerContentSourceImpl(controller: chatController, sourceNode: sourceNode, sourceRect: sourceRect, passthroughTouches: true)), items: .single(ContextController.Items(content: .list(items))), gesture: gesture)
                 strongSelf.presentInGlobalOverlay(contextController)
             }
         )

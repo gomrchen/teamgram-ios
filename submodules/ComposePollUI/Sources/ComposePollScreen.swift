@@ -26,56 +26,11 @@ import ChatPresentationInterfaceState
 import EmojiSuggestionsComponent
 import TextFormat
 import TextFieldComponent
-import ListComposePollOptionComponent
-import GlassBarButtonComponent
-
-public final class ComposedPoll {
-    public struct Text {
-        public let string: String
-        public let entities: [MessageTextEntity]
-        
-        public init(string: String, entities: [MessageTextEntity]) {
-            self.string = string
-            self.entities = entities
-        }
-    }
-    
-    public let publicity: TelegramMediaPollPublicity
-    public let kind: TelegramMediaPollKind
-
-    public let text: Text
-    public let options: [TelegramMediaPollOption]
-    public let correctAnswers: [Data]?
-    public let results: TelegramMediaPollResults
-    public let deadlineTimeout: Int32?
-    public let usedCustomEmojiFiles: [Int64: TelegramMediaFile]
-
-    public init(
-        publicity: TelegramMediaPollPublicity,
-        kind: TelegramMediaPollKind,
-        text: Text,
-        options: [TelegramMediaPollOption],
-        correctAnswers: [Data]?,
-        results: TelegramMediaPollResults,
-        deadlineTimeout: Int32?,
-        usedCustomEmojiFiles: [Int64: TelegramMediaFile]
-    ) {
-        self.publicity = publicity
-        self.kind = kind
-        self.text = text
-        self.options = options
-        self.correctAnswers = correctAnswers
-        self.results = results
-        self.deadlineTimeout = deadlineTimeout
-        self.usedCustomEmojiFiles = usedCustomEmojiFiles
-    }
-}
 
 final class ComposePollScreenComponent: Component {
     typealias EnvironmentType = ViewControllerComponentContainer.Environment
     
     let context: AccountContext
-    let overNavigationContainer: UIView
     let peer: EnginePeer
     let isQuiz: Bool?
     let initialData: ComposePollScreen.InitialData
@@ -83,14 +38,12 @@ final class ComposePollScreenComponent: Component {
 
     init(
         context: AccountContext,
-        overNavigationContainer: UIView,
         peer: EnginePeer,
         isQuiz: Bool?,
         initialData: ComposePollScreen.InitialData,
         completion: @escaping (ComposedPoll) -> Void
     ) {
         self.context = context
-        self.overNavigationContainer = overNavigationContainer
         self.peer = peer
         self.isQuiz = isQuiz
         self.initialData = initialData
@@ -114,7 +67,6 @@ final class ComposePollScreenComponent: Component {
     
     final class View: UIView, UIScrollViewDelegate {
         private let scrollView: UIScrollView
-        
         private var reactionInput: ComponentView<Empty>?
         private let pollTextSection = ComponentView<Empty>()
         private let quizAnswerSection = ComponentView<Empty>()
@@ -125,14 +77,12 @@ final class ComposePollScreenComponent: Component {
         private var pollOptionsSectionContainer: ListSectionContentView
         
         private let pollSettingsSection = ComponentView<Empty>()
-        
-        private let title = ComponentView<Empty>()
-        private let cancelButton = ComponentView<Empty>()
-        private let doneButton = ComponentView<Empty>()
+        private let actionButton = ComponentView<Empty>()
         
         private var reactionSelectionControl: ComponentView<Empty>?
         
         private var isUpdating: Bool = false
+        private var ignoreScrolling: Bool = false
         private var previousHadInputHeight: Bool = false
         
         private var component: ComposePollScreenComponent?
@@ -172,9 +122,6 @@ final class ComposePollScreenComponent: Component {
         
         private var currentEditingTag: AnyObject?
         
-        private var reorderRecognizer: ReorderGestureRecognizer?
-        private var reorderingItem: (id: AnyHashable, snapshotView: UIView, backgroundView: UIView, initialPosition: CGPoint, position: CGPoint)?
-        
         override init(frame: CGRect) {
             self.scrollView = UIScrollView()
             self.scrollView.showsVerticalScrollIndicator = true
@@ -191,39 +138,6 @@ final class ComposePollScreenComponent: Component {
             
             self.scrollView.delegate = self
             self.addSubview(self.scrollView)
-            
-            let reorderRecognizer = ReorderGestureRecognizer(
-                shouldBegin: { [weak self] point in
-                    guard let self, let (id, item) = self.item(at: point) else {
-                        return (allowed: false, requiresLongPress: false, id: nil, item: nil)
-                    }
-                    return (allowed: true, requiresLongPress: false, id: id, item: item)
-                },
-                willBegin: { point in
-                },
-                began: { [weak self] item in
-                    guard let self else {
-                        return
-                    }
-                    self.setReorderingItem(item: item)
-                },
-                ended: { [weak self] in
-                    guard let self else {
-                        return
-                    }
-                    self.setReorderingItem(item: nil)
-                },
-                moved: { [weak self] distance in
-                    guard let self else {
-                        return
-                    }
-                    self.moveReorderingItem(distance: distance)
-                },
-                isActiveUpdated: { _ in
-                }
-            )
-            self.reorderRecognizer = reorderRecognizer
-            self.addGestureRecognizer(reorderRecognizer)
         }
         
         required init?(coder: NSCoder) {
@@ -236,119 +150,6 @@ final class ComposePollScreenComponent: Component {
 
         func scrollToTop() {
             self.scrollView.setContentOffset(CGPoint(), animated: true)
-        }
-        
-        private func item(at point: CGPoint) -> (AnyHashable, ComponentView<Empty>)? {
-            if self.scrollView.isDragging || self.scrollView.isDecelerating {
-                return nil
-            }
-            
-            let localPoint = self.pollOptionsSectionContainer.convert(point, from: self)
-            for (id, itemView) in self.pollOptionsSectionContainer.itemViews {
-                if let view = itemView.contents.view as? ListComposePollOptionComponent.View, !view.isRevealed && !view.currentText.isEmpty {
-                    let viewFrame = view.convert(view.bounds, to: self.pollOptionsSectionContainer)
-                    let iconFrame = CGRect(origin: CGPoint(x: viewFrame.maxX - 40.0, y: viewFrame.minY), size: CGSize(width: viewFrame.height, height: viewFrame.height))
-                    if iconFrame.contains(localPoint) {
-                        return (id, itemView.contents)
-                    }
-                }
-            }
-            return nil
-        }
-        
-        func setReorderingItem(item: AnyHashable?) {
-            guard let environment = self.environment else {
-                return
-            }
-            var mappedItem: (AnyHashable, ComponentView<Empty>)?
-            for (id, itemView) in self.pollOptionsSectionContainer.itemViews {
-                if id == item {
-                    mappedItem = (id, itemView.contents)
-                    break
-                }
-            }
-            if self.reorderingItem?.id != mappedItem?.0 {
-                if let (id, visibleItem) = mappedItem, let view = visibleItem.view, !view.isHidden, let viewSuperview = view.superview, let snapshotView = view.snapshotView(afterScreenUpdates: false) {
-                    let mappedCenter = viewSuperview.convert(view.center, to: self.scrollView)
-                    
-                    let wrapperView = UIView()
-                    wrapperView.alpha = 0.8
-                    wrapperView.frame = CGRect(origin: mappedCenter.offsetBy(dx: -snapshotView.bounds.width / 2.0, dy: -snapshotView.bounds.height / 2.0), size: snapshotView.bounds.size)
-                    
-                    let theme = environment.theme.withModalBlocksBackground()
-                    let backgroundView = UIImageView(image: generateReorderingBackgroundImage(backgroundColor: theme.list.itemBlocksBackgroundColor))
-                    backgroundView.frame = wrapperView.bounds.insetBy(dx: -16.0, dy: -16.0)
-                    snapshotView.frame = snapshotView.bounds
-                    
-                    wrapperView.addSubview(backgroundView)
-                    wrapperView.addSubview(snapshotView)
-                    
-                    backgroundView.layer.animateAlpha(from: 0.0, to: 1.0, duration: 0.2)
-                    wrapperView.transform = CGAffineTransformMakeScale(1.04, 1.04)
-                    wrapperView.layer.animateScale(from: 1.0, to: 1.04, duration: 0.2)
-                    
-                    self.scrollView.addSubview(wrapperView)
-                    self.reorderingItem = (id, wrapperView, backgroundView, mappedCenter, mappedCenter)
-                    self.state?.updated()
-                } else {
-                    if let reorderingItem = self.reorderingItem {
-                        self.reorderingItem = nil
-                        for (itemId, itemView) in self.pollOptionsSectionContainer.itemViews {
-                            if itemId == reorderingItem.id, let view = itemView.contents.view {
-                                let viewFrame = view.convert(view.bounds, to: self.scrollView)
-                                let transition = ComponentTransition.spring(duration: 0.3)
-                                transition.setPosition(view: reorderingItem.snapshotView, position: viewFrame.center)
-                                transition.setAlpha(view: reorderingItem.backgroundView, alpha: 0.0, completion: { _ in
-                                    reorderingItem.snapshotView.removeFromSuperview()
-                                    self.state?.updated()
-                                })
-                                transition.setScale(view: reorderingItem.snapshotView, scale: 1.0)
-                                break
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        
-        func moveReorderingItem(distance: CGPoint) {
-            if let (id, snapshotView, backgroundView, initialPosition, _) = self.reorderingItem {
-                let targetPosition = CGPoint(x: initialPosition.x + distance.x, y: initialPosition.y + distance.y)
-                self.reorderingItem = (id, snapshotView, backgroundView, initialPosition, targetPosition)
-                
-                snapshotView.center = targetPosition
-                
-                let localPoint = self.pollOptionsSectionContainer.convert(targetPosition, from: self.scrollView)
-                for (itemId, itemView) in self.pollOptionsSectionContainer.itemViews {
-                    if itemId == id {
-                        continue
-                    }
-                    if let view = itemView.contents.view {
-                        let viewFrame = view.convert(view.bounds, to: self.pollOptionsSectionContainer)
-                        if viewFrame.contains(localPoint) {
-                            if let targetIndex = self.pollOptions.firstIndex(where: { AnyHashable($0.id) == itemId }), let reorderingItem = self.pollOptions.first(where: { AnyHashable($0.id) == id }) {
-                                self.reorderIfPossible(item: reorderingItem, toIndex: targetIndex)
-                            }
-                            break
-                        }
-                    }
-                }
-            }
-        }
-        
-        private func reorderIfPossible(item: PollOption, toIndex: Int) {
-            let targetItem = self.pollOptions[toIndex]
-            guard targetItem.textInputState.hasText else {
-                return
-            }
-            if let fromIndex = self.pollOptions.firstIndex(where: { $0.id == item.id }) {
-                self.pollOptions[toIndex] = item
-                self.pollOptions[fromIndex] = targetItem
-                
-                HapticFeedback().tap()
-                
-                self.state?.updated(transition: .spring(duration: 0.4))
-            }
         }
         
         func validatedInput() -> ComposedPoll? {
@@ -459,8 +260,19 @@ final class ComposePollScreenComponent: Component {
             return true
         }
         
-        func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
-            self.endEditing(true)
+        func scrollViewDidScroll(_ scrollView: UIScrollView) {
+            if !self.ignoreScrolling {
+                self.updateScrolling(transition: .immediate)
+            }
+        }
+        
+        private func updateScrolling(transition: ComponentTransition) {
+            let navigationAlphaDistance: CGFloat = 16.0
+            let navigationAlpha: CGFloat = max(0.0, min(1.0, self.scrollView.contentOffset.y / navigationAlphaDistance))
+            if let controller = self.environment?.controller(), let navigationBar = controller.navigationBar {
+                transition.setAlpha(layer: navigationBar.backgroundNode.layer, alpha: navigationAlpha)
+                transition.setAlpha(layer: navigationBar.stripeNode.layer, alpha: navigationAlpha)
+            }
         }
         
         func isPanGestureEnabled() -> Bool {
@@ -532,7 +344,6 @@ final class ComposePollScreenComponent: Component {
                 let presentationInterfaceState = ChatPresentationInterfaceState(
                     chatWallpaper: .builtin(WallpaperSettings()),
                     theme: presentationData.theme,
-                    preferredGlassType: .default,
                     strings: presentationData.strings,
                     dateTimeFormat: presentationData.dateTimeFormat,
                     nameDisplayOrder: presentationData.nameDisplayOrder,
@@ -548,11 +359,13 @@ final class ComposePollScreenComponent: Component {
                     pendingUnpinnedAllMessages: false,
                     activeGroupCallInfo: nil,
                     hasActiveGroupCall: false,
+                    importState: nil,
                     threadData: nil,
                     isGeneralThreadClosed: nil,
                     replyMessage: nil,
                     accountPeerColor: nil,
-                    businessIntro: nil
+                    businessIntro: nil,
+                    starGiftsAvailable: false
                 )
                 
                 self.inputMediaNodeBackground.backgroundColor = presentationData.theme.rootController.navigationBar.opaqueBackgroundColor.cgColor
@@ -665,7 +478,7 @@ final class ComposePollScreenComponent: Component {
             defer {
                 self.isUpdating = false
             }
-                        
+            
             var alphaTransition = transition
             if !transition.animation.isImmediate {
                 alphaTransition = alphaTransition.withAnimation(.curve(duration: 0.25, curve: .easeInOut))
@@ -674,8 +487,6 @@ final class ComposePollScreenComponent: Component {
             let environment = environment[EnvironmentType.self].value
             let themeUpdated = self.environment?.theme !== environment.theme
             self.environment = environment
-            
-            let theme = environment.theme.withModalBlocksBackground()
             
             if self.component == nil {
                 self.isQuiz = component.isQuiz ?? false
@@ -699,7 +510,6 @@ final class ComposePollScreenComponent: Component {
                         hasStickers: false,
                         hasGifs: false,
                         hideBackground: true,
-                        maskEdge: .fade,
                         sendGif: nil
                     )
                 )
@@ -723,8 +533,6 @@ final class ComposePollScreenComponent: Component {
                     },
                     sendBotContextResultAsGif: { _, _ , _, _, _, _ in
                         return false
-                    },
-                    editGif: { _, _ in
                     },
                     updateChoosingSticker: { _ in
                     },
@@ -832,7 +640,7 @@ final class ComposePollScreenComponent: Component {
             let sectionSpacing: CGFloat = 24.0
             
             if themeUpdated {
-                self.backgroundColor = theme.list.blocksBackgroundColor
+                self.backgroundColor = environment.theme.list.blocksBackgroundColor
             }
             
             let presentationData = component.context.sharedContext.currentPresentationData.with { $0 }
@@ -845,8 +653,7 @@ final class ComposePollScreenComponent: Component {
             pollTextSectionItems.append(AnyComponentWithIdentity(id: 0, component: AnyComponent(ListComposePollOptionComponent(
                 externalState: self.pollTextInputState,
                 context: component.context,
-                style: .glass,
-                theme: theme,
+                theme: environment.theme,
                 strings: environment.strings,
                 resetText: self.resetPollText.flatMap { resetText in
                     return ListComposePollOptionComponent.ResetText(value: NSAttributedString(string: resetText))
@@ -888,13 +695,12 @@ final class ComposePollScreenComponent: Component {
             let pollTextSectionSize = self.pollTextSection.update(
                 transition: transition,
                 component: AnyComponent(ListSectionComponent(
-                    theme: theme,
-                    style: .glass,
+                    theme: environment.theme,
                     header: AnyComponent(MultilineTextComponent(
                         text: .plain(NSAttributedString(
                             string: environment.strings.CreatePoll_TextHeader,
                             font: Font.regular(presentationData.listsFontSize.itemListBaseHeaderFontSize),
-                            textColor: theme.list.freeTextColor
+                            textColor: environment.theme.list.freeTextColor
                         )),
                         maximumNumberOfLines: 0
                     )),
@@ -939,23 +745,16 @@ final class ComposePollScreenComponent: Component {
                     })
                 }
                 
-                var canDelete = true
-                if i == self.pollOptions.count - 1 {
-                    canDelete = false
-                }
-                
                 pollOptionsSectionItems.append(AnyComponentWithIdentity(id: pollOption.id, component: AnyComponent(ListComposePollOptionComponent(
                     externalState: pollOption.textInputState,
                     context: component.context,
-                    style: .glass,
-                    theme: theme,
+                    theme: environment.theme,
                     strings: environment.strings,
                     resetText: pollOption.resetText.flatMap { resetText in
                         return ListComposePollOptionComponent.ResetText(value: NSAttributedString(string: resetText))
                     },
                     assumeIsEditing: self.inputMediaNodeTargetTag === pollOption.textFieldTag,
                     characterLimit: component.initialData.maxPollOptionLength,
-                    canReorder: true,
                     emptyLineHandling: .notAllowed,
                     returnKeyAction: { [weak self] in
                         guard let self else {
@@ -1005,13 +804,6 @@ final class ComposePollScreenComponent: Component {
                         }
                         self.state?.updated(transition: .spring(duration: 0.4))
                     },
-                    deleteAction: canDelete ? { [weak self] in
-                        guard let self else {
-                            return
-                        }
-                        self.pollOptions.removeAll(where: { $0.id == optionId })
-                        self.state?.updated(transition: .spring(duration: 0.4))
-                    } : nil,
                     tag: pollOption.textFieldTag
                 ))))
                 
@@ -1042,12 +834,6 @@ final class ComposePollScreenComponent: Component {
                     size: itemSize,
                     transition: itemTransition
                 ))
-                
-                var isReordering = false
-                if let reorderingItem = self.reorderingItem, itemId == reorderingItem.id {
-                    isReordering = true
-                }
-                itemView.contents.view?.isHidden = isReordering
             }
             
             for i in 0 ..< self.pollOptions.count {
@@ -1065,7 +851,7 @@ final class ComposePollScreenComponent: Component {
                 }
             }
             
-            if self.pollOptions.count < component.initialData.maxPollAnswersCount, let lastOption = self.pollOptions.last {
+            if self.pollOptions.count < 10, let lastOption = self.pollOptions.last {
                 if lastOption.textInputState.text.length != 0 {
                     self.pollOptions.append(PollOption(id: self.nextPollOptionId))
                     self.nextPollOptionId += 1
@@ -1088,8 +874,7 @@ final class ComposePollScreenComponent: Component {
             
             let pollOptionsSectionUpdateResult = self.pollOptionsSectionContainer.update(
                 configuration: ListSectionContentView.Configuration(
-                    theme: theme,
-                    style: .glass,
+                    theme: environment.theme,
                     displaySeparators: true,
                     extendsItemHighlightToSection: false,
                     background: .all
@@ -1107,7 +892,7 @@ final class ComposePollScreenComponent: Component {
                     text: .plain(NSAttributedString(
                         string: environment.strings.CreatePoll_OptionsHeader,
                         font: Font.regular(presentationData.listsFontSize.itemListBaseHeaderFontSize),
-                        textColor: theme.list.freeTextColor
+                        textColor: environment.theme.list.freeTextColor
                     )),
                     maximumNumberOfLines: 0
                 )),
@@ -1137,7 +922,7 @@ final class ComposePollScreenComponent: Component {
             
             contentHeight += 7.0
             
-            let pollOptionsLimitReached = self.pollOptions.count >= component.initialData.maxPollAnswersCount
+            let pollOptionsLimitReached = self.pollOptions.count >= 10
             var animatePollOptionsFooterIn = false
             var pollOptionsFooterTransition = transition
             if self.currentPollOptionsLimitReached != pollOptionsLimitReached {
@@ -1156,11 +941,11 @@ final class ComposePollScreenComponent: Component {
             if pollOptionsLimitReached {
                 pollOptionsFooterTransition = pollOptionsFooterTransition.withAnimation(.none)
                 pollOptionsComponent = AnyComponent(MultilineTextComponent(
-                    text: .plain(NSAttributedString(string: environment.strings.CreatePoll_AllOptionsAdded, font: Font.regular(presentationData.listsFontSize.itemListBaseHeaderFontSize), textColor: theme.list.freeTextColor)),
+                    text: .plain(NSAttributedString(string: environment.strings.CreatePoll_AllOptionsAdded, font: Font.regular(presentationData.listsFontSize.itemListBaseHeaderFontSize), textColor: environment.theme.list.freeTextColor)),
                     maximumNumberOfLines: 0
                 ))
             } else {
-                let remainingCount = component.initialData.maxPollAnswersCount - self.pollOptions.count
+                let remainingCount = 10 - self.pollOptions.count
                 let rawString = environment.strings.CreatePoll_OptionCountFooterFormat(Int32(remainingCount))
                 
                 var pollOptionsFooterItems: [AnimatedTextComponent.Item] = []
@@ -1188,7 +973,7 @@ final class ComposePollScreenComponent: Component {
                 
                 pollOptionsComponent = AnyComponent(AnimatedTextComponent(
                     font: Font.regular(presentationData.listsFontSize.itemListBaseHeaderFontSize),
-                    color: theme.list.freeTextColor,
+                    color: environment.theme.list.freeTextColor,
                     items: pollOptionsFooterItems
                 ))
             }
@@ -1228,14 +1013,13 @@ final class ComposePollScreenComponent: Component {
             var pollSettingsSectionItems: [AnyComponentWithIdentity<Empty>] = []
             if canBePublic {
                 pollSettingsSectionItems.append(AnyComponentWithIdentity(id: "anonymous", component: AnyComponent(ListActionItemComponent(
-                    theme: theme,
-                    style: .glass,
+                    theme: environment.theme,
                     title: AnyComponent(VStack([
                         AnyComponentWithIdentity(id: AnyHashable(0), component: AnyComponent(MultilineTextComponent(
                             text: .plain(NSAttributedString(
                                 string: environment.strings.CreatePoll_Anonymous,
                                 font: Font.regular(presentationData.listsFontSize.baseDisplaySize),
-                                textColor: theme.list.itemPrimaryTextColor
+                                textColor: environment.theme.list.itemPrimaryTextColor
                             )),
                             maximumNumberOfLines: 1
                         ))),
@@ -1251,14 +1035,13 @@ final class ComposePollScreenComponent: Component {
                 ))))
             }
             pollSettingsSectionItems.append(AnyComponentWithIdentity(id: "multiAnswer", component: AnyComponent(ListActionItemComponent(
-                theme: theme,
-                style: .glass,
+                theme: environment.theme,
                 title: AnyComponent(VStack([
                     AnyComponentWithIdentity(id: AnyHashable(0), component: AnyComponent(MultilineTextComponent(
                         text: .plain(NSAttributedString(
                             string: environment.strings.CreatePoll_MultipleChoice,
                             font: Font.regular(presentationData.listsFontSize.baseDisplaySize),
-                            textColor: theme.list.itemPrimaryTextColor
+                            textColor: environment.theme.list.itemPrimaryTextColor
                         )),
                         maximumNumberOfLines: 1
                     ))),
@@ -1276,14 +1059,13 @@ final class ComposePollScreenComponent: Component {
                 action: nil
             ))))
             pollSettingsSectionItems.append(AnyComponentWithIdentity(id: "quiz", component: AnyComponent(ListActionItemComponent(
-                theme: theme,
-                style: .glass,
+                theme: environment.theme,
                 title: AnyComponent(VStack([
                     AnyComponentWithIdentity(id: AnyHashable(0), component: AnyComponent(MultilineTextComponent(
                         text: .plain(NSAttributedString(
                             string: environment.strings.CreatePoll_Quiz,
                             font: Font.regular(presentationData.listsFontSize.baseDisplaySize),
-                            textColor: theme.list.itemPrimaryTextColor
+                            textColor: environment.theme.list.itemPrimaryTextColor
                         )),
                         maximumNumberOfLines: 1
                     ))),
@@ -1304,14 +1086,13 @@ final class ComposePollScreenComponent: Component {
             let pollSettingsSectionSize = self.pollSettingsSection.update(
                 transition: transition,
                 component: AnyComponent(ListSectionComponent(
-                    theme: theme,
-                    style: .glass,
+                    theme: environment.theme,
                     header: nil,
                     footer: AnyComponent(MultilineTextComponent(
                         text: .plain(NSAttributedString(
                             string: environment.strings.CreatePoll_QuizInfo,
                             font: Font.regular(presentationData.listsFontSize.itemListBaseHeaderFontSize),
-                            textColor: theme.list.freeTextColor
+                            textColor: environment.theme.list.freeTextColor
                         )),
                         maximumNumberOfLines: 0
                     )),
@@ -1335,13 +1116,12 @@ final class ComposePollScreenComponent: Component {
             let quizAnswerSectionSize = self.quizAnswerSection.update(
                 transition: transition,
                 component: AnyComponent(ListSectionComponent(
-                    theme: theme,
-                    style: .glass,
+                    theme: environment.theme,
                     header: AnyComponent(MultilineTextComponent(
                         text: .plain(NSAttributedString(
                             string: environment.strings.CreatePoll_ExplanationHeader,
                             font: Font.regular(presentationData.listsFontSize.itemListBaseHeaderFontSize),
-                            textColor: theme.list.freeTextColor
+                            textColor: environment.theme.list.freeTextColor
                         )),
                         maximumNumberOfLines: 0
                     )),
@@ -1349,7 +1129,7 @@ final class ComposePollScreenComponent: Component {
                         text: .plain(NSAttributedString(
                             string: environment.strings.CreatePoll_ExplanationInfo,
                             font: Font.regular(presentationData.listsFontSize.itemListBaseHeaderFontSize),
-                            textColor: theme.list.freeTextColor
+                            textColor: environment.theme.list.freeTextColor
                         )),
                         maximumNumberOfLines: 0
                     )),
@@ -1357,8 +1137,7 @@ final class ComposePollScreenComponent: Component {
                         AnyComponentWithIdentity(id: 0, component: AnyComponent(ListComposePollOptionComponent(
                             externalState: self.quizAnswerTextInputState,
                             context: component.context,
-                            style: .glass,
-                            theme: theme,
+                            theme: environment.theme,
                             strings: environment.strings,
                             resetText: self.resetQuizAnswerText.flatMap { resetText in
                                 return ListComposePollOptionComponent.ResetText(value: NSAttributedString(string: resetText))
@@ -1505,7 +1284,7 @@ final class ComposePollScreenComponent: Component {
                     component: AnyComponent(EmojiSuggestionsComponent(
                         context: component.context,
                         userLocation: .other,
-                        theme: EmojiSuggestionsComponent.Theme(theme: theme, backgroundColor: theme.list.itemBlocksBackgroundColor),
+                        theme: EmojiSuggestionsComponent.Theme(theme: environment.theme, backgroundColor: environment.theme.list.itemBlocksBackgroundColor),
                         animationCache: component.context.animationCache,
                         animationRenderer: component.context.animationRenderer,
                         files: value,
@@ -1610,6 +1389,7 @@ final class ComposePollScreenComponent: Component {
             }
             self.previousHadInputHeight = (inputHeight > 0.0)
             
+            self.ignoreScrolling = true
             let previousBounds = self.scrollView.bounds
             let contentSize = CGSize(width: availableSize.width, height: contentHeight)
             if self.scrollView.frame != CGRect(origin: CGPoint(), size: availableSize) {
@@ -1619,101 +1399,8 @@ final class ComposePollScreenComponent: Component {
                 self.scrollView.contentSize = contentSize
             }
             let scrollInsets = UIEdgeInsets(top: environment.navigationHeight, left: 0.0, bottom: environment.safeInsets.bottom, right: 0.0)
-            if self.scrollView.verticalScrollIndicatorInsets != scrollInsets {
-                self.scrollView.verticalScrollIndicatorInsets = scrollInsets
-            }
-            
-            let title = self.isQuiz ? environment.strings.CreatePoll_QuizTitle : environment.strings.CreatePoll_Title
-            let titleSize = self.title.update(
-                transition: .immediate,
-                component: AnyComponent(
-                    MultilineTextComponent(
-                        text: .plain(
-                            NSAttributedString(
-                                string: title,
-                                font: Font.semibold(17.0),
-                                textColor: environment.theme.rootController.navigationBar.primaryTextColor
-                            )
-                        )
-                    )
-                ),
-                environment: {},
-                containerSize: CGSize(width: 200.0, height: 40.0)
-            )
-            let titleFrame = CGRect(origin: CGPoint(x: floorToScreenPixels((availableSize.width - titleSize.width) / 2.0), y: floorToScreenPixels((environment.navigationHeight - titleSize.height) / 2.0) + 3.0), size: titleSize)
-            if let titleView = self.title.view {
-                if titleView.superview == nil {
-                    component.overNavigationContainer.addSubview(titleView)
-                }
-                transition.setFrame(view: titleView, frame: titleFrame)
-            }
-            
-            let barButtonSize = CGSize(width: 44.0, height: 44.0)
-            let cancelButtonSize = self.cancelButton.update(
-                transition: transition,
-                component: AnyComponent(GlassBarButtonComponent(
-                    size: barButtonSize,
-                    backgroundColor: nil,
-                    isDark: environment.theme.overallDarkAppearance,
-                    state: .glass,
-                    component: AnyComponentWithIdentity(id: "close", component: AnyComponent(
-                        BundleIconComponent(
-                            name: "Navigation/Close",
-                            tintColor: environment.theme.chat.inputPanel.panelControlColor
-                        )
-                    )),
-                    action: { [weak self] _ in
-                        guard let self, let controller = self.environment?.controller() as? ComposePollScreen else {
-                            return
-                        }
-                        controller.dismiss()
-                    }
-                )),
-                environment: {},
-                containerSize: barButtonSize
-            )
-            let cancelButtonFrame = CGRect(origin: CGPoint(x: environment.safeInsets.left + 16.0, y: 16.0), size: cancelButtonSize)
-            if let cancelButtonView = self.cancelButton.view {
-                if cancelButtonView.superview == nil {
-                    component.overNavigationContainer.addSubview(cancelButtonView)
-                }
-                transition.setFrame(view: cancelButtonView, frame: cancelButtonFrame)
-            }
-            
-            let isValid = self.validatedInput() != nil
-            let doneButtonSize = self.doneButton.update(
-                transition: transition,
-                component: AnyComponent(GlassBarButtonComponent(
-                    size: barButtonSize,
-                    backgroundColor: isValid ? environment.theme.list.itemCheckColors.fillColor : environment.theme.list.itemCheckColors.fillColor.desaturated().withMultipliedAlpha(0.5),
-                    isDark: environment.theme.overallDarkAppearance,
-                    state: .tintedGlass,
-                    isEnabled: isValid,
-                    component: AnyComponentWithIdentity(id: "done", component: AnyComponent(
-                        BundleIconComponent(
-                            name: "Navigation/Done",
-                            tintColor: environment.theme.list.itemCheckColors.foregroundColor
-                        )
-                    )),
-                    action: { [weak self] _ in
-                        guard let self, let controller = self.environment?.controller() as? ComposePollScreen else {
-                            return
-                        }
-                        if let input = self.validatedInput() {
-                            controller.completion(input)
-                        }
-                        controller.dismiss()
-                    }
-                )),
-                environment: {},
-                containerSize: barButtonSize
-            )
-            let doneButtonFrame = CGRect(origin: CGPoint(x: availableSize.width - environment.safeInsets.right - 16.0 - doneButtonSize.width, y: 16.0), size: doneButtonSize)
-            if let doneButtonView = self.doneButton.view {
-                if doneButtonView.superview == nil {
-                    component.overNavigationContainer.addSubview(doneButtonView)
-                }
-                transition.setFrame(view: doneButtonView, frame: doneButtonFrame)
+            if self.scrollView.scrollIndicatorInsets != scrollInsets {
+                self.scrollView.scrollIndicatorInsets = scrollInsets
             }
             
             if let recenterOnTag {
@@ -1739,12 +1426,27 @@ final class ComposePollScreenComponent: Component {
                     transition.animateBoundsOrigin(view: self.scrollView, from: CGPoint(x: 0.0, y: offsetY), to: CGPoint(), additive: true)
                 }
             }
+            self.ignoreScrolling = false
+            
+            self.updateScrolling(transition: transition)
             
             if isEditing {
                 if let controller = environment.controller() as? ComposePollScreen {
                     DispatchQueue.main.async { [weak controller] in
                         controller?.requestAttachmentMenuExpansion()
                     }
+                }
+            }
+            
+            let isValid = self.validatedInput() != nil
+            if let controller = environment.controller() as? ComposePollScreen, let sendButtonItem = controller.sendButtonItem {
+                if sendButtonItem.isEnabled != isValid {
+                    sendButtonItem.isEnabled = isValid
+                }
+                
+                let controllerTitle = self.isQuiz ? presentationData.strings.CreatePoll_QuizTitle : presentationData.strings.CreatePoll_Title
+                if controller.title != controllerTitle {
+                    controller.title = controllerTitle
                 }
             }
             
@@ -1775,24 +1477,19 @@ public class ComposePollScreen: ViewControllerComponentContainer, AttachmentCont
     public final class InitialData {
         fileprivate let maxPollTextLength: Int
         fileprivate let maxPollOptionLength: Int
-        fileprivate let maxPollAnswersCount: Int
         
         fileprivate init(
             maxPollTextLength: Int,
-            maxPollOptionLength: Int,
-            maxPollAnwsersCount: Int
+            maxPollOptionLength: Int
         ) {
             self.maxPollTextLength = maxPollTextLength
             self.maxPollOptionLength = maxPollOptionLength
-            self.maxPollAnswersCount = maxPollAnwsersCount
         }
     }
     
     private let context: AccountContext
-    fileprivate let completion: (ComposedPoll) -> Void
+    private let completion: (ComposedPoll) -> Void
     private var isDismissed: Bool = false
-    
-    private let overNavigationContainer: UIView
     
     fileprivate private(set) var sendButtonItem: UIBarButtonItem?
     
@@ -1838,34 +1535,23 @@ public class ComposePollScreen: ViewControllerComponentContainer, AttachmentCont
         self.context = context
         self.completion = completion
         
-        self.overNavigationContainer = SparseContainerView()
-        
         super.init(context: context, component: ComposePollScreenComponent(
             context: context,
-            overNavigationContainer: self.overNavigationContainer,
             peer: peer,
             isQuiz: isQuiz,
             initialData: initialData,
             completion: completion
         ), navigationBarAppearance: .default, theme: .default)
         
-        self._hasGlassStyle = true
-        
         let presentationData = context.sharedContext.currentPresentationData.with { $0 }
-                
-        if self._hasGlassStyle {
-            self.navigationItem.setLeftBarButton(UIBarButtonItem(customView: UIView()), animated: false)
-        } else {
-            self.navigationItem.setLeftBarButton(UIBarButtonItem(title: presentationData.strings.Common_Cancel, style: .plain, target: self, action: #selector(self.cancelPressed)), animated: false)
-        }
+        
+        self.title = isQuiz == true ? presentationData.strings.CreatePoll_QuizTitle : presentationData.strings.CreatePoll_Title
+        
+        self.navigationItem.setLeftBarButton(UIBarButtonItem(title: presentationData.strings.Common_Cancel, style: .plain, target: self, action: #selector(self.cancelPressed)), animated: false)
         
         let sendButtonItem = UIBarButtonItem(title: presentationData.strings.CreatePoll_Create, style: .done, target: self, action: #selector(self.sendPressed))
         self.sendButtonItem = sendButtonItem
-        if self._hasGlassStyle {
-        
-        } else {
-            self.navigationItem.setRightBarButton(sendButtonItem, animated: false)
-        }
+        self.navigationItem.setRightBarButton(sendButtonItem, animated: false)
         sendButtonItem.isEnabled = false
         
         self.scrollToTop = { [weak self] in
@@ -1882,10 +1568,6 @@ public class ComposePollScreen: ViewControllerComponentContainer, AttachmentCont
             
             return componentView.attemptNavigation(complete: complete)
         }
-        
-        if let navigationBar = self.navigationBar {
-            navigationBar.customOverBackgroundContentView.insertSubview(self.overNavigationContainer, at: 0)
-        }
     }
     
     required public init(coder aDecoder: NSCoder) {
@@ -1896,14 +1578,9 @@ public class ComposePollScreen: ViewControllerComponentContainer, AttachmentCont
     }
     
     public static func initialData(context: AccountContext) -> InitialData {
-        var maxPollAnwsersCount: Int = 10
-        if let data = context.currentAppConfiguration.with({ $0 }).data, let value = data["poll_answers_max"] as? Double {
-            maxPollAnwsersCount = Int(value)
-        }
         return InitialData(
-            maxPollTextLength: 200,
-            maxPollOptionLength: 100,
-            maxPollAnwsersCount: maxPollAnwsersCount
+            maxPollTextLength: Int(200),
+            maxPollOptionLength: 100
         )
     }
     
@@ -1934,7 +1611,7 @@ public class ComposePollScreen: ViewControllerComponentContainer, AttachmentCont
     public func prepareForReuse() {
     }
     
-    public func requestDismiss(completion: @escaping () -> Void) {        
+    public func requestDismiss(completion: @escaping () -> Void) {
         completion()
     }
     

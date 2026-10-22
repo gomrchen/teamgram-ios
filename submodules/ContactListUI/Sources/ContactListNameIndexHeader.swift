@@ -6,12 +6,10 @@ import ListSectionHeaderNode
 
 final class ContactListNameIndexHeader: Equatable, ListViewItemHeader {
     let id: ListViewItemNode.HeaderId
-    let stackingId: ListViewItemNode.HeaderId? = nil
     let theme: PresentationTheme
     let letter: unichar
     let stickDirection: ListViewItemHeaderStickDirection = .top
     public let stickOverInsets: Bool = true
-    public let isSticky: Bool = false
     
     let height: CGFloat = 29.0
     
@@ -68,7 +66,7 @@ final class ContactListNameIndexHeaderNode: ListViewItemHeaderNode {
         self.sectionHeaderNode.updateTheme(theme: theme)
     }
     
-    override func updateLayout(size: CGSize, leftInset: CGFloat, rightInset: CGFloat, transition: ContainedViewLayoutTransition) {
+    override func updateLayout(size: CGSize, leftInset: CGFloat, rightInset: CGFloat) {
         self.sectionHeaderNode.frame = CGRect(origin: CGPoint(), size: size)
         self.sectionHeaderNode.updateLayout(size: size, leftInset: leftInset, rightInset: rightInset)
     }

@@ -10,6 +10,7 @@ import Display
 import UIKit
 import UndoUI
 import ShareController
+import ChatQrCodeScreen
 import ChatShareMessageTagView
 import ReactionSelectionNode
 import TopMessageReactions
@@ -113,7 +114,7 @@ extension ChatControllerImpl {
         shareController.parentNavigationController = self.navigationController as? NavigationController
         
         if let message = messages.first, message.media.contains(where: { media in
-            if media is TelegramMediaContact || media is TelegramMediaPoll || media is TelegramMediaTodo {
+            if media is TelegramMediaContact || media is TelegramMediaPoll {
                 return true
             } else if let file = media as? TelegramMediaFile, file.isSticker || file.isAnimatedSticker || file.isVideoSticker {
                 return true
@@ -137,6 +138,12 @@ extension ChatControllerImpl {
                     self.push(controller)
                 }
             }
+        }
+        shareController.openShareAsImage = { [weak self] messages in
+            guard let self else {
+                return
+            }
+            self.present(ChatQrCodeScreen(context: self.context, subject: .messages(messages)), in: .window(.root))
         }
         shareController.dismissed = { [weak self] shared in
             if shared {
@@ -162,7 +169,7 @@ extension ChatControllerImpl {
           
             let _ = (self.context.engine.data.get(
                 EngineDataList(
-                    peerIds.map(TelegramEngine.EngineData.Item.Peer.RenderedPeer.init)
+                    peerIds.map(TelegramEngine.EngineData.Item.Peer.Peer.init)
                 )
             )
             |> deliverOnMainQueue).startStandalone(next: { [weak self] peerList in
@@ -177,17 +184,17 @@ extension ChatControllerImpl {
                     text = messages.count == 1 ? presentationData.strings.Conversation_ForwardTooltip_SavedMessages_One : presentationData.strings.Conversation_ForwardTooltip_SavedMessages_Many
                     savedMessages = true
                 } else {
-                    if peers.count == 1, let peer = peers.first?.chatOrMonoforumMainPeer {
+                    if peers.count == 1, let peer = peers.first {
                         var peerName = peer.id == self.context.account.peerId ? presentationData.strings.DialogList_SavedMessages : peer.displayTitle(strings: presentationData.strings, displayOrder: presentationData.nameDisplayOrder)
                         peerName = peerName.replacingOccurrences(of: "**", with: "")
                         text = messages.count == 1 ? presentationData.strings.Conversation_ForwardTooltip_Chat_One(peerName).string : presentationData.strings.Conversation_ForwardTooltip_Chat_Many(peerName).string
-                    } else if peers.count == 2, let firstPeer = peers.first?.chatOrMonoforumMainPeer, let secondPeer = peers.last?.chatOrMonoforumMainPeer {
+                    } else if peers.count == 2, let firstPeer = peers.first, let secondPeer = peers.last {
                         var firstPeerName = firstPeer.id == self.context.account.peerId ? presentationData.strings.DialogList_SavedMessages : firstPeer.displayTitle(strings: presentationData.strings, displayOrder: presentationData.nameDisplayOrder)
                         firstPeerName = firstPeerName.replacingOccurrences(of: "**", with: "")
                         var secondPeerName = secondPeer.id == self.context.account.peerId ? presentationData.strings.DialogList_SavedMessages : secondPeer.displayTitle(strings: presentationData.strings, displayOrder: presentationData.nameDisplayOrder)
                         secondPeerName = secondPeerName.replacingOccurrences(of: "**", with: "")
                         text = messages.count == 1 ? presentationData.strings.Conversation_ForwardTooltip_TwoChats_One(firstPeerName, secondPeerName).string : presentationData.strings.Conversation_ForwardTooltip_TwoChats_Many(firstPeerName, secondPeerName).string
-                    } else if let peer = peers.first?.chatOrMonoforumMainPeer {
+                    } else if let peer = peers.first {
                         var peerName = peer.displayTitle(strings: presentationData.strings, displayOrder: presentationData.nameDisplayOrder)
                         peerName = peerName.replacingOccurrences(of: "**", with: "")
                         text = messages.count == 1 ? presentationData.strings.Conversation_ForwardTooltip_ManyChats_One(peerName, "\(peers.count - 1)").string : presentationData.strings.Conversation_ForwardTooltip_ManyChats_Many(peerName, "\(peers.count - 1)").string

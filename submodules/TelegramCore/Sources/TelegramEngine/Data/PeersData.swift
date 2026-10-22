@@ -81,29 +81,18 @@ public extension EngineChannelParticipant {
 }
 
 public enum EngineLegacyGroupParticipant: Equatable {
-    case member(id: EnginePeer.Id, invitedBy: EnginePeer.Id, invitedAt: Int32, rank: String?)
-    case creator(id: EnginePeer.Id, rank: String?)
-    case admin(id: EnginePeer.Id, invitedBy: EnginePeer.Id, invitedAt: Int32, rank: String?)
+    case member(id: EnginePeer.Id, invitedBy: EnginePeer.Id, invitedAt: Int32)
+    case creator(id: EnginePeer.Id)
+    case admin(id: EnginePeer.Id, invitedBy: EnginePeer.Id, invitedAt: Int32)
     
     public var peerId: EnginePeer.Id {
         switch self {
-        case let .member(id, _, _, _):
+        case let .member(id, _, _):
             return id
-        case let .creator(id, _):
+        case let .creator(id):
             return id
-        case let .admin(id, _, _, _):
+        case let .admin(id, _, _):
             return id
-        }
-    }
-
-    public var rank: String? {
-        switch self {
-        case let .member(_, _, _, rank):
-            return rank
-        case let .creator(_, rank):
-            return rank
-        case let .admin(_, _, _, rank):
-            return rank
         }
     }
 }
@@ -111,23 +100,23 @@ public enum EngineLegacyGroupParticipant: Equatable {
 public extension EngineLegacyGroupParticipant {
     init(_ participant: GroupParticipant) {
         switch participant {
-        case let .member(id, invitedBy, invitedAt, rank):
-            self = .member(id: id, invitedBy: invitedBy, invitedAt: invitedAt, rank: rank)
-        case let .creator(id, rank):
-            self = .creator(id: id, rank: rank)
-        case let .admin(id, invitedBy, invitedAt, rank):
-            self = .admin(id: id, invitedBy: invitedBy, invitedAt: invitedAt, rank: rank)
+        case let .member(id, invitedBy, invitedAt):
+            self = .member(id: id, invitedBy: invitedBy, invitedAt: invitedAt)
+        case let .creator(id):
+            self = .creator(id: id)
+        case let .admin(id, invitedBy, invitedAt):
+            self = .admin(id: id, invitedBy: invitedBy, invitedAt: invitedAt)
         }
     }
     
     func _asParticipant() -> GroupParticipant {
         switch self {
-        case let .member(id, invitedBy, invitedAt, rank):
-            return .member(id: id, invitedBy: invitedBy, invitedAt: invitedAt, rank: rank)
-        case let .creator(id, rank):
-            return .creator(id: id, rank: rank)
-        case let .admin(id, invitedBy, invitedAt, rank):
-            return .admin(id: id, invitedBy: invitedBy, invitedAt: invitedAt, rank: rank)
+        case let .member(id, invitedBy, invitedAt):
+            return .member(id: id, invitedBy: invitedBy, invitedAt: invitedAt)
+        case let .creator(id):
+            return .creator(id: id)
+        case let .admin(id, invitedBy, invitedAt):
+            return .admin(id: id, invitedBy: invitedBy, invitedAt: invitedAt)
         }
     }
 }
@@ -215,11 +204,6 @@ public extension TelegramEngine.EngineData.Item {
                         return nil
                     }
                     peers[mainPeer.id] = EnginePeer(mainPeer)
-                } else if let channel = peer as? TelegramChannel, channel.isMonoForum, let linkedMonoforumId = channel.linkedMonoforumId {
-                    guard let mainChannel = view.peers[linkedMonoforumId] else {
-                        return nil
-                    }
-                    peers[mainChannel.id] = EnginePeer(mainChannel)
                 }
 
                 return EngineRenderedPeer(peerId: self.id, peers: peers, associatedMedia: view.media)
@@ -407,34 +391,6 @@ public extension TelegramEngine.EngineData.Item {
                 }
             }
         }
-        
-        public struct SendMessageToChannelPrice: TelegramEngineDataItem, TelegramEngineMapKeyDataItem, PostboxViewDataItem {
-            public typealias Result = Optional<StarsAmount>
-
-            fileprivate var id: EnginePeer.Id
-            public var mapKey: EnginePeer.Id {
-                return self.id
-            }
-
-            public init(id: EnginePeer.Id) {
-                self.id = id
-            }
-
-            var key: PostboxViewKey {
-                return .peer(peerId: self.id, components: [])
-            }
-
-            func extract(view: PostboxView) -> Result {
-                guard let view = view as? PeerView else {
-                    preconditionFailure()
-                }
-                if let channel = peerViewMainPeer(view) as? TelegramChannel {
-                    return channel.sendPaidMessageStars
-                } else {
-                    return nil
-                }
-            }
-        }
 
         public struct GroupCallDescription: TelegramEngineDataItem, TelegramEngineMapKeyDataItem, PostboxViewDataItem {
             public typealias Result = Optional<EngineGroupCallDescription>
@@ -536,8 +492,8 @@ public extension TelegramEngine.EngineData.Item {
             }
         }
         
-        public struct ChatTheme: TelegramEngineDataItem, TelegramEngineMapKeyDataItem, PostboxViewDataItem {
-            public typealias Result = Optional<TelegramCore.ChatTheme>
+        public struct ThemeEmoticon: TelegramEngineDataItem, TelegramEngineMapKeyDataItem, PostboxViewDataItem {
+            public typealias Result = Optional<String>
 
             fileprivate var id: EnginePeer.Id
             public var mapKey: EnginePeer.Id {
@@ -560,11 +516,11 @@ public extension TelegramEngine.EngineData.Item {
                     return nil
                 }
                 if let cachedData = cachedPeerData as? CachedUserData {
-                    return cachedData.chatTheme
+                    return cachedData.themeEmoticon
                 } else if let cachedData = cachedPeerData as? CachedGroupData {
-                    return cachedData.chatTheme
+                    return cachedData.themeEmoticon
                 } else if let cachedData = cachedPeerData as? CachedChannelData {
-                    return cachedData.chatTheme
+                    return cachedData.themeEmoticon
                 } else {
                     return nil
                 }
@@ -2137,37 +2093,6 @@ public extension TelegramEngine.EngineData.Item {
             }
         }
         
-        public struct BotStorageValue: TelegramEngineDataItem, TelegramEngineMapKeyDataItem, PostboxViewDataItem {
-            public typealias Result = String?
-
-            fileprivate var id: EnginePeer.Id
-            fileprivate var storageKey: String
-            
-            public var mapKey: EnginePeer.Id {
-                return self.id
-            }
-
-            public init(id: EnginePeer.Id, key: String) {
-                self.id = id
-                self.storageKey = key
-            }
-
-            var key: PostboxViewKey {
-                return .preferences(keys: Set([PreferencesKeys.botStorageState(peerId: self.id)]))
-            }
-
-            func extract(view: PostboxView) -> Result {
-                guard let view = view as? PreferencesView else {
-                    preconditionFailure()
-                }
-                if let state = view.values[PreferencesKeys.botStorageState(peerId: self.id)]?.get(TelegramBotStorageState.self) {
-                    return state.data[self.storageKey]
-                } else {
-                    return nil
-                }
-            }
-        }
-        
         public struct BusinessChatLinks: TelegramEngineDataItem, TelegramEngineMapKeyDataItem, PostboxViewDataItem {
             public typealias Result = TelegramBusinessChatLinks?
 
@@ -2270,69 +2195,6 @@ public extension TelegramEngine.EngineData.Item {
                 }
                 if let cachedData = view.cachedPeerData as? CachedUserData {
                     return cachedData.flags.contains(.adsEnabled)
-                } else {
-                    return false
-                }
-            }
-        }
-        
-        public struct CopyProtectionEnabled: TelegramEngineDataItem, TelegramEngineMapKeyDataItem, PostboxViewDataItem {
-            public typealias Result = Bool
-
-            fileprivate var id: EnginePeer.Id
-            public var mapKey: EnginePeer.Id {
-                return self.id
-            }
-
-            public init(id: EnginePeer.Id) {
-                self.id = id
-            }
-
-            var key: PostboxViewKey {
-                return .peer(peerId: self.id, components: [.cachedData])
-            }
-
-            func extract(view: PostboxView) -> Result {
-                guard let view = view as? PeerView else {
-                    preconditionFailure()
-                }
-                guard let peer = peerViewMainPeer(view) else {
-                    return false
-                }
-                if let cachedPeerData = view.cachedData as? CachedUserData {
-                    return cachedPeerData.flags.contains(.copyProtectionEnabled)
-                } else if let group = peer as? TelegramGroup {
-                    return group.flags.contains(.copyProtectionEnabled)
-                } else if let channel = peer as? TelegramChannel {
-                    return channel.flags.contains(.copyProtectionEnabled)
-                } else {
-                    return false
-                }
-            }
-        }
-        
-        public struct MyCopyProtectionEnabled: TelegramEngineDataItem, TelegramEngineMapKeyDataItem, PostboxViewDataItem {
-            public typealias Result = Bool
-
-            fileprivate var id: EnginePeer.Id
-            public var mapKey: EnginePeer.Id {
-                return self.id
-            }
-
-            public init(id: EnginePeer.Id) {
-                self.id = id
-            }
-
-            var key: PostboxViewKey {
-                return .cachedPeerData(peerId: self.id)
-            }
-
-            func extract(view: PostboxView) -> Result {
-                guard let view = view as? CachedPeerDataView else {
-                    preconditionFailure()
-                }
-                if let cachedData = view.cachedPeerData as? CachedUserData {
-                    return cachedData.flags.contains(.myCopyProtectionEnabled)
                 } else {
                     return false
                 }
@@ -2451,36 +2313,6 @@ public extension TelegramEngine.EngineData.Item {
             }
         }
         
-        public struct ProfileMainTab: TelegramEngineDataItem, TelegramEngineMapKeyDataItem, PostboxViewDataItem {
-            public typealias Result = Optional<TelegramProfileTab>
-            
-            fileprivate var id: EnginePeer.Id
-            public var mapKey: EnginePeer.Id {
-                return self.id
-            }
-            
-            public init(id: EnginePeer.Id) {
-                self.id = id
-            }
-            
-            var key: PostboxViewKey {
-                return .cachedPeerData(peerId: self.id)
-            }
-            
-            func extract(view: PostboxView) -> Result {
-                guard let view = view as? CachedPeerDataView else {
-                    preconditionFailure()
-                }
-                if let cachedData = view.cachedPeerData as? CachedUserData {
-                    return cachedData.mainProfileTab
-                } else if let cachedData = view.cachedPeerData as? CachedChannelData {
-                    return cachedData.mainProfileTab
-                } else {
-                    return nil
-                }
-            }
-        }
-                
         public struct BotPrivacyPolicyUrl: TelegramEngineDataItem, TelegramEngineMapKeyDataItem, PostboxViewDataItem {
             public typealias Result = Optional<String>
             
@@ -2503,62 +2335,6 @@ public extension TelegramEngine.EngineData.Item {
                 }
                 if let cachedData = view.cachedPeerData as? CachedUserData {
                     return cachedData.botInfo?.privacyPolicyUrl
-                } else {
-                    return nil
-                }
-            }
-        }
-        
-        public struct BotGroupAdminRights: TelegramEngineDataItem, TelegramEngineMapKeyDataItem, PostboxViewDataItem {
-            public typealias Result = Optional<TelegramChatAdminRights>
-            
-            fileprivate var id: EnginePeer.Id
-            public var mapKey: EnginePeer.Id {
-                return self.id
-            }
-            
-            public init(id: EnginePeer.Id) {
-                self.id = id
-            }
-            
-            var key: PostboxViewKey {
-                return .cachedPeerData(peerId: self.id)
-            }
-            
-            func extract(view: PostboxView) -> Result {
-                guard let view = view as? CachedPeerDataView else {
-                    preconditionFailure()
-                }
-                if let cachedData = view.cachedPeerData as? CachedUserData {
-                    return cachedData.botGroupAdminRights
-                } else {
-                    return nil
-                }
-            }
-        }
-        
-        public struct BotChannelAdminRights: TelegramEngineDataItem, TelegramEngineMapKeyDataItem, PostboxViewDataItem {
-            public typealias Result = Optional<TelegramChatAdminRights>
-            
-            fileprivate var id: EnginePeer.Id
-            public var mapKey: EnginePeer.Id {
-                return self.id
-            }
-            
-            public init(id: EnginePeer.Id) {
-                self.id = id
-            }
-            
-            var key: PostboxViewKey {
-                return .cachedPeerData(peerId: self.id)
-            }
-            
-            func extract(view: PostboxView) -> Result {
-                guard let view = view as? CachedPeerDataView else {
-                    preconditionFailure()
-                }
-                if let cachedData = view.cachedPeerData as? CachedUserData {
-                    return cachedData.botChannelAdminRights
                 } else {
                     return nil
                 }
@@ -2633,58 +2409,6 @@ public extension TelegramEngine.EngineData.Item {
                 } else {
                     return nil
                 }
-            }
-        }
-        
-        public struct DisallowedGifts: TelegramEngineDataItem, PostboxViewDataItem {
-            public typealias Result = TelegramDisallowedGifts?
-            
-            public let id: EnginePeer.Id
-            
-            public init(id: EnginePeer.Id) {
-                self.id = id
-            }
-            
-            var key: PostboxViewKey {
-                return .cachedPeerData(peerId: self.id)
-            }
-            
-            func extract(view: PostboxView) -> Result {
-                guard let view = view as? CachedPeerDataView else {
-                    preconditionFailure()
-                }
-                if let cachedData = view.cachedPeerData as? CachedUserData {
-                    return cachedData.disallowedGifts
-                } else {
-                    return nil
-                }
-            }
-        }
-        
-        public struct AutoTranslateEnabled: TelegramEngineDataItem, TelegramEngineMapKeyDataItem, PostboxViewDataItem {
-            public typealias Result = Bool
-
-            fileprivate var id: EnginePeer.Id
-            public var mapKey: EnginePeer.Id {
-                return self.id
-            }
-
-            public init(id: EnginePeer.Id) {
-                self.id = id
-            }
-
-            var key: PostboxViewKey {
-                return .peer(peerId: self.id, components: [])
-            }
-
-            func extract(view: PostboxView) -> Result {
-                guard let view = view as? PeerView else {
-                    preconditionFailure()
-                }
-                if let channel = peerViewMainPeer(view) as? TelegramChannel {
-                    return channel.flags.contains(.autoTranslateEnabled)
-                }
-                return false
             }
         }
     }

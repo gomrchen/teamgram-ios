@@ -348,8 +348,8 @@ public func makeDefaultDarkPresentationTheme(extendingThemeReference: Presentati
         badgeBackgroundColor:  UIColor(rgb: 0xffffff),
         badgeStrokeColor: UIColor(rgb: 0x1c1c1d),
         badgeTextColor:  UIColor(rgb: 0x000000),
-        segmentedBackgroundColor: UIColor(rgb: 0xffffff, alpha: 0.11),
-        segmentedForegroundColor: UIColor(rgb: 0xffffff, alpha: 0.36),
+        segmentedBackgroundColor: UIColor(rgb: 0x3a3b3d),
+        segmentedForegroundColor: UIColor(rgb: 0x6f7075),
         segmentedTextColor: UIColor(rgb: 0xffffff),
         segmentedDividerColor: UIColor(rgb: 0x505155),
         clearButtonBackgroundColor: UIColor(rgb: 0xffffff, alpha: 0.1),
@@ -359,9 +359,9 @@ public func makeDefaultDarkPresentationTheme(extendingThemeReference: Presentati
     let rootTabBar = PresentationThemeRootTabBar(
         backgroundColor: rootNavigationBar.blurredBackgroundColor,
         separatorColor: UIColor(rgb: 0x545458, alpha: 0.55),
-        iconColor: UIColor(rgb: 0xffffff),
+        iconColor: UIColor(rgb: 0x828282),
         selectedIconColor: UIColor(rgb: 0xffffff),
-        textColor: UIColor(rgb: 0xffffff),
+        textColor: UIColor(rgb: 0x828282),
         selectedTextColor: UIColor(rgb: 0xffffff),
         badgeBackgroundColor:  UIColor(rgb: 0xffffff),
         badgeStrokeColor: UIColor(rgb: 0x1c1c1d),
@@ -371,7 +371,7 @@ public func makeDefaultDarkPresentationTheme(extendingThemeReference: Presentati
     let navigationSearchBar = PresentationThemeNavigationSearchBar(
         backgroundColor: UIColor(rgb: 0x1c1c1d),
         accentColor: UIColor(rgb: 0xffffff),
-        inputFillColor: UIColor(white: 1.0, alpha: 0.1),
+        inputFillColor: UIColor(rgb: 0x0f0f0f),
         inputTextColor: UIColor(rgb: 0xffffff),
         inputPlaceholderTextColor: UIColor(rgb: 0x8f8f8f),
         inputIconColor: UIColor(rgb: 0x8f8f8f),
@@ -504,8 +504,8 @@ public func makeDefaultDarkPresentationTheme(extendingThemeReference: Presentati
         pinnedBadgeColor: UIColor(rgb: 0x767677),
         pinnedSearchBarColor: UIColor(rgb: 0x272728),
         regularSearchBarColor: UIColor(rgb: 0x272728),
-        sectionHeaderFillColor: .black,
-        sectionHeaderTextColor: UIColor(rgb: 0x8d8e93),
+        sectionHeaderFillColor: UIColor(rgb: 0x1c1c1d),
+        sectionHeaderTextColor: UIColor(rgb: 0xffffff),
         verifiedIconFillColor: UIColor(rgb: 0xffffff),
         verifiedIconForegroundColor:  UIColor(rgb: 0x000000),
         secretIconColor: UIColor(rgb: 0x00b12c),
@@ -532,7 +532,7 @@ public func makeDefaultDarkPresentationTheme(extendingThemeReference: Presentati
                     reactionActiveBackground: UIColor(rgb: 0xffffff, alpha: 1.0),
                     reactionActiveForeground: .clear,
                     reactionStarsInactiveBackground: UIColor(rgb: 0xD3720A, alpha: 0.2),
-                    reactionStarsInactiveForeground: UIColor(rgb: 0xFFD738),
+                    reactionStarsInactiveForeground: UIColor(rgb: 0xD3720A),
                     reactionStarsActiveBackground: UIColor(rgb: 0xD3720A, alpha: 1.0),
                     reactionStarsActiveForeground: .white,
                     reactionInactiveMediaPlaceholder: UIColor(rgb: 0x000000, alpha: 0.1),
@@ -548,7 +548,7 @@ public func makeDefaultDarkPresentationTheme(extendingThemeReference: Presentati
                     reactionActiveBackground: UIColor(rgb: 0xffffff, alpha: 1.0),
                     reactionActiveForeground: .clear,
                     reactionStarsInactiveBackground: UIColor(rgb: 0xD3720A, alpha: 0.2),
-                    reactionStarsInactiveForeground: UIColor(rgb: 0xFFD738),
+                    reactionStarsInactiveForeground: UIColor(rgb: 0xD3720A),
                     reactionStarsActiveBackground: UIColor(rgb: 0xD3720A, alpha: 1.0),
                     reactionStarsActiveForeground: .white,
                     reactionInactiveMediaPlaceholder: UIColor(rgb: 0x000000, alpha: 0.1),
@@ -561,7 +561,7 @@ public func makeDefaultDarkPresentationTheme(extendingThemeReference: Presentati
         outgoing: PresentationThemePartedColors(
             bubble: PresentationThemeBubbleColor(
                 withWallpaper: PresentationThemeBubbleColorComponents(
-                    fill: [UIColor(rgb: 0x61BCF9), UIColor(rgb: 0x0088ff)],
+                    fill: [UIColor(rgb: 0x61BCF9), UIColor(rgb: 0x007AFF)],
                     highlightedFill: UIColor(rgb: 0x61BCF9),
                     stroke: .clear,
                     shadow: nil,
@@ -570,14 +570,14 @@ public func makeDefaultDarkPresentationTheme(extendingThemeReference: Presentati
                     reactionActiveBackground: UIColor(rgb: 0xffffff, alpha: 1.0),
                     reactionActiveForeground: .clear,
                     reactionStarsInactiveBackground: UIColor(rgb: 0xD3720A, alpha: 0.2),
-                    reactionStarsInactiveForeground: UIColor(rgb: 0xFFD738),
+                    reactionStarsInactiveForeground: UIColor(rgb: 0xD3720A),
                     reactionStarsActiveBackground: UIColor(rgb: 0xD3720A, alpha: 1.0),
                     reactionStarsActiveForeground: .white,
                     reactionInactiveMediaPlaceholder: UIColor(rgb: 0x000000, alpha: 0.1),
                     reactionActiveMediaPlaceholder: UIColor(rgb: 0x000000, alpha: 0.1)
                 ),
                 withoutWallpaper: PresentationThemeBubbleColorComponents(
-                    fill: [UIColor(rgb: 0x61BCF9), UIColor(rgb: 0x0088ff)],
+                    fill: [UIColor(rgb: 0x61BCF9), UIColor(rgb: 0x007AFF)],
                     highlightedFill: UIColor(rgb: 0x61BCF9),
                     stroke: .clear,
                     shadow: nil,
@@ -586,7 +586,7 @@ public func makeDefaultDarkPresentationTheme(extendingThemeReference: Presentati
                     reactionActiveBackground: UIColor(rgb: 0xffffff, alpha: 1.0),
                     reactionActiveForeground: .clear,
                     reactionStarsInactiveBackground: UIColor(rgb: 0xD3720A, alpha: 0.2),
-                    reactionStarsInactiveForeground: UIColor(rgb: 0xFFD738),
+                    reactionStarsInactiveForeground: UIColor(rgb: 0xD3720A),
                     reactionStarsActiveBackground: UIColor(rgb: 0xD3720A, alpha: 1.0),
                     reactionStarsActiveForeground: .white,
                     reactionInactiveMediaPlaceholder: UIColor(rgb: 0x000000, alpha: 0.1),
@@ -605,7 +605,7 @@ public func makeDefaultDarkPresentationTheme(extendingThemeReference: Presentati
                 reactionActiveBackground: UIColor(rgb: 0xffffff, alpha: 1.0),
                 reactionActiveForeground: .clear,
                 reactionStarsInactiveBackground: UIColor(rgb: 0xD3720A, alpha: 0.2),
-                reactionStarsInactiveForeground: UIColor(rgb: 0xFFD738),
+                reactionStarsInactiveForeground: UIColor(rgb: 0xD3720A),
                 reactionStarsActiveBackground: UIColor(rgb: 0xD3720A, alpha: 1.0),
                 reactionStarsActiveForeground: .white,
                 reactionInactiveMediaPlaceholder: UIColor(rgb: 0x000000, alpha: 0.1),
@@ -621,7 +621,7 @@ public func makeDefaultDarkPresentationTheme(extendingThemeReference: Presentati
                 reactionActiveBackground: UIColor(rgb: 0xffffff, alpha: 1.0),
                 reactionActiveForeground: .clear,
                 reactionStarsInactiveBackground: UIColor(rgb: 0xD3720A, alpha: 0.2),
-                reactionStarsInactiveForeground: UIColor(rgb: 0xFFD738),
+                reactionStarsInactiveForeground: UIColor(rgb: 0xD3720A),
                 reactionStarsActiveBackground: UIColor(rgb: 0xD3720A, alpha: 1.0),
                 reactionStarsActiveForeground: .white,
                 reactionInactiveMediaPlaceholder: UIColor(rgb: 0x000000, alpha: 0.1),
@@ -663,14 +663,14 @@ public func makeDefaultDarkPresentationTheme(extendingThemeReference: Presentati
         panelBackgroundColorNoWallpaper: UIColor(rgb: 0x000000),
         panelSeparatorColor: UIColor(rgb: 0x545458, alpha: 0.55),
         panelControlAccentColor: UIColor(rgb: 0xffffff),
-        panelControlColor: UIColor(rgb: 0xffffff),
+        panelControlColor: UIColor(rgb: 0x808080),
         panelControlDisabledColor: UIColor(rgb: 0x808080, alpha: 0.5),
         panelControlDestructiveColor: UIColor(rgb: 0xff3b30),
-        inputBackgroundColor: UIColor(rgb: 0xffffff, alpha: 0.14).blitOver(.black, alpha: 1.0).withAlphaComponent(0.95),
+        inputBackgroundColor: UIColor(rgb: 0x060606),
         inputStrokeColor: UIColor(rgb: 0xffffff, alpha: 0.1),
-        inputPlaceholderColor: UIColor(rgb: 0xffffff, alpha: 0.48),
+        inputPlaceholderColor: UIColor(rgb: 0x7b7b7b),
         inputTextColor: UIColor(rgb: 0xffffff),
-        inputControlColor: UIColor(rgb: 0xffffff, alpha: 0.5),
+        inputControlColor: UIColor(rgb: 0x7b7b7b),
         actionControlFillColor: UIColor(rgb: 0xffffff),
         actionControlForegroundColor:  UIColor(rgb: 0x000000),
         primaryTextColor: UIColor(rgb: 0xffffff),
@@ -678,8 +678,6 @@ public func makeDefaultDarkPresentationTheme(extendingThemeReference: Presentati
         mediaRecordingDotColor: UIColor(rgb: 0xeb5545),
         mediaRecordingControl: inputPanelMediaRecordingControl
     )
-    
-    let inputMediaBackgroundColor = UIColor(rgb: 0xffffff, alpha: 0.14).blitOver(.black, alpha: 1.0).withAlphaComponent(0.95).withMultipliedAlpha(0.7)
 
     let inputMediaPanel = PresentationThemeInputMediaPanel(
         panelSeparatorColor: UIColor(rgb: 0x545458, alpha: 0.55),
@@ -697,14 +695,14 @@ public func makeDefaultDarkPresentationTheme(extendingThemeReference: Presentati
         panelContentOpaqueSearchOverlayColor: UIColor(rgb: 0x808080),
         panelContentOpaqueSearchOverlaySelectedColor: UIColor(rgb: 0x808080),
         panelContentOpaqueSearchOverlayHighlightColor: UIColor(rgb: 0x808080).withMultipliedAlpha(0.25),
-        stickersBackgroundColor: inputMediaBackgroundColor,
+        stickersBackgroundColor: UIColor(rgb: 0x000000),
         stickersSectionTextColor: UIColor(rgb: 0x7b7b7b),
         stickersSearchBackgroundColor: UIColor(rgb: 0x1c1c1d),
         stickersSearchPlaceholderColor: UIColor(rgb: 0x8d8e93),
         stickersSearchPrimaryColor: UIColor(rgb: 0xffffff),
         stickersSearchControlColor: UIColor(rgb: 0x8d8e93),
-        gifsBackgroundColor: inputMediaBackgroundColor,
-        backgroundColor: inputMediaBackgroundColor
+        gifsBackgroundColor: UIColor(rgb: 0x000000),
+        backgroundColor: UIColor(rgb: 0x000000, alpha: 0.75)
     )
 
     let inputButtonPanel = PresentationThemeInputButtonPanel(

@@ -19,8 +19,7 @@ swift_library(
         "//submodules/AppBundle",
         "//submodules/ContextUI",
         "//submodules/SoftwareVideo",
-        "//submodules/TelegramUI/Components/BatchVideoRendering",
-        "//submodules/TelegramUI/Components/GifVideoLayer",
+        "//submodules/TelegramUI/Components/MultiplexedVideoNode",
     ],
     visibility = [
         "//visibility:public",

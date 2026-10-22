@@ -77,21 +77,20 @@ private func paidContentGroupType(paidContent: TelegramMediaPaidContent) -> Mess
     return currentType
 }
 
-public func chatListItemStrings(strings: PresentationStrings, nameDisplayOrder: PresentationPersonNameOrder, dateTimeFormat: PresentationDateTimeFormat, contentSettings: ContentSettings, messages: [EngineMessage], chatPeer: EngineRenderedPeer, accountPeerId: EnginePeer.Id, enableMediaEmoji: Bool = true, isPeerGroup: Bool = false) -> (peer: EnginePeer?, hideAuthor: Bool, messageText: String, messageEntities: [MessageTextEntity], spoilers: [NSRange]?, customEmojiRanges: [(NSRange, ChatTextInputTextCustomEmojiAttribute)]?) {
+public func chatListItemStrings(strings: PresentationStrings, nameDisplayOrder: PresentationPersonNameOrder, dateTimeFormat: PresentationDateTimeFormat, contentSettings: ContentSettings, messages: [EngineMessage], chatPeer: EngineRenderedPeer, accountPeerId: EnginePeer.Id, enableMediaEmoji: Bool = true, isPeerGroup: Bool = false) -> (peer: EnginePeer?, hideAuthor: Bool, messageText: String, spoilers: [NSRange]?, customEmojiRanges: [(NSRange, ChatTextInputTextCustomEmojiAttribute)]?) {
     let peer: EnginePeer?
     
     let message = messages.last
     
     if let restrictionReason = message?._asMessage().restrictionReason(platform: "ios", contentSettings: contentSettings) {
-        return (nil, false, restrictionReason, [], nil, nil)
+        return (nil, false, restrictionReason, nil, nil)
     }
     if let restrictionReason = chatPeer.chatMainPeer?.restrictionText(platform: "ios", contentSettings: contentSettings) {
-        return (nil, false, restrictionReason, [], nil, nil)
+        return (nil, false, restrictionReason, nil, nil)
     }
     
     var hideAuthor = false
     var messageText: String
-    var messageEntities: [MessageTextEntity] = []
     var spoilers: [NSRange]?
     var customEmojiRanges: [(NSRange, ChatTextInputTextCustomEmojiAttribute)]?
     if let message = message {
@@ -105,7 +104,6 @@ public func chatListItemStrings(strings: PresentationStrings, nameDisplayOrder: 
         for message in messages {
             if !message.text.isEmpty {
                 messageText = message.text
-                messageEntities = message._asMessage().textEntitiesAttribute?.entities ?? []
                 break
             }
         }
@@ -255,21 +253,12 @@ public func chatListItemStrings(strings: PresentationStrings, nameDisplayOrder: 
                                         break inner
                                     } else {
                                         if message.text.isEmpty {
-                                            if flags.contains(.isLivePhoto) {
-                                                //TODO:localize
-                                                messageText = "Live Photo"
-                                            } else {
-                                                messageText = strings.Message_Video
-                                            }
+                                            messageText = strings.Message_Video
                                             processed = true
                                         } else {
                                             if enableMediaEmoji {
                                                 if !fileMedia.isAnimated {
-                                                    if flags.contains(.isLivePhoto) {
-                                                        messageText = "🖼 \(messageText)"
-                                                    } else {
-                                                        messageText = "📹 \(messageText)"
-                                                    }
+                                                    messageText = "📹 \(messageText)"
                                                 }
                                             }
                                             processed = true
@@ -309,23 +298,6 @@ public func chatListItemStrings(strings: PresentationStrings, nameDisplayOrder: 
                         messageText = invoice.title
                     case let action as TelegramMediaAction:
                         switch action.action {
-                            case let .conferenceCall(conferenceCall):
-                                let incoming = message.flags.contains(.Incoming)
-                                
-                                let missedTimeout: Int32 = 30
-                                let currentTime = Int32(Date().timeIntervalSince1970)
-                                
-                                if conferenceCall.flags.contains(.isMissed) {
-                                    messageText = strings.Chat_CallMessage_DeclinedGroupCall
-                                } else if conferenceCall.duration == nil && message.timestamp < currentTime - missedTimeout {
-                                    messageText = strings.Chat_CallMessage_MissedGroupCall
-                                } else {
-                                    if incoming {
-                                        messageText = strings.Chat_CallMessage_IncomingGroupCall
-                                    } else {
-                                        messageText = strings.Chat_CallMessage_OutgoingGroupCall
-                                    }
-                                }
                             case let .phoneCall(_, discardReason, _, isVideo):
                                 hideAuthor = !isPeerGroup
                                 let incoming = message.flags.contains(.Incoming)
@@ -434,20 +406,6 @@ public func chatListItemStrings(strings: PresentationStrings, nameDisplayOrder: 
                         if messageText.isEmpty, case let .Loaded(content) = webpage.content {
                             messageText = content.displayUrl
                         }
-                    case let todo as TelegramMediaTodo:
-                        let pollPrefix = "☑️ "
-                        let entityOffset = (pollPrefix as NSString).length
-                        messageText = "\(pollPrefix)\(todo.text)"
-                        for entity in todo.textEntities {
-                            if case let .CustomEmoji(_, fileId) = entity.type {
-                                if customEmojiRanges == nil {
-                                    customEmojiRanges = []
-                                }
-                                let range = NSRange(location: entityOffset + entity.range.lowerBound, length: entity.range.upperBound - entity.range.lowerBound)
-                                let attribute = ChatTextInputTextCustomEmojiAttribute(interactivelySelectedFromPackId: nil, fileId: fileId, file: message.associatedMedia[EngineMedia.Id(namespace: Namespaces.Media.CloudFile, id: fileId)] as? TelegramMediaFile)
-                                customEmojiRanges?.append((range, attribute))
-                            }
-                        }
                     default:
                         break
                 }
@@ -480,5 +438,5 @@ public func chatListItemStrings(strings: PresentationStrings, nameDisplayOrder: 
         }
     }
     
-    return (peer, hideAuthor, messageText, messageEntities, spoilers, customEmojiRanges)
+    return (peer, hideAuthor, messageText, spoilers, customEmojiRanges)
 }

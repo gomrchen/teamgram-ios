@@ -141,7 +141,7 @@ private enum ArchivedStickerPacksEntry: ItemListNodeEntry {
             case let .info(_, text):
                 return ItemListTextItem(presentationData: presentationData, text: .plain(text), sectionId: self.section)
             case let .pack(_, _, _, info, topItem, count, animatedStickers, enabled, editing, selected):
-                return ItemListStickerPackItem(presentationData: presentationData, context: arguments.context, systemStyle: .glass, packInfo: StickerPackCollectionInfo.Accessor(info), itemCount: count, topItem: topItem, unread: false, control: editing.editing ? .check(checked: selected ?? false) : .installation(installed: false), editing: editing, enabled: enabled, playAnimatedStickers: animatedStickers, sectionId: self.section, action: {
+                return ItemListStickerPackItem(presentationData: presentationData, context: arguments.context, packInfo: StickerPackCollectionInfo.Accessor(info), itemCount: count, topItem: topItem, unread: false, control: editing.editing ? .check(checked: selected ?? false) : .installation(installed: false), editing: editing, enabled: enabled, playAnimatedStickers: animatedStickers, sectionId: self.section, action: {
                     arguments.openStickerPack(info)
                 }, setPackIdWithRevealedOptions: { current, previous in
                     arguments.setPackIdWithRevealedOptions(current, previous)
@@ -249,17 +249,11 @@ private func archivedStickerPacksControllerEntries(context: AccountContext, mode
     return entries
 }
 
-public func archivedStickerPacksController(context: AccountContext, mode: ArchivedStickerPacksControllerMode, archived: [ArchivedStickerPackItem]?, forceTheme: PresentationTheme? = nil, updatedPacks: @escaping ([ArchivedStickerPackItem]?) -> Void, forceEdit: Bool = false) -> ViewController {
+public func archivedStickerPacksController(context: AccountContext, mode: ArchivedStickerPacksControllerMode, archived: [ArchivedStickerPackItem]?, forceTheme: PresentationTheme? = nil, updatedPacks: @escaping ([ArchivedStickerPackItem]?) -> Void) -> ViewController {
     let statePromise = ValuePromise(ArchivedStickerPacksControllerState(), ignoreRepeated: true)
     let stateValue = Atomic(value: ArchivedStickerPacksControllerState())
     let updateState: ((ArchivedStickerPacksControllerState) -> ArchivedStickerPacksControllerState) -> Void = { f in
         statePromise.set(stateValue.modify { f($0) })
-    }
-    
-    if forceEdit {
-        updateState {
-            $0.withUpdatedEditing(true)
-        }
     }
     
     var presentControllerImpl: ((ViewController, ViewControllerPresentationArguments?) -> Void)?

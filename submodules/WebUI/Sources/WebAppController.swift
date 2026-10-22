@@ -38,12 +38,6 @@ import DeviceLocationManager
 import LegacyMediaPickerUI
 import GenerateStickerPlaceholderImage
 import PassKit
-import Photos
-import GlassBarButtonComponent
-import BundleIconComponent
-import LottieComponent
-import CryptoKit
-import AlertComponent
 
 private let durgerKingBotIds: [Int64] = [5104055776, 2200339955]
 
@@ -140,53 +134,6 @@ public func generateWebAppThemeParams(_ theme: PresentationTheme) -> [String: An
     ]
 }
 
-#if DEBUG
-private let registeredProtocols: Void = {
-    class AppURLProtocol: URLProtocol {
-        var urlTask: URLSessionDataTask?
-        
-        override class func canInit(with request: URLRequest) -> Bool {
-            if request.url?.scheme == "https" {
-                return false
-            }
-            return false
-        }
-        
-        override class func canonicalRequest(for request: URLRequest) -> URLRequest {
-            return request
-        }
-        
-        override func startLoading() {
-            super.startLoading()
-            
-            /*if self.urlTask != nil {
-                return
-            }
-            self.urlTask = URLSession.shared.dataTask(with: self.request, completionHandler: { [weak self] _, response, error in
-                guard let self else {
-                    return
-                }
-                if let error {
-                    self.client?.urlProtocol(self, didFailWithError: error)
-                } else {
-                    if let response = response as? HTTPURLResponse {
-                        self.client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-                    } else {
-                    }
-                    self.client?.urlProtocolDidFinishLoading(self)
-                }
-            })
-            self.urlTask?.resume()*/
-        }
-        
-        override func stopLoading() {
-            self.urlTask?.cancel()
-        }
-    }
-    URLProtocol.registerClass(AppURLProtocol.self)
-}()
-#endif
-
 public final class WebAppController: ViewController, AttachmentContainable {
     public var requestAttachmentMenuExpansion: () -> Void = { }
     public var updateNavigationStack: (@escaping ([AttachmentContainable]) -> ([AttachmentContainable], AttachmentMediaPickerContext?)) -> Void = { _ in }
@@ -234,7 +181,7 @@ public final class WebAppController: ViewController, AttachmentContainable {
         private var queryId: Int64?
         fileprivate let canMinimize = true
         
-        fileprivate var hasBackButton = false
+        private var hasBackButton = false
         
         private var placeholderDisposable = MetaDisposable()
         private var keepAliveDisposable: Disposable?
@@ -251,10 +198,6 @@ public final class WebAppController: ViewController, AttachmentContainable {
         private var validLayout: (ContainerViewLayout, CGFloat)?
         
         init(context: AccountContext, controller: WebAppController) {
-            #if DEBUG
-            let _ = registeredProtocols
-            #endif
-            
             self.context = context
             self.controller = controller
             self.presentationData = controller.presentationData
@@ -290,13 +233,13 @@ public final class WebAppController: ViewController, AttachmentContainable {
                     }
                 }
             }
-            
-            if self.presentationData.theme.overallDarkAppearance {
-                webView.overrideUserInterfaceStyle = .dark
-            } else {
-                webView.overrideUserInterfaceStyle = .unspecified
+            if #available(iOS 13.0, *) {
+                if self.presentationData.theme.overallDarkAppearance {
+                    webView.overrideUserInterfaceStyle = .dark
+                } else {
+                    webView.overrideUserInterfaceStyle = .unspecified
+                }
             }
-            
             self.webView = webView
             
             self.addSubnode(self.backgroundNode)
@@ -479,47 +422,6 @@ public final class WebAppController: ViewController, AttachmentContainable {
             webView.scrollView.insertSubview(self.topOverscrollNode.view, at: 0)
         }
         
-        private func load(url: URL) {
-            /*#if DEBUG
-            if "".isEmpty {
-                if #available(iOS 16.0, *) {
-                    let documentsPath = URL.documentsDirectory.path(percentEncoded: false)
-                    
-                    var hasher = SHA256()
-                    var urlString = url.absoluteString
-                    if let range = urlString.firstRange(of: "#") {
-                        urlString.removeSubrange(range.lowerBound...)
-                    }
-                    hasher.update(data: urlString.data(using: .utf8)!)
-                    let digest = Data(hasher.finalize())
-                    let urlHash = hexString(digest)
-                    
-                    let cachedFilePath = documentsPath.appending("\(urlHash).bin")
-                    
-                    Task {
-                        do {
-                            let data: Data
-                            if let cachedData = try? Data(contentsOf: URL(fileURLWithPath: cachedFilePath)) {
-                                data = cachedData
-                                print("Loaded from cache at \(cachedFilePath)")
-                            } else {
-                                let (loadedData, _) = try await URLSession.shared.data(from: url)
-                                data = loadedData
-                                try loadedData.write(to: URL(fileURLWithPath: cachedFilePath), options: .atomic)
-                            }
-                            self.webView?.load(data, mimeType: "text/html", characterEncodingName: "utf-8", baseURL: url)
-                        } catch let e {
-                            print("\(e)")
-                        }
-                    }
-                }
-                
-                return
-            }
-            #endif*/
-            self.webView?.load(URLRequest(url: url))
-        }
-        
         func setupWebView() {
             guard let controller = self.controller else {
                 return
@@ -528,7 +430,7 @@ public final class WebAppController: ViewController, AttachmentContainable {
             if let url = controller.url, controller.source != .menu {
                 self.queryId = controller.queryId
                 if let parsedUrl = URL(string: url) {
-                    self.load(url: parsedUrl)
+                    self.webView?.load(URLRequest(url: parsedUrl))
                 }
                 if let keepAliveSignal = controller.keepAliveSignal {
                     self.keepAliveDisposable = (keepAliveSignal
@@ -551,7 +453,7 @@ public final class WebAppController: ViewController, AttachmentContainable {
                         }
                         if let parsedUrl = URL(string: result.url) {
                             strongSelf.queryId = result.queryId
-                            strongSelf.load(url: parsedUrl)
+                            strongSelf.webView?.load(URLRequest(url: parsedUrl))
                         }
                     })
                 } else {
@@ -571,7 +473,7 @@ public final class WebAppController: ViewController, AttachmentContainable {
                                     return
                                 }
                                 self.controller?.titleView?.title = WebAppTitle(title: botApp.title, counter: self.presentationData.strings.WebApp_Miniapp, isVerified: controller.botVerified)
-                                self.load(url: parsedUrl)
+                                self.webView?.load(URLRequest(url: parsedUrl))
                             })
                         })
                     } else {
@@ -581,7 +483,7 @@ public final class WebAppController: ViewController, AttachmentContainable {
                                 return
                             }
                             strongSelf.queryId = result.queryId
-                            strongSelf.load(url: parsedUrl)
+                            strongSelf.webView?.load(URLRequest(url: parsedUrl))
                                                         
                             if let keepAliveSignal = result.keepAliveSignal {
                                 strongSelf.keepAliveDisposable = (keepAliveSignal
@@ -686,14 +588,7 @@ public final class WebAppController: ViewController, AttachmentContainable {
                     if let data = try? Data(contentsOf: url), let pass = try? PKPass(data: data) {
                         let passLibrary = PKPassLibrary()
                         if passLibrary.containsPass(pass) {
-                            let alertController = AlertScreen(
-                                context: self.context,
-                                title: nil,
-                                text: self.presentationData.strings.WebBrowser_PassExistsError,
-                                actions: [
-                                    .init(title: self.presentationData.strings.Common_OK, type: .default)
-                                ]
-                            )
+                            let alertController = textAlertController(context: self.context, updatedPresentationData: nil, title: nil, text: self.presentationData.strings.WebBrowser_PassExistsError, actions: [TextAlertAction(type: .genericAction, title: self.presentationData.strings.Common_OK, action: {})])
                             self.controller?.present(alertController, in: .window(.root))
                         } else if let controller = PKAddPassesViewController(pass: pass) {
                             self.controller?.view.window?.rootViewController?.present(controller, animated: true)
@@ -757,31 +652,20 @@ public final class WebAppController: ViewController, AttachmentContainable {
                 self.animateTransitionIn()
             })
         }
-                
+        
         @available(iOSApplicationExtension 15.0, iOS 15.0, *)
         func webView(_ webView: WKWebView, requestMediaCapturePermissionFor origin: WKSecurityOrigin, initiatedByFrame frame: WKFrameInfo, type: WKMediaCaptureType, decisionHandler: @escaping (WKPermissionDecision) -> Void) {
-            if self.controller?.isVerifyAgeBot == true && type == .camera {
-                decisionHandler(.grant)
-            } else {
-                decisionHandler(.prompt)
-            }
+            decisionHandler(.prompt)
         }
                 
         func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping () -> Void) {
             var completed = false
-            let alertController = AlertScreen(
-                context: self.context,
-                title: nil,
-                text: message,
-                actions: [
-                    .init(title: self.presentationData.strings.Common_OK, action: {
-                        if !completed {
-                            completed = true
-                            completionHandler()
-                        }
-                    })
-                ]
-            )
+            let alertController = textAlertController(context: self.context, updatedPresentationData: self.controller?.updatedPresentationData, title: nil, text: message, actions: [TextAlertAction(type: .defaultAction, title: self.presentationData.strings.Common_OK, action: {
+                if !completed {
+                    completed = true
+                    completionHandler()
+                }
+            })])
             alertController.dismissed = { byOutsideTap in
                 if byOutsideTap {
                     if !completed {
@@ -795,25 +679,17 @@ public final class WebAppController: ViewController, AttachmentContainable {
 
         func webView(_ webView: WKWebView, runJavaScriptConfirmPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping (Bool) -> Void) {
             var completed = false
-            let alertController = AlertScreen(
-                context: self.context,
-                title: nil,
-                text: message,
-                actions: [
-                    .init(title: self.presentationData.strings.Common_Cancel, action: {
-                        if !completed {
-                            completed = true
-                            completionHandler(false)
-                        }
-                    }),
-                    .init(title: self.presentationData.strings.Common_OK, type: .default, action: {
-                        if !completed {
-                            completed = true
-                            completionHandler(true)
-                        }
-                    })
-                ]
-            )
+            let alertController = textAlertController(context: self.context, updatedPresentationData: self.controller?.updatedPresentationData, title: nil, text: message, actions: [TextAlertAction(type: .genericAction, title: self.presentationData.strings.Common_Cancel, action: {
+                if !completed {
+                    completed = true
+                    completionHandler(false)
+                }
+            }), TextAlertAction(type: .defaultAction, title: self.presentationData.strings.Common_OK, action: {
+                if !completed {
+                    completed = true
+                    completionHandler(true)
+                }
+            })])
             alertController.dismissed = { byOutsideTap in
                 if byOutsideTap {
                     if !completed {
@@ -827,28 +703,24 @@ public final class WebAppController: ViewController, AttachmentContainable {
 
         func webView(_ webView: WKWebView, runJavaScriptTextInputPanelWithPrompt prompt: String, defaultText: String?, initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping (String?) -> Void) {
             var completed = false
-            let promptController = promptController(
-                context: self.context,
-                updatedPresentationData: self.controller?.updatedPresentationData,
-                text: prompt,
-                value: defaultText,
-                apply: { value in
-                    if !completed {
-                        completed = true
-                        if let value = value {
-                            completionHandler(value)
-                        } else {
-                            completionHandler(nil)
-                        }
+            let promptController = promptController(sharedContext: self.context.sharedContext, updatedPresentationData: self.controller?.updatedPresentationData, text: prompt, value: defaultText, apply: { value in
+                if !completed {
+                    completed = true
+                    if let value = value {
+                        completionHandler(value)
+                    } else {
+                        completionHandler(nil)
                     }
-                },
-                dismissed: {
+                }
+            })
+            promptController.dismissed = { byOutsideTap in
+                if byOutsideTap {
                     if !completed {
                         completed = true
                         completionHandler(nil)
                     }
                 }
-            )
+            }
             self.controller?.present(promptController, in: .window(.root))
         }
         
@@ -931,7 +803,7 @@ public final class WebAppController: ViewController, AttachmentContainable {
                                 guard let self else {
                                     return
                                 }
-                                self.controller?.morePressed(view: node.view, gesture: gesture)
+                                self.controller?.morePressed(node: node, gesture: gesture)
                             }
                         )
                     ),
@@ -956,11 +828,7 @@ public final class WebAppController: ViewController, AttachmentContainable {
             }
             
             if let webView = self.webView {
-                let inputHeight = self.validLayout?.0.inputHeight ?? 0.0
-                
-                let intrinsicBottomInset = layout.intrinsicInsets.bottom > 40.0 ? layout.intrinsicInsets.bottom : 0.0
-                
-                var scrollInset = UIEdgeInsets(top: 0.0, left: 0.0, bottom: max(inputHeight, intrinsicBottomInset), right: 0.0)
+                var scrollInset = UIEdgeInsets(top: 0.0, left: 0.0, bottom: layout.intrinsicInsets.bottom, right: 0.0)
                 var frameBottomInset: CGFloat = 0.0
                 if scrollInset.bottom > 40.0 {
                     frameBottomInset = scrollInset.bottom
@@ -973,31 +841,28 @@ public final class WebAppController: ViewController, AttachmentContainable {
                 if !webView.frame.width.isZero && webView.frame != webViewFrame {
                     self.updateWebViewWhenStable = true
                 }
-                                
-                var viewportBottomInset = max(frameBottomInset, scrollInset.bottom)
-                if (self.validLayout?.0.inputHeight ?? 0.0) < 44.0 {
-                    viewportBottomInset += layout.additionalInsets.bottom
+                
+                var bottomInset = layout.intrinsicInsets.bottom + layout.additionalInsets.bottom
+                if let inputHeight = self.validLayout?.0.inputHeight, inputHeight > 44.0 {
+                    bottomInset = max(bottomInset, inputHeight)
                 }
-                let viewportFrame = CGRect(origin: CGPoint(x: layout.safeInsets.left, y: topInset), size: CGSize(width: layout.size.width - layout.safeInsets.left - layout.safeInsets.right, height: max(1.0, layout.size.height - topInset - viewportBottomInset)))
+                let viewportFrame = CGRect(origin: CGPoint(x: layout.safeInsets.left, y: topInset), size: CGSize(width: layout.size.width - layout.safeInsets.left - layout.safeInsets.right, height: max(1.0, layout.size.height - topInset - bottomInset)))
                 
                 if webView.scrollView.contentInset != scrollInset {
                     webView.scrollView.contentInset = scrollInset
-                    webView.scrollView.horizontalScrollIndicatorInsets = scrollInset
-                    webView.scrollView.verticalScrollIndicatorInsets = scrollInset
+                    webView.scrollView.scrollIndicatorInsets = scrollInset
                 }
                 
                 if previousLayout != nil && (previousLayout?.inputHeight ?? 0.0).isZero, let inputHeight = layout.inputHeight, inputHeight > 44.0, transition.isAnimated {
+                    webView.scrollToActiveElement(layout: layout, completion: { [weak self] contentOffset in
+                        self?.targetContentOffset = contentOffset
+                    }, transition: transition)
                     Queue.mainQueue().after(0.4, {
                         if let inputHeight = self.validLayout?.0.inputHeight, inputHeight > 44.0 {
-                            webView.scrollToActiveElement(layout: layout, completion: { [weak self] contentOffset in
-                                let _ = self
-                            //    self?.targetContentOffset = contentOffset
-                            }, transition: transition)
-                            
                             transition.updateFrame(view: webView, frame: webViewFrame)
-//                            Queue.mainQueue().after(0.1) {
-//                                self.targetContentOffset = nil
-//                            }
+                            Queue.mainQueue().after(0.1) {
+                                self.targetContentOffset = nil
+                            }
                         }
                     })
                 } else {
@@ -1030,13 +895,8 @@ public final class WebAppController: ViewController, AttachmentContainable {
                 if let controller = self.controller {
                     webView.updateMetrics(height: viewportFrame.height, isExpanded: controller.isContainerExpanded(), isStable: !controller.isContainerPanning(), transition: transition)
                     
-                    let data: JSON = [
-                        "top": Double(contentTopInset),
-                        "bottom": 0.0,
-                        "left": 0.0,
-                        "right": 0.0
-                    ]
-                    webView.sendEvent(name: "content_safe_area_changed", data: data.string)
+                    let contentInsetsData = "{top:\(contentTopInset), bottom:0.0, left:0.0, right:0.0}"
+                    webView.sendEvent(name: "content_safe_area_changed", data: contentInsetsData)
                     
                     if self.updateWebViewWhenStable && !controller.isContainerPanning() {
                         self.updateWebViewWhenStable = false
@@ -1093,9 +953,6 @@ public final class WebAppController: ViewController, AttachmentContainable {
             guard let controller = self.controller else {
                 return
             }
-            guard message.frameInfo.isMainFrame else {
-                return
-            }
             guard let body = message.body as? [String: Any] else {
                 return
             }
@@ -1107,831 +964,601 @@ public final class WebAppController: ViewController, AttachmentContainable {
             let json = try? JSONSerialization.jsonObject(with: eventData ?? Data(), options: []) as? [String: Any]
             
             switch eventName {
-            case "web_app_ready":
-                self.animateTransitionIn()
-            case "web_app_switch_inline_query":
-                if let json, let query = json["query"] as? String {
-                    if let chatTypes = json["chat_types"] as? [String], !chatTypes.isEmpty {
-                        var requestPeerTypes: [ReplyMarkupButtonRequestPeerType] = []
-                        for type in chatTypes {
-                            switch type {
-                            case "users":
-                                requestPeerTypes.append(.user(ReplyMarkupButtonRequestPeerType.User(isBot: false, isPremium: nil)))
-                            case "bots":
-                                requestPeerTypes.append(.user(ReplyMarkupButtonRequestPeerType.User(isBot: true, isPremium: nil)))
-                            case "groups":
-                                requestPeerTypes.append(.group(ReplyMarkupButtonRequestPeerType.Group(isCreator: false, hasUsername: nil, isForum: nil, botParticipant: false, userAdminRights: nil, botAdminRights: nil)))
-                            case "channels":
-                                requestPeerTypes.append(.channel(ReplyMarkupButtonRequestPeerType.Channel(isCreator: false, hasUsername: nil, userAdminRights: nil, botAdminRights: nil)))
-                            default:
-                                break
-                            }
-                        }
-                        controller.requestSwitchInline(query, requestPeerTypes, { [weak controller] in
-                            controller?.dismiss()
-                        })
-                    } else {
-                        controller.dismiss()
-                        controller.requestSwitchInline(query, nil, {})
-                    }
-                }
-            case "web_app_data_send":
-                if controller.source.isSimple, let eventData = body["eventData"] as? String {
-                    self.handleSendData(data: eventData)
-                }
-            case "web_app_setup_main_button":
-                if let webView = self.webView, !webView.didTouchOnce && controller.url == nil && controller.source == .attachMenu {
-                    self.delayedScriptMessages.append(message)
-                } else if let json = json {
-                    if var isVisible = json["is_visible"] as? Bool {
-                        let text = json["text"] as? String
-                        if (text ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                            isVisible = false
-                        }
-                        
-                        let backgroundColorString = json["color"] as? String
-                        let backgroundColor = backgroundColorString.flatMap({ UIColor(hexString: $0) }) ?? self.presentationData.theme.list.itemCheckColors.fillColor
-                        let textColorString = json["text_color"] as? String
-                        let textColor = textColorString.flatMap({ UIColor(hexString: $0) }) ?? self.presentationData.theme.list.itemCheckColors.foregroundColor
-                        
-                        let isLoading = json["is_progress_visible"] as? Bool
-                        let isEnabled = json["is_active"] as? Bool
-                        let hasShimmer = json["has_shine_effect"] as? Bool
-                        
-                        var iconCustomEmojiId: Int64?
-                        if let stringValue = json["icon_custom_emoji_id"] as? String, let intValue = Int64(stringValue) {
-                            iconCustomEmojiId = intValue
-                        }
-                        
-                        let state = AttachmentMainButtonState(
-                            text: text,
-                            font: .bold,
-                            background: .color(backgroundColor),
-                            textColor: textColor,
-                            isVisible: isVisible,
-                            progress: (isLoading ?? false) ? .center : .none,
-                            isEnabled: isEnabled ?? true,
-                            hasShimmer: hasShimmer ?? false,
-                            iconCustomEmojiId: iconCustomEmojiId
-                        )
-                        self.mainButtonState = state
-                    }
-                }
-            case "web_app_setup_secondary_button":
-                if let webView = self.webView, !webView.didTouchOnce && controller.url == nil && controller.source == .attachMenu {
-                    self.delayedScriptMessages.append(message)
-                } else if let json = json {
-                    if var isVisible = json["is_visible"] as? Bool {
-                        let text = json["text"] as? String
-                        if (text ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                            isVisible = false
-                        }
-                        
-                        let backgroundColorString = json["color"] as? String
-                        let backgroundColor = backgroundColorString.flatMap({ UIColor(hexString: $0) }) ?? self.presentationData.theme.list.itemCheckColors.fillColor
-                        let textColorString = json["text_color"] as? String
-                        let textColor = textColorString.flatMap({ UIColor(hexString: $0) }) ?? self.presentationData.theme.list.itemCheckColors.foregroundColor
-                        
-                        let isLoading = json["is_progress_visible"] as? Bool
-                        let isEnabled = json["is_active"] as? Bool
-                        let hasShimmer = json["has_shine_effect"] as? Bool
-                        let position = json["position"] as? String
-                        
-                        var iconCustomEmojiId: Int64?
-                        if let stringValue = json["icon_custom_emoji_id"] as? String, let intValue = Int64(stringValue) {
-                            iconCustomEmojiId = intValue
-                        }
-                        
-                        let state = AttachmentMainButtonState(
-                            text: text,
-                            font: .bold,
-                            background: .color(backgroundColor),
-                            textColor: textColor,
-                            isVisible: isVisible,
-                            progress: (isLoading ?? false) ? .center : .none,
-                            isEnabled: isEnabled ?? true,
-                            hasShimmer: hasShimmer ?? false,
-                            iconCustomEmojiId: iconCustomEmojiId,
-                            position: position.flatMap { AttachmentMainButtonState.Position(rawValue: $0) }
-                        )
-                        self.secondaryButtonState = state
-                    }
-                }
-            case "web_app_request_viewport":
-                self.requestLayout(transition: .immediate)
-            case "web_app_request_safe_area":
-                self.requestLayout(transition: .immediate)
-            case "web_app_request_content_safe_area":
-                self.requestLayout(transition: .immediate)
-            case "web_app_request_theme":
-                self.sendThemeChangedEvent()
-            case "web_app_expand":
-                if let lastExpansionTimestamp = self.lastExpansionTimestamp, currentTimestamp < lastExpansionTimestamp + 1.0 {
-                    
-                } else {
-                    self.lastExpansionTimestamp = currentTimestamp
-                    controller.requestAttachmentMenuExpansion()
-                    
-                    Queue.mainQueue().after(0.4) {
-                        self.webView?.setNeedsLayout()
-                    }
-                }
-            case "web_app_close":
-                controller.dismiss()
-            case "web_app_open_tg_link":
-                if let json = json, let path = json["path_full"] as? String {
-                    let forceRequest = json["force_request"] as? Bool ?? false
-                    controller.openUrl("https://t.me\(path)", false, forceRequest, {
-                    })
-                }
-            case "web_app_open_invoice":
-                if let json = json, let slug = json["slug"] as? String {
-                    self.paymentDisposable = (self.context.engine.payments.fetchBotPaymentInvoice(source: .slug(slug))
-                    |> map(Optional.init)
-                    |> `catch` { _ -> Signal<TelegramMediaInvoice?, NoError> in
-                        return .single(nil)
-                    }
-                    |> deliverOnMainQueue).start(next: { [weak self] invoice in
-                        if let strongSelf = self, let invoice, let navigationController = strongSelf.controller?.getNavigationController() {
-                            let inputData = Promise<BotCheckoutController.InputData?>()
-                            inputData.set(BotCheckoutController.InputData.fetch(context: strongSelf.context, source: .slug(slug))
-                            |> map(Optional.init)
-                            |> `catch` { _ -> Signal<BotCheckoutController.InputData?, NoError> in
-                                return .single(nil)
-                            })
-                            if invoice.currency == "XTR", let starsContext = strongSelf.context.starsContext {
-                                let starsInputData = combineLatest(
-                                    inputData.get(),
-                                    starsContext.state
-                                )
-                                |> map { data, state -> (StarsContext.State, BotPaymentForm, EnginePeer?, EnginePeer?)? in
-                                    if let data, let state {
-                                        return (state, data.form, data.botPeer, nil)
-                                    } else {
-                                        return nil
-                                    }
-                                }
-                                let _ = (starsInputData |> filter { $0 != nil } |> take(1) |> deliverOnMainQueue).start(next: { _ in
-                                    let controller = strongSelf.context.sharedContext.makeStarsTransferScreen(
-                                        context: strongSelf.context,
-                                        starsContext: starsContext,
-                                        invoice: invoice,
-                                        source: .slug(slug),
-                                        extendedMedia: [],
-                                        inputData: starsInputData,
-                                        completion: { [weak self] paid in
-                                            guard let self else {
-                                                return
-                                            }
-                                            self.sendInvoiceClosedEvent(slug: slug, result: paid ? .paid : .cancelled)
-                                        }
-                                    )
-                                    navigationController.pushViewController(controller)
-                                })
-                            } else {
-                                let checkoutController = BotCheckoutController(context: strongSelf.context, invoice: invoice, source: .slug(slug), inputData: inputData, completed: { currencyValue, receiptMessageId in
-                                    self?.sendInvoiceClosedEvent(slug: slug, result: .paid)
-                                }, cancelled: { [weak self] in
-                                    self?.sendInvoiceClosedEvent(slug: slug, result: .cancelled)
-                                }, failed: { [weak self] in
-                                    self?.sendInvoiceClosedEvent(slug: slug, result: .failed)
-                                })
-                                checkoutController.navigationPresentation = .modal
-                                navigationController.pushViewController(checkoutController)
-                            }
-                        }
-                    })
-                }
-            case "web_app_open_link":
-                if let json = json, let url = json["url"] as? String {
-                    let webAppConfiguration = WebAppConfiguration.with(appConfiguration: self.context.currentAppConfiguration.with { $0 })
-                    if let escapedUrl = url.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed), let url = URL(string: escapedUrl), let scheme = url.scheme?.lowercased(), !["http", "https"].contains(scheme) && !webAppConfiguration.allowedProtocols.contains(scheme) {
-                        return
-                    }
-                    
-                    let tryInstantView = json["try_instant_view"] as? Bool ?? false
-                    let tryBrowser = json["try_browser"] as? String
-                    
-                    if let lastTouchTimestamp = self.webView?.lastTouchTimestamp, currentTimestamp < lastTouchTimestamp + 10.0 {
-                        self.webView?.lastTouchTimestamp = nil
-                        if tryInstantView {
-                            let _ = (resolveInstantViewUrl(account: self.context.account, url: url)
-                            |> mapToSignal { result -> Signal<ResolvedUrl, NoError> in
-                                guard case let .result(result) = result else {
-                                    return .complete()
-                                }
-                                return .single(result)
-                            }
-                            |> deliverOnMainQueue).start(next: { [weak self] result in
-                                guard let strongSelf = self else {
-                                    return
-                                }
-                                switch result {
-                                case let .instantView(webPage, anchor):
-                                    let controller = strongSelf.context.sharedContext.makeInstantPageController(context: strongSelf.context, webPage: webPage, anchor: anchor, sourceLocation: InstantPageSourceLocation(userLocation: .other, peerType: .otherPrivate))
-                                    strongSelf.controller?.getNavigationController()?.pushViewController(controller)
-                                default:
-                                    strongSelf.context.sharedContext.openExternalUrl(context: strongSelf.context, urlContext: .generic, url: url, forceExternal: true, presentationData: strongSelf.context.sharedContext.currentPresentationData.with { $0 }, navigationController: nil, dismissInput: {})
-                                }
-                            })
-                        } else {
-                            var url = url
-                            if let tryBrowser {
-                                let openInOptions = availableOpenInOptions(context: self.context, item: .url(url: url))
-                                var matchingOption: OpenInOption?
-                                for option in openInOptions {
-                                    if case .other = option.application {
-                                        switch tryBrowser {
-                                        case "safari":
-                                            break
-                                        case "chrome":
-                                            if option.identifier == "chrome" {
-                                                matchingOption = option
-                                                break
-                                            }
-                                        case "firefox":
-                                            if ["firefox", "firefoxFocus"].contains(option.identifier) {
-                                                matchingOption = option
-                                                break
-                                            }
-                                        case "opera":
-                                            if ["operaMini", "operaTouch"].contains(option.identifier) {
-                                                matchingOption = option
-                                                break
-                                            }
-                                        default:
-                                            break
-                                        }
-                                    }
-                                }
-                                if let matchingOption, case let .openUrl(newUrl) = matchingOption.action() {
-                                    url = newUrl
-                                }
-                            }
-
-                            self.context.sharedContext.openExternalUrl(context: self.context, urlContext: .generic, url: url, forceExternal: true, presentationData: self.context.sharedContext.currentPresentationData.with { $0 }, navigationController: nil, dismissInput: {})
-                        }
-                    }
-                }
-            case "web_app_setup_back_button":
-                if let json = json, let isVisible = json["is_visible"] as? Bool {
-                    self.hasBackButton = isVisible
-                    self.controller?.updateNavigationButtons()
-                    if controller.isFullscreen {
-                        self.requestLayout(transition: .immediate)
-                    }
-                }
-            case "web_app_trigger_haptic_feedback":
-                if let json = json, let type = json["type"] as? String {
-                    switch type {
-                        case "impact":
-                            if let impactType = json["impact_style"] as? String {
-                                switch impactType {
-                                    case "light":
-                                        self.hapticFeedback.impact(.light)
-                                    case "medium":
-                                        self.hapticFeedback.impact(.medium)
-                                    case "heavy":
-                                        self.hapticFeedback.impact(.heavy)
-                                    case "rigid":
-                                        self.hapticFeedback.impact(.rigid)
-                                    case "soft":
-                                        self.hapticFeedback.impact(.soft)
-                                    default:
-                                        break
-                                }
-                            }
-                        case "notification":
-                            if let notificationType = json["notification_type"] as? String {
-                                switch notificationType {
-                                    case "success":
-                                        self.hapticFeedback.success()
-                                    case "error":
-                                        self.hapticFeedback.error()
-                                    case "warning":
-                                        self.hapticFeedback.warning()
-                                    default:
-                                        break
-                                }
-                            }
-                        case "selection_change":
-                            self.hapticFeedback.tap()
-                        default:
-                            break
-                    }
-                }
-            case "web_app_set_background_color":
-                if let json = json, let colorValue = json["color"] as? String, let color = UIColor(hexString: colorValue) {
-                    self.appBackgroundColor = color
-                    self.updateBackgroundColor(transition: .animated(duration: 0.2, curve: .linear))
-                }
-            case "web_app_set_header_color":
-                if let json = json {
-                    if let colorKey = json["color_key"] as? String, ["bg_color", "secondary_bg_color"].contains(colorKey) {
-                        self.headerColor = nil
-                        self.headerColorKey = colorKey
-                    } else if let hexColor = json["color"] as? String, let color = UIColor(hexString: hexColor) {
-                        self.headerColor = color
-                        self.headerColorKey = nil
-                    }
-                    self.updateHeaderBackgroundColor(transition: .animated(duration: 0.2, curve: .linear))
-                }
-            case "web_app_set_bottom_bar_color":
-                if let json = json {
-                    if let hexColor = json["color"] as? String, let color = UIColor(hexString: hexColor) {
-                        self.bottomPanelColor = color
-                    }
-                }
-            case "web_app_open_popup":
-                if let json, let message = json["message"] as? String, let buttons = json["buttons"] as? [Any] {
-                    let presentationData = self.presentationData
-                    
-                    let title = json["title"] as? String
-                    var actions: [AlertScreen.Action] = []
-                    
-                    for buttonJson in buttons.reversed() {
-                        if let button = buttonJson as? [String: Any], let id = button["id"] as? String, let type = button["type"] as? String {
-                            let buttonAction = {
-                                self.sendAlertButtonEvent(id: id)
-                            }
-                            let text = button["text"] as? String
-                            switch type {
-                                case "default":
-                                    if let text {
-                                        actions.append(AlertScreen.Action(title: text, action: {
-                                            buttonAction()
-                                        }))
-                                    }
-                                case "destructive":
-                                    if let text {
-                                        actions.append(AlertScreen.Action(title: text, type: .destructive, action: {
-                                            buttonAction()
-                                        }))
-                                    }
-                                case "ok":
-                                    actions.append(AlertScreen.Action(title: presentationData.strings.Common_OK, type: .default, action: {
-                                        buttonAction()
-                                    }))
-                                case "cancel":
-                                    actions.append(AlertScreen.Action(title: presentationData.strings.Common_Cancel, action: {
-                                        buttonAction()
-                                    }))
-                                case "close":
-                                    actions.append(AlertScreen.Action(title: presentationData.strings.Common_Close, action: {
-                                        buttonAction()
-                                    }))
+                case "web_app_ready":
+                    self.animateTransitionIn()
+                case "web_app_switch_inline_query":
+                    if let json, let query = json["query"] as? String {
+                        if let chatTypes = json["chat_types"] as? [String], !chatTypes.isEmpty {
+                            var requestPeerTypes: [ReplyMarkupButtonRequestPeerType] = []
+                            for type in chatTypes {
+                                switch type {
+                                case "users":
+                                    requestPeerTypes.append(.user(ReplyMarkupButtonRequestPeerType.User(isBot: false, isPremium: nil)))
+                                case "bots":
+                                    requestPeerTypes.append(.user(ReplyMarkupButtonRequestPeerType.User(isBot: true, isPremium: nil)))
+                                case "groups":
+                                    requestPeerTypes.append(.group(ReplyMarkupButtonRequestPeerType.Group(isCreator: false, hasUsername: nil, isForum: nil, botParticipant: false, userAdminRights: nil, botAdminRights: nil)))
+                                case "channels":
+                                    requestPeerTypes.append(.channel(ReplyMarkupButtonRequestPeerType.Channel(isCreator: false, hasUsername: nil, userAdminRights: nil, botAdminRights: nil)))
                                 default:
                                     break
-                            }
-                        }
-                    }
-                    
-                    var actionLayout: AlertScreen.ActionAligmnent = .default
-                    if actions.count > 2 {
-                        actionLayout = .vertical
-                        actions = Array(actions.reversed())
-                    }
-                    let alertController = AlertScreen(
-                        context: self.context,
-                        configuration: AlertScreen.Configuration(actionAlignment: actionLayout, dismissOnOutsideTap: true, allowInputInset: false),
-                        title: title,
-                        text: message,
-                        actions: actions
-                    )
-                    alertController.dismissed = { byOutsideTap in
-                        if byOutsideTap {
-                            self.sendAlertButtonEvent(id: nil)
-                        }
-                    }
-                    self.controller?.present(alertController, in: .window(.root))
-                }
-            case "web_app_setup_closing_behavior":
-                if let json, let needConfirmation = json["need_confirmation"] as? Bool {
-                    self.needDismissConfirmation = needConfirmation
-                }
-            case "web_app_open_scan_qr_popup":
-                var info: String = ""
-                if let json, let text = json["text"] as? String {
-                    info = text
-                }
-                let controller = QrCodeScanScreen(context: self.context, subject: .custom(info: info))
-                controller.completion = { [weak self] result in
-                    if let strongSelf = self {
-                        if let result = result {
-                            strongSelf.sendQrCodeScannedEvent(dataString: result)
-                        } else {
-                            strongSelf.sendQrCodeScannerClosedEvent()
-                        }
-                    }
-                }
-                self.currentQrCodeScannerScreen = controller
-                self.controller?.present(controller, in: .window(.root))
-            case "web_app_close_scan_qr_popup":
-                if let controller = self.currentQrCodeScannerScreen {
-                    self.currentQrCodeScannerScreen = nil
-                    controller.dismissAnimated()
-                }
-            case "web_app_read_text_from_clipboard":
-                if let json, let requestId = json["req_id"] as? String {
-                    let botId = controller.botId
-                    let isAttachMenu = controller.url == nil
-                    
-                    let _ = (self.context.engine.messages.attachMenuBots()
-                    |> take(1)
-                    |> deliverOnMainQueue).startStandalone(next: { [weak self] attachMenuBots in
-                        guard let self, let controller = self.controller else {
-                            return
-                        }
-                        let currentTimestamp = CACurrentMediaTime()
-                        var fillData = false
-                        
-                        let attachMenuBot = attachMenuBots.first(where: { $0.peer.id == botId && !$0.flags.contains(.notActivated) })
-                        if isAttachMenu || attachMenuBot != nil || controller.isWhiteListedBot {
-                            if let lastTouchTimestamp = self.webView?.lastTouchTimestamp, currentTimestamp < lastTouchTimestamp + 10.0 {
-                                self.webView?.lastTouchTimestamp = nil
-                                fillData = true
-                            }
-                        }
-                        
-                        self.sendClipboardTextEvent(requestId: requestId, fillData: fillData)
-                    })
-                }
-            case "web_app_request_write_access":
-                self.requestWriteAccess()
-            case "web_app_request_phone":
-                self.shareAccountContact()
-            case "web_app_invoke_custom_method":
-                if let json, let requestId = json["req_id"] as? String, let method = json["method"] as? String, let params = json["params"] {
-                    var paramsString: String?
-                    if let string = params as? String {
-                        paramsString = string
-                    } else if let data1 = try? JSONSerialization.data(withJSONObject: params, options: []), let convertedString = String(data: data1, encoding: String.Encoding.utf8) {
-                        paramsString = convertedString
-                    }
-                    self.invokeCustomMethod(requestId: requestId, method: method, params: paramsString ?? "{}")
-                }
-            case "web_app_setup_settings_button":
-                if let json, let isVisible = json["is_visible"] as? Bool {
-                    self.controller?.hasSettings = isVisible
-                }
-            case "web_app_biometry_get_info":
-                self.sendBiometryInfoReceivedEvent()
-            case "web_app_biometry_request_access":
-                var reason: String?
-                if let json, let reasonValue = json["reason"] as? String, !reasonValue.isEmpty {
-                    reason = reasonValue
-                }
-                self.requestBiometryAccess(reason: reason)
-            case "web_app_biometry_request_auth":
-                self.requestBiometryAuth()
-            case "web_app_biometry_update_token":
-                var tokenData: Data?
-                if let json, let tokenDataValue = json["token"] as? String, !tokenDataValue.isEmpty {
-                    tokenData = tokenDataValue.data(using: .utf8)
-                }
-                self.requestBiometryUpdateToken(tokenData: tokenData)
-            case "web_app_biometry_open_settings":
-                if let lastTouchTimestamp = self.webView?.lastTouchTimestamp, currentTimestamp < lastTouchTimestamp + 10.0 {
-                    self.webView?.lastTouchTimestamp = nil
-
-                    self.openBotSettings()
-                }
-            case "web_app_setup_swipe_behavior":
-                if let json, let isPanGestureEnabled = json["allow_vertical_swipe"] as? Bool {
-                    self.controller?._isPanGestureEnabled = isPanGestureEnabled
-                }
-            case "web_app_share_to_story":
-                if let json, let mediaUrl = json["media_url"] as? String {
-                    let text = json["text"] as? String
-                    let link = json["widget_link"] as? [String: Any]
-                    
-                    var linkUrl: String?
-                    var linkName: String?
-                    if let link {
-                        if let url = link["url"] as? String {
-                            linkUrl = url
-                            if let name = link["name"] as? String {
-                                linkName = name
-                            }
-                        }
-                    }
-                    
-                    enum FetchResult {
-                        case result(Data)
-                        case progress(Float)
-                    }
-                    
-                    let controller = OverlayStatusController(theme: self.presentationData.theme, type: .loading(cancelled: {
-                    }))
-                    self.controller?.present(controller, in: .window(.root))
-                    
-                    let _ = (fetchHttpResource(url: mediaUrl)
-                    |> map(Optional.init)
-                    |> `catch` { error in
-                        return .single(nil)
-                    }
-                    |> mapToSignal { value -> Signal<FetchResult, NoError> in
-                        if case let .dataPart(_, data, _, complete) = value, complete {
-                            return .single(.result(data))
-                        } else if case let .progressUpdated(progress) = value {
-                            return .single(.progress(progress))
-                        } else {
-                            return .complete()
-                        }
-                    }
-                    |> deliverOnMainQueue).start(next: { [weak self, weak controller] next in
-                        guard let self else {
-                            return
-                        }
-                        controller?.dismiss()
-                        
-                        switch next {
-                        case let .result(data):
-                            var source: Any?
-                            if let image = UIImage(data: data) {
-                                source = image
-                            } else {
-                                let tempFile = TempBox.shared.tempFile(fileName: "image.mp4")
-                                if let _ = try? data.write(to: URL(fileURLWithPath: tempFile.path), options: .atomic) {
-                                    source = tempFile.path
                                 }
                             }
-                            if let source {
-                                let controller = self.context.sharedContext.makeStoryMediaEditorScreen(context: self.context, source: source, text: text, link: linkUrl.flatMap { ($0, linkName) }, remainingCount: 1, completion: { results, externalState, commit in
-                                    let target: Stories.PendingTarget = results.first!.target
-                                    externalState.storyTarget = target
-                                    
-                                    if let rootController = self.context.sharedContext.mainWindow?.viewController as? TelegramRootControllerInterface {
-                                        rootController.proceedWithStoryUpload(target: target, results: results, existingMedia: nil, forwardInfo: nil, externalState: externalState, commit: commit)
+                            controller.requestSwitchInline(query, requestPeerTypes, { [weak controller] in
+                                controller?.dismiss()
+                            })
+                        } else {
+                            controller.dismiss()
+                            controller.requestSwitchInline(query, nil, {})
+                        }
+                    }
+                case "web_app_data_send":
+                    if controller.source.isSimple, let eventData = body["eventData"] as? String {
+                        self.handleSendData(data: eventData)
+                    }
+                case "web_app_setup_main_button":
+                    if let webView = self.webView, !webView.didTouchOnce && controller.url == nil && controller.source == .attachMenu {
+                        self.delayedScriptMessages.append(message)
+                    } else if let json = json {
+                        if var isVisible = json["is_visible"] as? Bool {
+                            let text = json["text"] as? String
+                            if (text ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                isVisible = false
+                            }
+                            
+                            let backgroundColorString = json["color"] as? String
+                            let backgroundColor = backgroundColorString.flatMap({ UIColor(hexString: $0) }) ?? self.presentationData.theme.list.itemCheckColors.fillColor
+                            let textColorString = json["text_color"] as? String
+                            let textColor = textColorString.flatMap({ UIColor(hexString: $0) }) ?? self.presentationData.theme.list.itemCheckColors.foregroundColor
+                            
+                            let isLoading = json["is_progress_visible"] as? Bool
+                            let isEnabled = json["is_active"] as? Bool
+                            let hasShimmer = json["has_shine_effect"] as? Bool
+                            let state = AttachmentMainButtonState(text: text, font: .bold, background: .color(backgroundColor), textColor: textColor, isVisible: isVisible, progress: (isLoading ?? false) ? .center : .none, isEnabled: isEnabled ?? true, hasShimmer: hasShimmer ?? false)
+                            self.mainButtonState = state
+                        }
+                    }
+                case "web_app_setup_secondary_button":
+                    if let webView = self.webView, !webView.didTouchOnce && controller.url == nil && controller.source == .attachMenu {
+                        self.delayedScriptMessages.append(message)
+                    } else if let json = json {
+                        if var isVisible = json["is_visible"] as? Bool {
+                            let text = json["text"] as? String
+                            if (text ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                isVisible = false
+                            }
+                            
+                            let backgroundColorString = json["color"] as? String
+                            let backgroundColor = backgroundColorString.flatMap({ UIColor(hexString: $0) }) ?? self.presentationData.theme.list.itemCheckColors.fillColor
+                            let textColorString = json["text_color"] as? String
+                            let textColor = textColorString.flatMap({ UIColor(hexString: $0) }) ?? self.presentationData.theme.list.itemCheckColors.foregroundColor
+                            
+                            let isLoading = json["is_progress_visible"] as? Bool
+                            let isEnabled = json["is_active"] as? Bool
+                            let hasShimmer = json["has_shine_effect"] as? Bool
+                            let position = json["position"] as? String
+                            
+                            let state = AttachmentMainButtonState(text: text, font: .bold, background: .color(backgroundColor), textColor: textColor, isVisible: isVisible, progress: (isLoading ?? false) ? .center : .none, isEnabled: isEnabled ?? true, hasShimmer: hasShimmer ?? false, position: position.flatMap { AttachmentMainButtonState.Position(rawValue: $0) })
+                            self.secondaryButtonState = state
+                        }
+                    }
+                case "web_app_request_viewport":
+                    self.requestLayout(transition: .immediate)
+                case "web_app_request_safe_area":
+                    self.requestLayout(transition: .immediate)
+                case "web_app_request_content_safe_area":
+                    self.requestLayout(transition: .immediate)
+                case "web_app_request_theme":
+                    self.sendThemeChangedEvent()
+                case "web_app_expand":
+                    if let lastExpansionTimestamp = self.lastExpansionTimestamp, currentTimestamp < lastExpansionTimestamp + 1.0 {
+                        
+                    } else {
+                        self.lastExpansionTimestamp = currentTimestamp
+                        controller.requestAttachmentMenuExpansion()
+                    }
+                case "web_app_close":
+                    controller.dismiss()
+                case "web_app_open_tg_link":
+                    if let json = json, let path = json["path_full"] as? String {
+                        let forceRequest = json["force_request"] as? Bool ?? false
+                        controller.openUrl("https://t.me\(path)", false, forceRequest, { [weak controller] in
+                            let _ = controller
+//                            controller?.dismiss()
+                        })
+                    }
+                case "web_app_open_invoice":
+                    if let json = json, let slug = json["slug"] as? String {
+                        self.paymentDisposable = (self.context.engine.payments.fetchBotPaymentInvoice(source: .slug(slug))
+                        |> map(Optional.init)
+                        |> `catch` { _ -> Signal<TelegramMediaInvoice?, NoError> in
+                            return .single(nil)
+                        }
+                        |> deliverOnMainQueue).start(next: { [weak self] invoice in
+                            if let strongSelf = self, let invoice, let navigationController = strongSelf.controller?.getNavigationController() {
+                                let inputData = Promise<BotCheckoutController.InputData?>()
+                                inputData.set(BotCheckoutController.InputData.fetch(context: strongSelf.context, source: .slug(slug))
+                                |> map(Optional.init)
+                                |> `catch` { _ -> Signal<BotCheckoutController.InputData?, NoError> in
+                                    return .single(nil)
+                                })
+                                if invoice.currency == "XTR", let starsContext = strongSelf.context.starsContext {
+                                    let starsInputData = combineLatest(
+                                        inputData.get(),
+                                        starsContext.state
+                                    )
+                                    |> map { data, state -> (StarsContext.State, BotPaymentForm, EnginePeer?, EnginePeer?)? in
+                                        if let data, let state {
+                                            return (state, data.form, data.botPeer, nil)
+                                        } else {
+                                            return nil
+                                        }
+                                    }
+                                    let _ = (starsInputData |> filter { $0 != nil } |> take(1) |> deliverOnMainQueue).start(next: { _ in
+                                        let controller = strongSelf.context.sharedContext.makeStarsTransferScreen(
+                                            context: strongSelf.context,
+                                            starsContext: starsContext,
+                                            invoice: invoice,
+                                            source: .slug(slug),
+                                            extendedMedia: [],
+                                            inputData: starsInputData,
+                                            completion: { [weak self] paid in
+                                                guard let self else {
+                                                    return
+                                                }
+                                                self.sendInvoiceClosedEvent(slug: slug, result: paid ? .paid : .cancelled)
+                                            }
+                                        )
+                                        navigationController.pushViewController(controller)
+                                    })
+                                } else {
+                                    let checkoutController = BotCheckoutController(context: strongSelf.context, invoice: invoice, source: .slug(slug), inputData: inputData, completed: { currencyValue, receiptMessageId in
+                                        self?.sendInvoiceClosedEvent(slug: slug, result: .paid)
+                                    }, cancelled: { [weak self] in
+                                        self?.sendInvoiceClosedEvent(slug: slug, result: .cancelled)
+                                    }, failed: { [weak self] in
+                                        self?.sendInvoiceClosedEvent(slug: slug, result: .failed)
+                                    })
+                                    checkoutController.navigationPresentation = .modal
+                                    navigationController.pushViewController(checkoutController)
+                                }
+                            }
+                        })
+                    }
+                case "web_app_open_link":
+                    if let json = json, let url = json["url"] as? String {
+                        let webAppConfiguration = WebAppConfiguration.with(appConfiguration: self.context.currentAppConfiguration.with { $0 })
+                        if let escapedUrl = url.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed), let url = URL(string: escapedUrl), let scheme = url.scheme?.lowercased(), !["http", "https"].contains(scheme) && !webAppConfiguration.allowedProtocols.contains(scheme) {
+                            return
+                        }
+                        
+                        let tryInstantView = json["try_instant_view"] as? Bool ?? false
+                        let tryBrowser = json["try_browser"] as? String
+                        
+                        if let lastTouchTimestamp = self.webView?.lastTouchTimestamp, currentTimestamp < lastTouchTimestamp + 10.0 {
+                            self.webView?.lastTouchTimestamp = nil
+                            if tryInstantView {
+                                let _ = (resolveInstantViewUrl(account: self.context.account, url: url)
+                                |> mapToSignal { result -> Signal<ResolvedUrl, NoError> in
+                                    guard case let .result(result) = result else {
+                                        return .complete()
+                                    }
+                                    return .single(result)
+                                }
+                                |> deliverOnMainQueue).start(next: { [weak self] result in
+                                    guard let strongSelf = self else {
+                                        return
+                                    }
+                                    switch result {
+                                    case let .instantView(webPage, anchor):
+                                        let controller = strongSelf.context.sharedContext.makeInstantPageController(context: strongSelf.context, webPage: webPage, anchor: anchor, sourceLocation: InstantPageSourceLocation(userLocation: .other, peerType: .otherPrivate))
+                                        strongSelf.controller?.getNavigationController()?.pushViewController(controller)
+                                    default:
+                                        strongSelf.context.sharedContext.openExternalUrl(context: strongSelf.context, urlContext: .generic, url: url, forceExternal: true, presentationData: strongSelf.context.sharedContext.currentPresentationData.with { $0 }, navigationController: nil, dismissInput: {})
                                     }
                                 })
-                                if let navigationController = self.controller?.getNavigationController() {
-                                    navigationController.pushViewController(controller)
+                            } else {
+                                var url = url
+                                if let tryBrowser {
+                                    let openInOptions = availableOpenInOptions(context: self.context, item: .url(url: url))
+                                    var matchingOption: OpenInOption?
+                                    for option in openInOptions {
+                                        if case .other = option.application {
+                                            switch tryBrowser {
+                                            case "safari":
+                                                break
+                                            case "chrome":
+                                                if option.identifier == "chrome" {
+                                                    matchingOption = option
+                                                    break
+                                                }
+                                            case "firefox":
+                                                if ["firefox", "firefoxFocus"].contains(option.identifier) {
+                                                    matchingOption = option
+                                                    break
+                                                }
+                                            case "opera":
+                                                if ["operaMini", "operaTouch"].contains(option.identifier) {
+                                                    matchingOption = option
+                                                    break
+                                                }
+                                            default:
+                                                break
+                                            }
+                                        }
+                                    }
+                                    if let matchingOption, case let .openUrl(newUrl) = matchingOption.action() {
+                                        url = newUrl
+                                    }
+                                }
+
+                                self.context.sharedContext.openExternalUrl(context: self.context, urlContext: .generic, url: url, forceExternal: true, presentationData: self.context.sharedContext.currentPresentationData.with { $0 }, navigationController: nil, dismissInput: {})
+                            }
+                        }
+                    }
+                case "web_app_setup_back_button":
+                    if let json = json, let isVisible = json["is_visible"] as? Bool {
+                        self.hasBackButton = isVisible
+                        self.controller?.cancelButtonNode.setState(isVisible ? .back : .cancel, animated: true)
+                        if controller.isFullscreen {
+                            self.requestLayout(transition: .immediate)
+                        }
+                    }
+                case "web_app_trigger_haptic_feedback":
+                    if let json = json, let type = json["type"] as? String {
+                        switch type {
+                            case "impact":
+                                if let impactType = json["impact_style"] as? String {
+                                    switch impactType {
+                                        case "light":
+                                            self.hapticFeedback.impact(.light)
+                                        case "medium":
+                                            self.hapticFeedback.impact(.medium)
+                                        case "heavy":
+                                            self.hapticFeedback.impact(.heavy)
+                                        case "rigid":
+                                            self.hapticFeedback.impact(.rigid)
+                                        case "soft":
+                                            self.hapticFeedback.impact(.soft)
+                                        default:
+                                            break
+                                    }
+                                }
+                            case "notification":
+                                if let notificationType = json["notification_type"] as? String {
+                                    switch notificationType {
+                                        case "success":
+                                            self.hapticFeedback.success()
+                                        case "error":
+                                            self.hapticFeedback.error()
+                                        case "warning":
+                                            self.hapticFeedback.warning()
+                                        default:
+                                            break
+                                    }
+                                }
+                            case "selection_change":
+                                self.hapticFeedback.tap()
+                            default:
+                                break
+                        }
+                    }
+                case "web_app_set_background_color":
+                    if let json = json, let colorValue = json["color"] as? String, let color = UIColor(hexString: colorValue) {
+                        self.appBackgroundColor = color
+                        self.updateBackgroundColor(transition: .animated(duration: 0.2, curve: .linear))
+                    }
+                case "web_app_set_header_color":
+                    if let json = json {
+                        if let colorKey = json["color_key"] as? String, ["bg_color", "secondary_bg_color"].contains(colorKey) {
+                            self.headerColor = nil
+                            self.headerColorKey = colorKey
+                        } else if let hexColor = json["color"] as? String, let color = UIColor(hexString: hexColor) {
+                            self.headerColor = color
+                            self.headerColorKey = nil
+                        }
+                        self.updateHeaderBackgroundColor(transition: .animated(duration: 0.2, curve: .linear))
+                    }
+                case "web_app_set_bottom_bar_color":
+                    if let json = json {
+                        if let hexColor = json["color"] as? String, let color = UIColor(hexString: hexColor) {
+                            self.bottomPanelColor = color
+                        }
+                    }
+                case "web_app_open_popup":
+                    if let json, let message = json["message"] as? String, let buttons = json["buttons"] as? [Any] {
+                        let presentationData = self.presentationData
+                        
+                        let title = json["title"] as? String
+                        var alertButtons: [TextAlertAction] = []
+                        
+                        for buttonJson in buttons.reversed() {
+                            if let button = buttonJson as? [String: Any], let id = button["id"] as? String, let type = button["type"] as? String {
+                                let buttonAction = {
+                                    self.sendAlertButtonEvent(id: id)
+                                }
+                                let text = button["text"] as? String
+                                switch type {
+                                    case "default":
+                                        if let text = text {
+                                            alertButtons.append(TextAlertAction(type: .genericAction, title: text, action: {
+                                                buttonAction()
+                                            }))
+                                        }
+                                    case "destructive":
+                                        if let text = text {
+                                            alertButtons.append(TextAlertAction(type: .destructiveAction, title: text, action: {
+                                                buttonAction()
+                                            }))
+                                        }
+                                    case "ok":
+                                        alertButtons.append(TextAlertAction(type: .defaultAction, title: presentationData.strings.Common_OK, action: {
+                                            buttonAction()
+                                        }))
+                                    case "cancel":
+                                        alertButtons.append(TextAlertAction(type: .genericAction, title: presentationData.strings.Common_Cancel, action: {
+                                            buttonAction()
+                                        }))
+                                    case "close":
+                                        alertButtons.append(TextAlertAction(type: .genericAction, title: presentationData.strings.Common_Close, action: {
+                                            buttonAction()
+                                        }))
+                                    default:
+                                        break
                                 }
                             }
-                        default:
-                            break
                         }
-                    })
-                }
-            case "web_app_request_fullscreen":
-                self.setIsFullscreen(true)
-            case "web_app_exit_fullscreen":
-                self.setIsFullscreen(false)
-            case "web_app_start_accelerometer":
-                if let json {
-                    let refreshRate = json["refresh_rate"] as? Double
-                    self.setIsAccelerometerActive(true, refreshRate: refreshRate)
-                }
-            case "web_app_stop_accelerometer":
-                self.setIsAccelerometerActive(false)
-            case "web_app_start_device_orientation":
-                if let json {
-                    let refreshRate = json["refresh_rate"] as? Double
-                    let absolute = (json["need_absolute"] as? Bool) == true
-                    self.setIsDeviceOrientationActive(true, refreshRate: refreshRate, absolute: absolute)
-                }
-            case "web_app_stop_device_orientation":
-                self.setIsDeviceOrientationActive(false)
-            case "web_app_start_gyroscope":
-                if let json {
-                    let refreshRate = json["refresh_rate"] as? Double
-                    self.setIsGyroscopeActive(true, refreshRate: refreshRate)
-                }
-            case "web_app_stop_gyroscope":
-                self.setIsGyroscopeActive(false)
-            case "web_app_set_emoji_status":
-                if let json, let emojiIdString = json["custom_emoji_id"] as? String, let emojiId = Int64(emojiIdString) {
-                    let duration = json["duration"] as? Double
-                    self.setEmojiStatus(emojiId, duration: duration.flatMap { Int32($0) })
-                }
-            case "web_app_add_to_home_screen":
-                self.addToHomeScreen()
-            case "web_app_check_home_screen":
-                let data: JSON = ["status": "unknown"]
-                self.webView?.sendEvent(name: "home_screen_checked", data: data.string)
-            case "web_app_request_location":
-                self.requestLocation()
-            case "web_app_check_location":
-                self.checkLocation()
-            case "web_app_open_location_settings":
-                if let lastTouchTimestamp = self.webView?.lastTouchTimestamp, currentTimestamp < lastTouchTimestamp + 10.0 {
-                    self.webView?.lastTouchTimestamp = nil
-                    
-                    self.openLocationSettings()
-                }
-            case "web_app_send_prepared_message":
-                if let json, let id = json["id"] as? String {
-                    self.sendPreparedMessage(id: id)
-                }
-            case "web_app_request_emoji_status_access":
-                self.requestEmojiStatusAccess()
-            case "web_app_request_file_download":
-                if let json, let url = json["url"] as? String, let fileName = json["file_name"] as? String {
-                    self.downloadFile(url: url, fileName: fileName)
-                }
-            case "web_app_toggle_orientation_lock":
-                if let json, let lock = json["locked"] as? Bool {
-                    controller.parentController()?.lockOrientation = lock
-                }
-            case "web_app_device_storage_save_key":
-                if let json, let requestId = json["req_id"] as? String {
-                    if let key = json["key"] as? String {
-                        let value = json["value"]
                         
-                        var effectiveValue: String?
-                        if let stringValue = value as? String {
-                            effectiveValue = stringValue
-                        } else if value is NSNull {
-                            effectiveValue = nil
-                        } else {
-                            let data: JSON = [
-                                "req_id": requestId,
-                                "error": "VALUE_INVALID"
-                            ]
-                            self.webView?.sendEvent(name: "device_storage_failed", data: data.string)
-                            return
+                        var actionLayout: TextAlertContentActionLayout = .horizontal
+                        if alertButtons.count > 2 {
+                            actionLayout = .vertical
+                            alertButtons = Array(alertButtons.reversed())
                         }
-                        let _ = self.context.engine.peers.setBotStorageValue(peerId: controller.botId, key: key, value: effectiveValue).start(error: { [weak self] error in
-                            var errorValue = "UNKNOWN_ERROR"
-                            if case .quotaExceeded = error {
-                                errorValue = "QUOTA_EXCEEDED"
+                        let alertController = textAlertController(context: self.context, updatedPresentationData: self.controller?.updatedPresentationData, title: title, text: message, actions: alertButtons, actionLayout: actionLayout)
+                        alertController.dismissed = { byOutsideTap in
+                            if byOutsideTap {
+                                self.sendAlertButtonEvent(id: nil)
                             }
-                            let data: JSON = [
-                                "req_id": requestId,
-                                "error": errorValue
-                            ]
-                            self?.webView?.sendEvent(name: "device_storage_failed", data: data.string)
-                        }, completed: { [weak self] in
-                            let data: JSON = [
-                                "req_id": requestId
-                            ]
-                            self?.webView?.sendEvent(name: "device_storage_key_saved", data: data.string)
-                        })
-                    } else {
-                        let data: JSON = [
-                            "req_id": requestId,
-                            "error": "KEY_INVALID"
-                        ]
-                        self.webView?.sendEvent(name: "device_storage_failed", data: data.string)
-                    }
-                }
-            case "web_app_device_storage_get_key":
-                if let json, let requestId = json["req_id"] as? String {
-                    if let key = json["key"] as? String {
-                        let _ = (self.context.engine.data.get(TelegramEngine.EngineData.Item.Peer.BotStorageValue(id: controller.botId, key: key))
-                        |> deliverOnMainQueue).start(next: { [weak self] value in
-                            let data: JSON = [
-                                "req_id": requestId,
-                                "value": value ?? NSNull()
-                            ]
-                            self?.webView?.sendEvent(name: "device_storage_key_received", data: data.string)
-                        })
-                    } else {
-                        let data: JSON = [
-                            "req_id": requestId,
-                            "error": "KEY_INVALID"
-                        ]
-                        self.webView?.sendEvent(name: "device_storage_failed", data: data.string)
-                    }
-                }
-            case "web_app_device_storage_clear":
-                if let json, let requestId = json["req_id"] as? String {
-                    let _ = (self.context.engine.peers.clearBotStorage(peerId: controller.botId)
-                    |> deliverOnMainQueue).start(completed: { [weak self] in
-                        let data: JSON = [
-                            "req_id": requestId
-                        ]
-                        self?.webView?.sendEvent(name: "device_storage_cleared", data: data.string)
-                    })
-                }
-            case "web_app_secure_storage_save_key":
-                if let json, let requestId = json["req_id"] as? String {
-                    if let key = json["key"] as? String {
-                        let value = json["value"]
-
-                        var effectiveValue: String?
-                        if let stringValue = value as? String {
-                            effectiveValue = stringValue
-                        } else if value is NSNull {
-                            effectiveValue = nil
-                        } else {
-                            let data: JSON = [
-                                "req_id": requestId,
-                                "error": "VALUE_INVALID"
-                            ]
-                            self.webView?.sendEvent(name: "secure_storage_failed", data: data.string)
-                            return
                         }
-                        let _ = (WebAppSecureStorage.setValue(context: self.context, botId: controller.botId, key: key, value: effectiveValue)
-                        |> deliverOnMainQueue).start(error: { [weak self] error in
-                            var errorValue = "UNKNOWN_ERROR"
-                            if case .quotaExceeded = error {
-                                errorValue = "QUOTA_EXCEEDED"
-                            }
-                            let data: JSON = [
-                                "req_id": requestId,
-                                "error": errorValue
-                            ]
-                            self?.webView?.sendEvent(name: "secure_storage_failed", data: data.string)
-                        }, completed: { [weak self] in
-                            let data: JSON = [
-                                "req_id": requestId
-                            ]
-                            self?.webView?.sendEvent(name: "secure_storage_key_saved", data: data.string)
-                        })
-                    } else {
-                        let data: JSON = [
-                            "req_id": requestId,
-                            "error": "KEY_INVALID"
-                        ]
-                        self.webView?.sendEvent(name: "secure_storage_failed", data: data.string)
+                        self.controller?.present(alertController, in: .window(.root))
                     }
-                }
-            case "web_app_secure_storage_get_key":
-                if let json, let requestId = json["req_id"] as? String {
-                    if let key = json["key"] as? String {
-                        let _ = (WebAppSecureStorage.getValue(context: self.context, botId: controller.botId, key: key)
-                        |> deliverOnMainQueue).start(next: { [weak self] value in
-                            let data: JSON = [
-                                "req_id": requestId,
-                                "value": value ?? NSNull()
-                            ]
-                            self?.webView?.sendEvent(name: "secure_storage_key_received", data: data.string)
-                        }, error: { [weak self] error in
-                            if case .canRestore = error {
-                                let data: JSON = [
-                                    "req_id": requestId,
-                                    "value": NSNull(),
-                                    "canRestore": true
-                                ]
-                                self?.webView?.sendEvent(name: "secure_storage_key_received", data: data.string)
+                case "web_app_setup_closing_behavior":
+                    if let json, let needConfirmation = json["need_confirmation"] as? Bool {
+                        self.needDismissConfirmation = needConfirmation
+                    }
+                case "web_app_open_scan_qr_popup":
+                    var info: String = ""
+                    if let json, let text = json["text"] as? String {
+                        info = text
+                    }
+                    let controller = QrCodeScanScreen(context: self.context, subject: .custom(info: info))
+                    controller.completion = { [weak self] result in
+                        if let strongSelf = self {
+                            if let result = result {
+                                strongSelf.sendQrCodeScannedEvent(data: result)
                             } else {
-                                let data: JSON = [
-                                    "req_id": requestId,
-                                    "value": NSNull()
-                                ]
-                                self?.webView?.sendEvent(name: "secure_storage_key_received", data: data.string)
+                                strongSelf.sendQrCodeScannerClosedEvent()
                             }
-                        })
-                    } else {
-                        let data: JSON = [
-                            "req_id": requestId,
-                            "error": "KEY_INVALID"
-                        ]
-                        self.webView?.sendEvent(name: "secure_storage_failed", data: data.string)
+                        }
                     }
-                }
-            case "web_app_secure_storage_restore_key":
-                if let json, let requestId = json["req_id"] as? String {
-                    if let key = json["key"] as? String {
-                        let _ = (WebAppSecureStorage.checkRestoreAvailability(context: self.context, botId: controller.botId, key: key)
-                        |> deliverOnMainQueue).start(next: { [weak self] storedKeys in
+                    self.currentQrCodeScannerScreen = controller
+                    self.controller?.present(controller, in: .window(.root))
+                case "web_app_close_scan_qr_popup":
+                    if let controller = self.currentQrCodeScannerScreen {
+                        self.currentQrCodeScannerScreen = nil
+                        controller.dismissAnimated()
+                    }
+                case "web_app_read_text_from_clipboard":
+                    if let json, let requestId = json["req_id"] as? String {
+                        let botId = controller.botId
+                        let isAttachMenu = controller.url == nil
+                        
+                        let _ = (self.context.engine.messages.attachMenuBots()
+                        |> take(1)
+                        |> deliverOnMainQueue).startStandalone(next: { [weak self] attachMenuBots in
                             guard let self else {
                                 return
                             }
-                            guard !storedKeys.isEmpty else {
-                                let data: JSON = [
-                                    "req_id": requestId,
-                                    "error": "RESTORE_UNAVAILABLE"
-                                ]
-                                self.webView?.sendEvent(name: "secure_storage_failed", data: data.string)
-                                return
+                            let currentTimestamp = CACurrentMediaTime()
+                            var fillData = false
+                            
+                            let attachMenuBot = attachMenuBots.first(where: { $0.peer.id == botId && !$0.flags.contains(.notActivated) })
+                            if isAttachMenu || attachMenuBot != nil {
+                                if let lastTouchTimestamp = self.webView?.lastTouchTimestamp, currentTimestamp < lastTouchTimestamp + 10.0 {
+                                    self.webView?.lastTouchTimestamp = nil
+                                    fillData = true
+                                }
                             }
-                            self.openSecureBotStorageTransfer(requestId: requestId, key: key, storedKeys: storedKeys)
-                        }, error: { [weak self] error in
-                            var errorValue = "UNKNOWN_ERROR"
-                            if case .storageNotEmpty = error {
-                                errorValue = "STORAGE_NOT_EMPTY"
-                            }
-                            let data: JSON = [
-                                "req_id": requestId,
-                                "error": errorValue
-                            ]
-                            self?.webView?.sendEvent(name: "secure_storage_failed", data: data.string)
+                            
+                            self.sendClipboardTextEvent(requestId: requestId, fillData: fillData)
                         })
                     }
-                }
-            case "web_app_secure_storage_clear":
-                if let json, let requestId = json["req_id"] as? String {
-                    let _ = (WebAppSecureStorage.clearStorage(context: self.context, botId: controller.botId)
-                    |> deliverOnMainQueue).start(completed: { [weak self] in
-                        let data: JSON = [
-                            "req_id": requestId
-                        ]
-                        self?.webView?.sendEvent(name: "secure_storage_cleared", data: data.string)
-                    })
-                }
-            case "web_app_hide_keyboard":
-                self.view.window?.endEditing(true)
-            case "web_app_verify_age":
-                if let json, self.controller?.isVerifyAgeBot == true {
-                    if let ageValue = json["age"] as? Double {
-                        self.controller?.verifyAgeCompletion?(Int(ageValue))
+                case "web_app_request_write_access":
+                    self.requestWriteAccess()
+                case "web_app_request_phone":
+                    self.shareAccountContact()
+                case "web_app_invoke_custom_method":
+                    if let json, let requestId = json["req_id"] as? String, let method = json["method"] as? String, let params = json["params"] {
+                        var paramsString: String?
+                        if let string = params as? String {
+                            paramsString = string
+                        } else if let data1 = try? JSONSerialization.data(withJSONObject: params, options: []), let convertedString = String(data: data1, encoding: String.Encoding.utf8) {
+                            paramsString = convertedString
+                        }
+                        self.invokeCustomMethod(requestId: requestId, method: method, params: paramsString ?? "{}")
                     }
-                }
-            default:
-                break
+                case "web_app_setup_settings_button":
+                    if let json, let isVisible = json["is_visible"] as? Bool {
+                        self.controller?.hasSettings = isVisible
+                    }
+                case "web_app_biometry_get_info":
+                    self.sendBiometryInfoReceivedEvent()
+                case "web_app_biometry_request_access":
+                    var reason: String?
+                    if let json, let reasonValue = json["reason"] as? String, !reasonValue.isEmpty {
+                        reason = reasonValue
+                    }
+                    self.requestBiometryAccess(reason: reason)
+                case "web_app_biometry_request_auth":
+                    self.requestBiometryAuth()
+                case "web_app_biometry_update_token":
+                    var tokenData: Data?
+                    if let json, let tokenDataValue = json["token"] as? String, !tokenDataValue.isEmpty {
+                        tokenData = tokenDataValue.data(using: .utf8)
+                    }
+                    self.requestBiometryUpdateToken(tokenData: tokenData)
+                case "web_app_biometry_open_settings":
+                    if let lastTouchTimestamp = self.webView?.lastTouchTimestamp, currentTimestamp < lastTouchTimestamp + 10.0 {
+                        self.webView?.lastTouchTimestamp = nil
+
+                        self.openBotSettings()
+                    }
+                case "web_app_setup_swipe_behavior":
+                    if let json, let isPanGestureEnabled = json["allow_vertical_swipe"] as? Bool {
+                        self.controller?._isPanGestureEnabled = isPanGestureEnabled
+                    }
+                case "web_app_share_to_story":
+                    if let json, let mediaUrl = json["media_url"] as? String {
+                        let text = json["text"] as? String
+                        let link = json["widget_link"] as? [String: Any]
+                        
+                        var linkUrl: String?
+                        var linkName: String?
+                        if let link {
+                            if let url = link["url"] as? String {
+                                linkUrl = url
+                                if let name = link["name"] as? String {
+                                    linkName = name
+                                }
+                            }
+                        }
+                        
+                        enum FetchResult {
+                            case result(Data)
+                            case progress(Float)
+                        }
+                        
+                        let controller = OverlayStatusController(theme: self.presentationData.theme, type: .loading(cancelled: {
+                        }))
+                        self.controller?.present(controller, in: .window(.root))
+                        
+                        let _ = (fetchHttpResource(url: mediaUrl)
+                        |> map(Optional.init)
+                        |> `catch` { error in
+                            return .single(nil)
+                        }
+                        |> mapToSignal { value -> Signal<FetchResult, NoError> in
+                            if case let .dataPart(_, data, _, complete) = value, complete {
+                                return .single(.result(data))
+                            } else if case let .progressUpdated(progress) = value {
+                                return .single(.progress(progress))
+                            } else {
+                                return .complete()
+                            }
+                        }
+                        |> deliverOnMainQueue).start(next: { [weak self, weak controller] next in
+                            guard let self else {
+                                return
+                            }
+                            controller?.dismiss()
+                            
+                            switch next {
+                            case let .result(data):
+                                var source: Any?
+                                if let image = UIImage(data: data) {
+                                    source = image
+                                } else {
+                                    let tempFile = TempBox.shared.tempFile(fileName: "image.mp4")
+                                    if let _ = try? data.write(to: URL(fileURLWithPath: tempFile.path), options: .atomic) {
+                                        source = tempFile.path
+                                    }
+                                }
+                                if let source {
+                                    let externalState = MediaEditorTransitionOutExternalState(
+                                        storyTarget: nil,
+                                        isForcedTarget: false,
+                                        isPeerArchived: false,
+                                        transitionOut: nil
+                                    )
+                                    let controller = self.context.sharedContext.makeStoryMediaEditorScreen(context: self.context, source: source, text: text, link: linkUrl.flatMap { ($0, linkName) }, completion: { result, commit in
+                                        let target: Stories.PendingTarget = result.target
+                                        externalState.storyTarget = target
+                                        
+                                        if let rootController = self.context.sharedContext.mainWindow?.viewController as? TelegramRootControllerInterface {
+                                            rootController.proceedWithStoryUpload(target: target, result: result, existingMedia: nil, forwardInfo: nil, externalState: externalState, commit: commit)
+                                        }
+                                    })
+                                    if let navigationController = self.controller?.getNavigationController() {
+                                        navigationController.pushViewController(controller)
+                                    }
+                                }
+                            default:
+                                break
+                            }
+                        })
+                    }
+                case "web_app_request_fullscreen":
+                    self.setIsFullscreen(true)
+                case "web_app_exit_fullscreen":
+                    self.setIsFullscreen(false)
+                case "web_app_start_accelerometer":
+                    if let json {
+                        let refreshRate = json["refresh_rate"] as? Double
+                        self.setIsAccelerometerActive(true, refreshRate: refreshRate)
+                    }
+                case "web_app_stop_accelerometer":
+                    self.setIsAccelerometerActive(false)
+                case "web_app_start_device_orientation":
+                    if let json {
+                        let refreshRate = json["refresh_rate"] as? Double
+                        let absolute = (json["need_absolute"] as? Bool) == true
+                        self.setIsDeviceOrientationActive(true, refreshRate: refreshRate, absolute: absolute)
+                    }
+                case "web_app_stop_device_orientation":
+                    self.setIsDeviceOrientationActive(false)
+                case "web_app_start_gyroscope":
+                    if let json {
+                        let refreshRate = json["refresh_rate"] as? Double
+                        self.setIsGyroscopeActive(true, refreshRate: refreshRate)
+                    }
+                case "web_app_stop_gyroscope":
+                    self.setIsGyroscopeActive(false)
+                case "web_app_set_emoji_status":
+                    if let json, let emojiIdString = json["custom_emoji_id"] as? String, let emojiId = Int64(emojiIdString) {
+                        let duration = json["duration"] as? Double
+                        self.setEmojiStatus(emojiId, duration: duration.flatMap { Int32($0) })
+                    }
+                case "web_app_add_to_home_screen":
+                    self.addToHomeScreen()
+                case "web_app_check_home_screen":
+                    let data: JSON = ["status": "unknown"]
+                    self.webView?.sendEvent(name: "home_screen_checked", data: data.string)
+                case "web_app_request_location":
+                    self.requestLocation()
+                case "web_app_check_location":
+                    self.checkLocation()
+                case "web_app_open_location_settings":
+                    if let lastTouchTimestamp = self.webView?.lastTouchTimestamp, currentTimestamp < lastTouchTimestamp + 10.0 {
+                        self.webView?.lastTouchTimestamp = nil
+                        
+                        self.openLocationSettings()
+                    }
+                case "web_app_send_prepared_message":
+                    if let json, let id = json["id"] as? String {
+                        self.sendPreparedMessage(id: id)
+                    }
+                case "web_app_request_emoji_status_access":
+                    self.requestEmojiStatusAccess()
+                case "web_app_request_file_download":
+                    if let json, let url = json["url"] as? String, let fileName = json["file_name"] as? String {
+                        self.downloadFile(url: url, fileName: fileName)
+                    }
+                case "web_app_toggle_orientation_lock":
+                    if let json, let lock = json["locked"] as? Bool {
+                        controller.parentController()?.lockOrientation = lock
+                    }
+                default:
+                    break
             }
         }
         
@@ -2063,10 +1690,12 @@ public final class WebAppController: ViewController, AttachmentContainable {
             self.updateHeaderBackgroundColor(transition: .immediate)
             self.sendThemeChangedEvent()
             
-            if self.presentationData.theme.overallDarkAppearance {
-                self.webView?.overrideUserInterfaceStyle = .dark
-            } else {
-                self.webView?.overrideUserInterfaceStyle = .unspecified
+            if #available(iOS 13.0, *) {
+                if self.presentationData.theme.overallDarkAppearance {
+                    self.webView?.overrideUserInterfaceStyle = .dark
+                } else {
+                    self.webView?.overrideUserInterfaceStyle = .unspecified
+                }
             }
         }
         
@@ -2108,11 +1737,8 @@ public final class WebAppController: ViewController, AttachmentContainable {
         }
         
         private func sendInvoiceClosedEvent(slug: String, result: InvoiceCloseResult) {
-            let data: JSON = [
-                "slug": slug,
-                "status": result.string
-            ]
-            self.webView?.sendEvent(name: "invoice_closed", data: data.string)
+            let paramsString = "{slug: \"\(slug)\", status: \"\(result.string)\"}"
+            self.webView?.sendEvent(name: "invoice_closed", data: paramsString)
         }
         
         fileprivate func sendBackButtonEvent() {
@@ -2124,23 +1750,24 @@ public final class WebAppController: ViewController, AttachmentContainable {
         }
         
         fileprivate func sendAlertButtonEvent(id: String?) {
-            var data: [String: Any] = [:]
-            if let id {
-                data["button_id"] = id
+            var paramsString: String?
+            if let id = id {
+                paramsString = "{button_id: \"\(id)\"}"
             }
-            if let serializedData = JSON(dictionary: data)?.string {
-                self.webView?.sendEvent(name: "popup_closed", data: serializedData)
-            }
+            self.webView?.sendEvent(name: "popup_closed", data: paramsString ?? "{}")
         }
-                
-        fileprivate func sendQrCodeScannedEvent(dataString: String?) {
-            var data: [String: Any] = [:]
-            if let dataString {
-                data["data"] = dataString
+        
+        fileprivate func sendPhoneRequestedEvent(phone: String?) {
+            var paramsString: String?
+            if let phone = phone {
+                paramsString = "{phone_number: \"\(phone)\"}"
             }
-            if let serializedData = JSON(dictionary: data)?.string {
-                self.webView?.sendEvent(name: "qr_text_received", data: serializedData)
-            }
+            self.webView?.sendEvent(name: "phone_requested", data: paramsString)
+        }
+        
+        fileprivate func sendQrCodeScannedEvent(data: String?) {
+            let paramsString = data.flatMap { "{data: \"\($0)\"}" } ?? "{}"
+            self.webView?.sendEvent(name: "qr_text_received", data: paramsString)
         }
         
         fileprivate func sendQrCodeScannerClosedEvent() {
@@ -2148,15 +1775,14 @@ public final class WebAppController: ViewController, AttachmentContainable {
         }
         
         fileprivate func sendClipboardTextEvent(requestId: String, fillData: Bool) {
-            var data: [String: Any] = [:]
-            data["req_id"] = requestId
+            var paramsString: String
             if fillData {
-                let pasteboardData = UIPasteboard.general.string ?? ""
-                data["data"] = pasteboardData
+                let data = UIPasteboard.general.string ?? ""
+                paramsString = "{req_id: \"\(requestId)\", data: \"\(data)\"}"
+            } else {
+                paramsString = "{req_id: \"\(requestId)\"}"
             }
-            if let serializedData = JSON(dictionary: data)?.string {
-                self.webView?.sendEvent(name: "clipboard_text_received", data: serializedData)
-            }
+            self.webView?.sendEvent(name: "clipboard_text_received", data: paramsString)
         }
         
         fileprivate func requestWriteAccess() {
@@ -2165,10 +1791,13 @@ public final class WebAppController: ViewController, AttachmentContainable {
             }
             
             let sendEvent: (Bool) -> Void = { success in
-                let data: JSON = [
-                    "status": success ? "allowed" : "cancelled"
-                ]
-                self.webView?.sendEvent(name: "write_access_requested", data: data.string)
+                var paramsString: String
+                if success {
+                    paramsString = "{status: \"allowed\"}"
+                } else {
+                    paramsString = "{status: \"cancelled\"}"
+                }
+                self.webView?.sendEvent(name: "write_access_requested", data: paramsString)
             }
             
             let _ = (self.context.engine.messages.canBotSendMessages(botId: controller.botId)
@@ -2179,26 +1808,18 @@ public final class WebAppController: ViewController, AttachmentContainable {
                 if result {
                     sendEvent(true)
                 } else {
-                    let alertController = AlertScreen(
-                        context: self.context,
-                        title: self.presentationData.strings.WebApp_AllowWriteTitle,
-                        text: self.presentationData.strings.WebApp_AllowWriteConfirmation(controller.botName).string,
-                        actions: [
-                            .init(title: self.presentationData.strings.Common_Cancel, action: {
-                                sendEvent(false)
-                            }),
-                            .init(title: self.presentationData.strings.Common_OK, type: .default, action: { [weak self] in
-                                guard let self else {
-                                    return
-                                }
-                                
-                                let _ = (self.context.engine.messages.allowBotSendMessages(botId: controller.botId)
-                                |> deliverOnMainQueue).start(completed: {
-                                    sendEvent(true)
-                                })
-                            })
-                        ]
-                    )
+                    let alertController = textAlertController(context: self.context, updatedPresentationData: controller.updatedPresentationData, title: self.presentationData.strings.WebApp_AllowWriteTitle, text: self.presentationData.strings.WebApp_AllowWriteConfirmation(controller.botName).string, actions: [TextAlertAction(type: .genericAction, title: self.presentationData.strings.Common_Cancel, action: {
+                        sendEvent(false)
+                    }), TextAlertAction(type: .defaultAction, title: self.presentationData.strings.Common_OK, action: { [weak self] in
+                        guard let self else {
+                            return
+                        }
+                        
+                        let _ = (self.context.engine.messages.allowBotSendMessages(botId: controller.botId)
+                        |> deliverOnMainQueue).start(completed: {
+                            sendEvent(true)
+                        })
+                    })], parseMarkdown: true)
                     alertController.dismissed = { byOutsideTap in
                         if byOutsideTap {
                             sendEvent(false)
@@ -2214,10 +1835,13 @@ public final class WebAppController: ViewController, AttachmentContainable {
                 return
             }
             let sendEvent: (Bool) -> Void = { success in
-                let data: JSON = [
-                    "status": success ? "sent" : "cancelled"
-                ]
-                self.webView?.sendEvent(name: "phone_requested", data: data.string)
+                var paramsString: String
+                if success {
+                    paramsString = "{status: \"sent\"}"
+                } else {
+                    paramsString = "{status: \"cancelled\"}"
+                }
+                self.webView?.sendEvent(name: "phone_requested", data: paramsString)
             }
             
             let _ = (self.context.engine.data.get(
@@ -2240,56 +1864,48 @@ public final class WebAppController: ViewController, AttachmentContainable {
                     text = self.presentationData.strings.WebApp_SharePhoneConfirmation(botName).string
                 }
                 
-                let alertController = AlertScreen(
-                    context: self.context,
-                    title: self.presentationData.strings.WebApp_SharePhoneTitle,
-                    text: text,
-                    actions: [
-                        .init(title: self.presentationData.strings.Common_Cancel, action: {
-                            sendEvent(false)
-                        }),
-                        .init(title: self.presentationData.strings.Common_OK, type: .default, action: { [weak self] in
-                            guard let self, case let .user(user) = accountPeer, let phone = user.phone, !phone.isEmpty else {
-                                return
-                            }
-                            
-                            let sendMessageSignal = enqueueMessages(account: self.context.account, peerId: botId, messages: [
-                                .message(text: "", attributes: [], inlineStickers: [:], mediaReference: .standalone(media: TelegramMediaContact(firstName: user.firstName ?? "", lastName: user.lastName ?? "", phoneNumber: phone, peerId: user.id, vCardData: nil)), threadId: nil, replyToMessageId: nil, replyToStoryId: nil, localGroupingKey: nil, correlationId: nil, bubbleUpEmojiOrStickersets: [])
-                            ])
-                            |> mapToSignal { messageIds in
-                                if let maybeMessageId = messageIds.first, let messageId = maybeMessageId {
-                                    return context.account.pendingMessageManager.pendingMessageStatus(messageId)
-                                    |> mapToSignal { status, _ -> Signal<Bool, NoError> in
-                                        if status != nil {
-                                            return .never()
-                                        } else {
-                                            return .single(true)
-                                        }
-                                    }
-                                    |> take(1)
+                let alertController = textAlertController(context: self.context, updatedPresentationData: controller.updatedPresentationData, title: self.presentationData.strings.WebApp_SharePhoneTitle, text: text, actions: [TextAlertAction(type: .genericAction, title: self.presentationData.strings.Common_Cancel, action: {
+                    sendEvent(false)
+                }), TextAlertAction(type: .defaultAction, title: self.presentationData.strings.Common_OK, action: { [weak self] in
+                    guard let self, case let .user(user) = accountPeer, let phone = user.phone, !phone.isEmpty else {
+                        return
+                    }
+                    
+                    let sendMessageSignal = enqueueMessages(account: self.context.account, peerId: botId, messages: [
+                        .message(text: "", attributes: [], inlineStickers: [:], mediaReference: .standalone(media: TelegramMediaContact(firstName: user.firstName ?? "", lastName: user.lastName ?? "", phoneNumber: phone, peerId: user.id, vCardData: nil)), threadId: nil, replyToMessageId: nil, replyToStoryId: nil, localGroupingKey: nil, correlationId: nil, bubbleUpEmojiOrStickersets: [])
+                    ])
+                    |> mapToSignal { messageIds in
+                        if let maybeMessageId = messageIds.first, let messageId = maybeMessageId {
+                            return context.account.pendingMessageManager.pendingMessageStatus(messageId)
+                            |> mapToSignal { status, _ -> Signal<Bool, NoError> in
+                                if status != nil {
+                                    return .never()
                                 } else {
-                                    return .complete()
+                                    return .single(true)
                                 }
                             }
-                            
-                            let sendMessage = {
-                                let _ = (sendMessageSignal
-                                |> deliverOnMainQueue).start(completed: {
-                                    sendEvent(true)
-                                })
-                            }
-                            
-                            if requiresUnblock {
-                                let _ = (context.engine.privacy.requestUpdatePeerIsBlocked(peerId: botId, isBlocked: false)
-                                |> deliverOnMainQueue).start(completed: {
-                                    sendMessage()
-                                })
-                            } else {
-                                sendMessage()
-                            }
+                            |> take(1)
+                        } else {
+                            return .complete()
+                        }
+                    }
+                    
+                    let sendMessage = {
+                        let _ = (sendMessageSignal
+                        |> deliverOnMainQueue).start(completed: {
+                            sendEvent(true)
                         })
-                    ]
-                )
+                    }
+                    
+                    if requiresUnblock {
+                        let _ = (context.engine.privacy.requestUpdatePeerIsBlocked(peerId: botId, isBlocked: false)
+                        |> deliverOnMainQueue).start(completed: {
+                            sendMessage()
+                        })
+                    } else {
+                        sendMessage()
+                    }
+                })], parseMarkdown: true)
                 alertController.dismissed = { byOutsideTap in
                     if byOutsideTap {
                         sendEvent(false)
@@ -2308,19 +1924,8 @@ public final class WebAppController: ViewController, AttachmentContainable {
                 guard let self else {
                     return
                 }
-                var payload: [String: Any] = ["req_id": requestId]
-                if let data = result.data(using: .utf8), let json = try? JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed]) {
-                    payload["result"] = json
-                } else {
-                    payload["result"] = [:]
-                }
-                guard let jsonData = try? JSONSerialization.data(withJSONObject: payload) else {
-                    return
-                }
-                guard let jsonDataString = String(data: jsonData, encoding: .utf8) else {
-                    return
-                }
-                self.webView?.sendEvent(name: "custom_method_invoked", data: jsonDataString)
+                let paramsString = "{req_id: \"\(requestId)\", result: \(result)}"
+                self.webView?.sendEvent(name: "custom_method_invoked", data: paramsString)
             })
         }
         
@@ -2421,21 +2026,14 @@ public final class WebAppController: ViewController, AttachmentContainable {
                         alertText = self.presentationData.strings.WebApp_AlertBiometryAccessText(botPeer.compactDisplayTitle).string
                     }
                 }
-                
-                let alertController = AlertScreen(
-                    context: self.context,
-                    title: alertTitle,
-                    text: alertText,
-                    actions: [
-                        .init(title: self.presentationData.strings.Common_No, action: {
-                            updateAccessGranted(false)
-                        }),
-                        .init(title: self.presentationData.strings.Common_Yes, type: .default, action: {
-                            updateAccessGranted(true)
-                        })
-                    ]
-                )
-                controller.present(alertController, in: .window(.root))
+                controller.present(standardTextAlertController(theme: AlertControllerTheme(presentationData: self.presentationData), title: alertTitle, text: alertText, actions: [
+                    TextAlertAction(type: .genericAction, title: self.presentationData.strings.Common_No, action: {
+                        updateAccessGranted(false)
+                    }),
+                    TextAlertAction(type: .defaultAction, title: self.presentationData.strings.Common_Yes, action: {
+                        updateAccessGranted(true)
+                    })
+                ], parseMarkdown: false), in: .window(.root))
             })
         }
         
@@ -2564,15 +2162,28 @@ public final class WebAppController: ViewController, AttachmentContainable {
                                 state.opaqueToken = encryptedData
                                 return state
                             })
-                            let data: JSON = [
-                                "status": "updated"
-                            ]
-                            self.webView?.sendEvent(name: "biometry_token_updated", data: data.string)
+                            
+                            var data: [String: Any] = [:]
+                            data["status"] = "updated"
+                            
+                            guard let jsonData = try? JSONSerialization.data(withJSONObject: data) else {
+                                return
+                            }
+                            guard let jsonDataString = String(data: jsonData, encoding: .utf8) else {
+                                return
+                            }
+                            self.webView?.sendEvent(name: "biometry_token_updated", data: jsonDataString)
                         } else {
-                            let data: JSON = [
-                                "status": "failed"
-                            ]
-                            self.webView?.sendEvent(name: "biometry_token_updated", data: data.string)
+                            var data: [String: Any] = [:]
+                            data["status"] = "failed"
+                            
+                            guard let jsonData = try? JSONSerialization.data(withJSONObject: data) else {
+                                return
+                            }
+                            guard let jsonDataString = String(data: jsonData, encoding: .utf8) else {
+                                return
+                            }
+                            self.webView?.sendEvent(name: "biometry_token_updated", data: jsonDataString)
                         }
                     }
                 }.start()
@@ -2582,10 +2193,17 @@ public final class WebAppController: ViewController, AttachmentContainable {
                     state.opaqueToken = nil
                     return state
                 })
-                let data: JSON = [
-                    "status": "removed"
-                ]
-                self.webView?.sendEvent(name: "biometry_token_updated", data: data.string)
+                
+                var data: [String: Any] = [:]
+                data["status"] = "removed"
+                
+                guard let jsonData = try? JSONSerialization.data(withJSONObject: data) else {
+                    return
+                }
+                guard let jsonDataString = String(data: jsonData, encoding: .utf8) else {
+                    return
+                }
+                self.webView?.sendEvent(name: "biometry_token_updated", data: jsonDataString)
             }
         }
         
@@ -2606,22 +2224,14 @@ public final class WebAppController: ViewController, AttachmentContainable {
                 return
             }
             guard controller.isFullscreen != isFullscreen else {
-                let data: JSON = [
-                    "error": "ALREADY_FULLSCREEN"
-                ]
-                self.webView?.sendEvent(name: "fullscreen_failed", data: data.string)
+                self.webView?.sendEvent(name: "fullscreen_failed", data: "{error: \"ALREADY_FULLSCREEN\"}")
                 return
             }
             
-            let data: JSON = [
-                "is_fullscreen": isFullscreen
-            ]
-            self.webView?.sendEvent(name: "fullscreen_changed", data: data.string)
-                        
+            let paramsString = "{is_fullscreen: \( isFullscreen ? "true" : "false" )}"
+            self.webView?.sendEvent(name: "fullscreen_changed", data: paramsString)
+            
             controller.isFullscreen = isFullscreen
-            if isFullscreen {
-                controller.requestAttachmentMenuExpansion()
-            }
             
             if let (layout, _) = self.validLayout, case .regular = layout.metrics.widthClass {
                 if let snapshotView = self.webView?.snapshotView(afterScreenUpdates: false) {
@@ -2637,10 +2247,7 @@ public final class WebAppController: ViewController, AttachmentContainable {
         private var isAccelerometerActive = false
         fileprivate func setIsAccelerometerActive(_ isActive: Bool, refreshRate: Double? = nil) {
             guard self.motionManager.isAccelerometerAvailable else {
-                let data: JSON = [
-                    "error": "UNSUPPORTED"
-                ]
-                self.webView?.sendEvent(name: "accelerometer_failed", data: data.string)
+                self.webView?.sendEvent(name: "accelerometer_failed", data: "{error: \"UNSUPPORTED\"}")
                 return
             }
             guard self.isAccelerometerActive != isActive else {
@@ -2655,17 +2262,15 @@ public final class WebAppController: ViewController, AttachmentContainable {
                 } else {
                     self.motionManager.accelerometerUpdateInterval = 1.0
                 }
-                self.motionManager.startAccelerometerUpdates(to: OperationQueue.main) { [weak self] accelerometerData, error in
-                    guard let self, let accelerometerData else {
+                self.motionManager.startAccelerometerUpdates(to: OperationQueue.main) { [weak self] data, error in
+                    guard let self, let data else {
                         return
                     }
-                    let gravityConstant: Double = 9.81
-                    let data: JSON = [
-                        "x": Double(accelerometerData.acceleration.x * gravityConstant),
-                        "y": Double(accelerometerData.acceleration.y * gravityConstant),
-                        "z": Double(accelerometerData.acceleration.z * gravityConstant)
-                    ]
-                    self.webView?.sendEvent(name: "accelerometer_changed", data: data.string)
+                    let gravityConstant = 9.81
+                    self.webView?.sendEvent(
+                        name: "accelerometer_changed",
+                        data: "{x: \(data.acceleration.x * gravityConstant), y: \(data.acceleration.y * gravityConstant), z: \(data.acceleration.z * gravityConstant)}"
+                    )
                 }
             } else {
                 if self.motionManager.isAccelerometerActive {
@@ -2678,10 +2283,7 @@ public final class WebAppController: ViewController, AttachmentContainable {
         private var isDeviceOrientationActive = false
         fileprivate func setIsDeviceOrientationActive(_ isActive: Bool, refreshRate: Double? = nil, absolute: Bool = false) {
             guard self.motionManager.isDeviceMotionAvailable else {
-                let data: JSON = [
-                    "error": "UNSUPPORTED"
-                ]
-                self.webView?.sendEvent(name: "device_orientation_failed", data: data.string)
+                self.webView?.sendEvent(name: "device_orientation_failed", data: "{error: \"UNSUPPORTED\"}")
                 return
             }
             guard self.isDeviceOrientationActive != isActive else {
@@ -2714,29 +2316,25 @@ public final class WebAppController: ViewController, AttachmentContainable {
                     }
                     effectiveIsAbsolute = false
                 }
-                self.motionManager.startDeviceMotionUpdates(using: referenceFrame, to: OperationQueue.main) { [weak self] motionData, error in
-                    guard let self, let motionData else {
+                self.motionManager.startDeviceMotionUpdates(using: referenceFrame, to: OperationQueue.main) { [weak self] data, error in
+                    guard let self, let data else {
                         return
                     }
                     var alpha: Double
                     if effectiveIsAbsolute {
-                        alpha = motionData.heading * .pi / 180.0
+                        alpha = data.heading * .pi / 180.0
                         if alpha > .pi {
                             alpha -= 2.0 * .pi
                         } else if alpha < -.pi {
                             alpha += 2.0 * .pi
                         }
                     } else {
-                        alpha = motionData.attitude.yaw
+                        alpha = data.attitude.yaw
                     }
-                    
-                    let data: JSON = [
-                        "absolute": effectiveIsAbsolute,
-                        "alpha": Double(alpha),
-                        "beta": Double(motionData.attitude.pitch),
-                        "gamma": Double(motionData.attitude.roll)
-                    ]
-                    self.webView?.sendEvent(name: "device_orientation_changed", data: data.string)
+                    self.webView?.sendEvent(
+                        name: "device_orientation_changed",
+                        data: "{absolute: \(effectiveIsAbsolute ? "true" : "false"), alpha: \(alpha), beta: \(data.attitude.pitch), gamma: \(data.attitude.roll)}"
+                    )
                 }
             } else {
                 if self.motionManager.isDeviceMotionActive {
@@ -2749,10 +2347,7 @@ public final class WebAppController: ViewController, AttachmentContainable {
         private var isGyroscopeActive = false
         fileprivate func setIsGyroscopeActive(_ isActive: Bool, refreshRate: Double? = nil) {
             guard self.motionManager.isGyroAvailable else {
-                let data: JSON = [
-                    "error": "UNSUPPORTED"
-                ]
-                self.webView?.sendEvent(name: "gyroscope_failed", data: data.string)
+                self.webView?.sendEvent(name: "gyroscope_failed", data: "{error: \"UNSUPPORTED\"}")
                 return
             }
             guard self.isGyroscopeActive != isActive else {
@@ -2767,16 +2362,14 @@ public final class WebAppController: ViewController, AttachmentContainable {
                 } else {
                     self.motionManager.gyroUpdateInterval = 1.0
                 }
-                self.motionManager.startGyroUpdates(to: OperationQueue.main) { [weak self] gyroData, error in
-                    guard let self, let gyroData else {
+                self.motionManager.startGyroUpdates(to: OperationQueue.main) { [weak self] data, error in
+                    guard let self, let data else {
                         return
                     }
-                    let data: JSON = [
-                        "x": Double(gyroData.rotationRate.x),
-                        "y": Double(gyroData.rotationRate.y),
-                        "z": Double(gyroData.rotationRate.z)
-                    ]
-                    self.webView?.sendEvent(name: "gyroscope_changed", data: data.string)
+                    self.webView?.sendEvent(
+                        name: "gyroscope_changed",
+                        data: "{x: \(data.rotationRate.x), y: \(data.rotationRate.y), z: \(data.rotationRate.z)}"
+                    )
                 }
             } else {
                 if self.motionManager.isGyroActive {
@@ -2793,10 +2386,7 @@ public final class WebAppController: ViewController, AttachmentContainable {
             let _ = (self.context.engine.messages.getPreparedInlineMessage(botId: controller.botId, id: id)
             |> deliverOnMainQueue).start(next: { [weak self, weak controller] preparedMessage in
                 guard let self, let controller, let preparedMessage else {
-                    let data: JSON = [
-                        "error": "MESSAGE_EXPIRED"
-                    ]
-                    self?.webView?.sendEvent(name: "prepared_message_failed", data: data.string)
+                    self?.webView?.sendEvent(name: "prepared_message_failed", data: "{error: \"MESSAGE_EXPIRED\"}")
                     return
                 }
                 let previewController = WebAppMessagePreviewScreen(context: controller.context, botName: controller.botName, botAddress: controller.botAddress, preparedMessage: preparedMessage, completion: { [weak self] result in
@@ -2806,10 +2396,7 @@ public final class WebAppController: ViewController, AttachmentContainable {
                     if result {
                         self.webView?.sendEvent(name: "prepared_message_sent", data: nil)
                     } else {
-                        let data: JSON = [
-                            "error": "USER_DECLINED"
-                        ]
-                        self.webView?.sendEvent(name: "prepared_message_failed", data: data.string)
+                        self.webView?.sendEvent(name: "prepared_message_failed", data: "{error: \"USER_DECLINED\"}")
                     }
                 })
                 previewController.navigationPresentation = .flatModal
@@ -2823,10 +2410,7 @@ public final class WebAppController: ViewController, AttachmentContainable {
             }
             
             guard !fileName.contains("/") && fileName.lengthOfBytes(using: .utf8) < 256 && url.lengthOfBytes(using: .utf8) < 32768 else {
-                let data: JSON = [
-                    "status": "cancelled"
-                ]
-                self.webView?.sendEvent(name: "file_download_requested", data: data.string)
+                self.webView?.sendEvent(name: "file_download_requested", data: "{status: \"cancelled\"}")
                 return
             }
             
@@ -2862,10 +2446,7 @@ public final class WebAppController: ViewController, AttachmentContainable {
                     return
                 }
                 guard canDownload else {
-                    let data: JSON = [
-                        "status": "cancelled"
-                    ]
-                    self.webView?.sendEvent(name: "file_download_requested", data: data.string)
+                    self.webView?.sendEvent(name: "file_download_requested", data: "{status: \"cancelled\"}")
                     return
                 }
                 var fileSizeString = ""
@@ -2874,28 +2455,16 @@ public final class WebAppController: ViewController, AttachmentContainable {
                 }
                 
                 let text: String = self.presentationData.strings.WebApp_Download_Text(controller.botName, fileName, fileSizeString).string
-                
-                let alertController = AlertScreen(
-                    context: self.context,
-                    title: title,
-                    text: text,
-                    actions: [
-                        .init(title: self.presentationData.strings.Common_Cancel, action: { [weak self] in
-                            let data: JSON = [
-                                "status": "cancelled"
-                            ]
-                            self?.webView?.sendEvent(name: "file_download_requested", data: data.string)
-                        }),
-                        .init(title: self.presentationData.strings.WebApp_Download_Download, type: .default, action: { [weak self] in
-                            self?.startDownload(url: url, fileName: fileName, fileSize: fileSize, isMedia: isMedia)
-                        })
-                    ]
-                )
+                let alertController = standardTextAlertController(theme: AlertControllerTheme(presentationData: self.presentationData), title: title, text: text, actions: [
+                    TextAlertAction(type: .genericAction, title: self.presentationData.strings.Common_Cancel, action: { [weak self] in
+                        self?.webView?.sendEvent(name: "file_download_requested", data: "{status: \"cancelled\"}")
+                    }),
+                    TextAlertAction(type: .defaultAction, title: self.presentationData.strings.WebApp_Download_Download, action: { [weak self] in
+                        self?.startDownload(url: url, fileName: fileName, fileSize: fileSize, isMedia: isMedia)
+                    })
+                ], parseMarkdown: true)
                 alertController.dismissed = { [weak self] byOutsideTap in
-                    let data: JSON = [
-                        "status": "cancelled"
-                    ]
-                    self?.webView?.sendEvent(name: "file_download_requested", data: data.string)
+                    self?.webView?.sendEvent(name: "file_download_requested", data: "{status: \"cancelled\"}")
                 }
                 controller.present(alertController, in: .window(.root))
             })
@@ -2906,10 +2475,7 @@ public final class WebAppController: ViewController, AttachmentContainable {
             guard let controller = self.controller else {
                 return
             }
-            let data: JSON = [
-                "status": "downloading"
-            ]
-            self.webView?.sendEvent(name: "file_download_requested", data: data.string)
+            self.webView?.sendEvent(name: "file_download_requested", data: "{status: \"downloading\"}")
             
             var removeImpl: (() -> Void)?
             let fileDownload = FileDownload(
@@ -3068,7 +2634,7 @@ public final class WebAppController: ViewController, AttachmentContainable {
                     accountPeer: accountPeer,
                     botName: controller.botName,
                     icons: iconStatusEmoji,
-                    completion: { [weak self] result, byOutsideTap in
+                    completion: { [weak self] result in
                         guard let self, let controller = self.controller else {
                             return
                         }
@@ -3085,20 +2651,13 @@ public final class WebAppController: ViewController, AttachmentContainable {
                                     demoController?.replace(with: c)
                                 }
                                 controller.parentController()?.push(demoController)
-                                
-                                let data: JSON = [
-                                    "status": "cancelled"
-                                ]
-                                self.webView?.sendEvent(name: "emoji_status_access_requested", data: data.string)
+                                self.webView?.sendEvent(name: "emoji_status_access_requested", data: "{status: \"cancelled\"}")
                                 return
                             }
                             
                             let _ = (context.engine.peers.toggleBotEmojiStatusAccess(peerId: botId, enabled: true)
                             |> deliverOnMainQueue).startStandalone(completed: { [weak self] in
-                                let data: JSON = [
-                                    "status": "allowed"
-                                ]
-                                self?.webView?.sendEvent(name: "emoji_status_access_requested", data: data.string)
+                                self?.webView?.sendEvent(name: "emoji_status_access_requested", data: "{status: \"allowed\"}")
                             })
 
                             if let botPeer {
@@ -3117,19 +2676,17 @@ public final class WebAppController: ViewController, AttachmentContainable {
                                 controller.present(resultController, in: .window(.root))
                             }
                         } else {
-                            let data: JSON = [
-                                "status": "cancelled"
-                            ]
-                            self.webView?.sendEvent(name: "emoji_status_access_requested", data: data.string)
+                            self.webView?.sendEvent(name: "emoji_status_access_requested", data: "{status: \"cancelled\"}")
                         }
                         
-                        if !byOutsideTap {
-                            let _ = updateWebAppPermissionsStateInteractively(context: context, peerId: botId) { current in
-                                return WebAppPermissionsState(location: current?.location, emojiStatus: WebAppPermissionsState.EmojiStatus(isRequested: true))
-                            }.startStandalone()
-                        }
+                        let _ = updateWebAppPermissionsStateInteractively(context: context, peerId: botId) { current in
+                            return WebAppPermissionsState(location: current?.location, emojiStatus: WebAppPermissionsState.EmojiStatus(isRequested: true))
+                        }.startStandalone()
                     }
                 )
+                alertController.dismissed = { [weak self] byOutsideTap in
+                    self?.webView?.sendEvent(name: "emoji_status_access_requested", data: "{status: \"cancelled\"}")
+                }
                 controller.present(alertController, in: .window(.root))
             })
         }
@@ -3148,10 +2705,7 @@ public final class WebAppController: ViewController, AttachmentContainable {
                     return
                 }
                 guard let file = files[fileId] else {
-                    let data: JSON = [
-                        "error": "SUGGESTED_EMOJI_INVALID"
-                    ]
-                    self.webView?.sendEvent(name: "emoji_status_failed", data: data.string)
+                    self.webView?.sendEvent(name: "emoji_status_failed", data: "{error: \"SUGGESTED_EMOJI_INVALID\"}")
                     return
                 }
                 let confirmController = WebAppSetEmojiStatusScreen(
@@ -3176,11 +2730,7 @@ public final class WebAppController: ViewController, AttachmentContainable {
                                     demoController?.replace(with: c)
                                 }
                                 controller.parentController()?.push(demoController)
-                                
-                                let data: JSON = [
-                                    "error": "USER_DECLINED"
-                                ]
-                                self.webView?.sendEvent(name: "emoji_status_failed", data: data.string)
+                                self.webView?.sendEvent(name: "emoji_status_failed", data: "{error: \"USER_DECLINED\"}")
                                 return
                             }
                             
@@ -3212,10 +2762,7 @@ public final class WebAppController: ViewController, AttachmentContainable {
                             )
                             controller.present(resultController, in: .window(.root))
                         } else {
-                            let data: JSON = [
-                                "error": "USER_DECLINED"
-                            ]
-                            self.webView?.sendEvent(name: "emoji_status_failed", data: data.string)
+                            self.webView?.sendEvent(name: "emoji_status_failed", data: "{error: \"USER_DECLINED\"}")
                         }
                     }
                 )
@@ -3246,53 +2793,6 @@ public final class WebAppController: ViewController, AttachmentContainable {
                 }
                 let url = URL(string: "\(scheme)://teamgram.me/\(addressName)\(appName)?startapp&addToHomeScreen")!
                 UIApplication.shared.open(url)
-            })
-        }
-        
-        fileprivate func openSecureBotStorageTransfer(requestId: String, key: String, storedKeys: [WebAppSecureStorage.ExistingKey]) {
-            guard let controller = self.controller else {
-                return
-            }
-            
-            let _ = (self.context.engine.data.get(TelegramEngine.EngineData.Item.Peer.Peer(id: controller.botId))
-            |> deliverOnMainQueue).start(next: { [weak self] botPeer in
-                guard let self, let botPeer, let controller = self.controller else {
-                    return
-                }
-                let transferController = WebAppSecureStorageTransferScreen(
-                    context: self.context,
-                    peer: botPeer,
-                    existingKeys: storedKeys,
-                    completion: { [weak self] uuid in
-                        guard let self else {
-                            return
-                        }
-                        guard let uuid else {
-                            let data: JSON = [
-                                "req_id": requestId,
-                                "error": "RESTORE_CANCELLED"
-                            ]
-                            self.webView?.sendEvent(name: "secure_storage_failed", data: data.string)
-                            return
-                        }
-                        
-                        let _ = (WebAppSecureStorage.transferAllValues(context: self.context, fromUuid: uuid, botId: controller.botId)
-                        |> deliverOnMainQueue).start(completed: { [weak self] in
-                            guard let self else {
-                                return
-                            }
-                            let _ = (WebAppSecureStorage.getValue(context: self.context, botId: controller.botId, key: key)
-                            |> deliverOnMainQueue).start(next: { [weak self] value in
-                                let data: JSON = [
-                                    "req_id": requestId,
-                                    "value": value ?? NSNull()
-                                ]
-                                self?.webView?.sendEvent(name: "secure_storage_key_restored", data: data.string)
-                            })
-                        })
-                    }
-                )
-                controller.parentController()?.push(transferController)
             })
         }
         
@@ -3458,9 +2958,6 @@ public final class WebAppController: ViewController, AttachmentContainable {
     private var titleView: WebAppTitleView?
     fileprivate let cancelButtonNode: WebAppCancelButtonNode
     fileprivate let moreButtonNode: MoreButtonNode
-    private var cancelBarButtonNode: BarComponentHostNode?
-    private var moreBarButtonNode: BarComponentHostNode?
-    private let moreButtonPlayOnce = ActionSlot<Void>()
     
     private let context: AccountContext
     public let source: WebAppParameters.Source
@@ -3491,8 +2988,6 @@ public final class WebAppController: ViewController, AttachmentContainable {
     public var getNavigationController: () -> NavigationController? = { return nil }
     public var completion: () -> Void = {}
     public var requestSwitchInline: (String, [ReplyMarkupButtonRequestPeerType]?, @escaping () -> Void) -> Void = { _, _, _ in }
-    
-    public var verifyAgeCompletion: ((Int) -> Void)?
     
     public init(context: AccountContext, updatedPresentationData: (initial: PresentationData, signal: Signal<PresentationData, NoError>)? = nil, params: WebAppParameters, replyToMessageId: MessageId?, threadId: Int64?) {
         self.context = context
@@ -3532,32 +3027,24 @@ public final class WebAppController: ViewController, AttachmentContainable {
         self.statusBar.statusBarStyle = self.presentationData.theme.rootController.statusBarStyle.style
         self.automaticallyControlPresentationContextLayout = false
         
-        if case .attachMenu = self.source {
-            
-        } else {
-            self.navigationItem.leftBarButtonItem = UIBarButtonItem(customDisplayNode: self.cancelButtonNode)
-            self.navigationItem.leftBarButtonItem?.action = #selector(self.cancelPressed)
-            self.navigationItem.leftBarButtonItem?.target = self
-            
-            if !self.isVerifyAgeBot {
-                self.navigationItem.rightBarButtonItem = UIBarButtonItem(customDisplayNode: self.moreButtonNode)
-                self.navigationItem.rightBarButtonItem?.action = #selector(self.moreButtonPressed)
-                self.navigationItem.rightBarButtonItem?.target = self
-            }
-        }
+        self.navigationItem.leftBarButtonItem = UIBarButtonItem(customDisplayNode: self.cancelButtonNode)
+        self.navigationItem.leftBarButtonItem?.action = #selector(self.cancelPressed)
+        self.navigationItem.leftBarButtonItem?.target = self
+        
+        self.navigationItem.rightBarButtonItem = UIBarButtonItem(customDisplayNode: self.moreButtonNode)
+        self.navigationItem.rightBarButtonItem?.action = #selector(self.moreButtonPressed)
+        self.navigationItem.rightBarButtonItem?.target = self
         
         self.navigationItem.backBarButtonItem = UIBarButtonItem(title: self.presentationData.strings.Common_Back, style: .plain, target: nil, action: nil)
         
-        if !self.isVerifyAgeBot {
-            let titleView = WebAppTitleView(context: self.context, theme: self.presentationData.theme, isAttachMenu: self.source == .attachMenu)
-            titleView.title = WebAppTitle(title: params.botName, counter: self.presentationData.strings.WebApp_Miniapp, isVerified: params.botVerified)
-            self.navigationItem.titleView = titleView
-            self.titleView = titleView
-        }
+        let titleView = WebAppTitleView(context: self.context, theme: self.presentationData.theme)
+        titleView.title = WebAppTitle(title: params.botName, counter: self.presentationData.strings.WebApp_Miniapp, isVerified: params.botVerified)
+        self.navigationItem.titleView = titleView
+        self.titleView = titleView
         
         self.moreButtonNode.action = { [weak self] _, gesture in
             if let strongSelf = self {
-                strongSelf.morePressed(view: strongSelf.moreButtonNode.contextSourceNode.view, gesture: gesture)
+                strongSelf.morePressed(node: strongSelf.moreButtonNode.contextSourceNode, gesture: gesture)
             }
         }
         
@@ -3579,26 +3066,6 @@ public final class WebAppController: ViewController, AttachmentContainable {
                 }
             }
         })
-        
-        self.longTapWithTabBar = { [weak self] in
-            guard let self else {
-                return
-            }
-            
-            let _ = (context.engine.messages.attachMenuBots()
-            |> take(1)
-            |> deliverOnMainQueue).start(next: { [weak self] attachMenuBots in
-                guard let self else {
-                    return
-                }
-                let attachMenuBot = attachMenuBots.first(where: { $0.peer.id == self.botId && !$0.flags.contains(.notActivated) })
-                if let _ = attachMenuBot, [.attachMenu, .settings, .generic].contains(self.source) {
-                    self.removeAttachBot()
-                }
-            })
-        }
-        
-        self.updateNavigationButtons()
     }
     
     required public init(coder aDecoder: NSCoder) {
@@ -3608,95 +3075,6 @@ public final class WebAppController: ViewController, AttachmentContainable {
     deinit {
         assert(true)
         self.presentationDataDisposable?.dispose()
-    }
-    
-    private func updateNavigationButtons() {
-        if case .attachMenu = self.source {
-            let barButtonSize = CGSize(width: 44.0, height: 44.0)
-            let closeComponent: AnyComponentWithIdentity<Empty> = AnyComponentWithIdentity(
-                id: "close",
-                component: AnyComponent(GlassBarButtonComponent(
-                    size: barButtonSize,
-                    backgroundColor: self.presentationData.theme.rootController.navigationBar.glassBarButtonBackgroundColor,
-                    isDark: self.presentationData.theme.overallDarkAppearance,
-                    state: .generic,
-                    component: AnyComponentWithIdentity(id: self.controllerNode.hasBackButton ? "back" : "close", component: AnyComponent(
-                        BundleIconComponent(
-                            name: self.controllerNode.hasBackButton ? "Navigation/Back" : "Navigation/Close",
-                            tintColor: self.presentationData.theme.chat.inputPanel.panelControlColor
-                        )
-                    )),
-                    action: { [weak self] _ in
-                        self?.cancelPressed()
-                    }
-                ))
-            )
-            
-            let moreComponent: AnyComponentWithIdentity<Empty> = AnyComponentWithIdentity(
-                id: "more",
-                component: AnyComponent(GlassBarButtonComponent(
-                    size: barButtonSize,
-                    backgroundColor: self.presentationData.theme.rootController.navigationBar.glassBarButtonBackgroundColor,
-                    isDark: self.presentationData.theme.overallDarkAppearance,
-                    state: .generic,
-                    component: AnyComponentWithIdentity(id: "more", component: AnyComponent(
-                        LottieComponent(
-                            content: LottieComponent.AppBundleContent(
-                                name: "anim_morewide"
-                            ),
-                            color: self.presentationData.theme.chat.inputPanel.panelControlColor,
-                            size: CGSize(width: 34.0, height: 34.0),
-                            playOnce: self.moreButtonPlayOnce
-                        )
-                    )),
-                    action: { [weak self] view in
-                        self?.morePressed(view: view, gesture: nil)
-                        self?.moreButtonPlayOnce.invoke(Void())
-                    }
-                ))
-            )
-            
-            let cancelButtonNode: BarComponentHostNode
-            if let current = self.cancelBarButtonNode {
-                cancelButtonNode = current
-                cancelButtonNode.component = closeComponent
-            } else {
-                cancelButtonNode = BarComponentHostNode(component: closeComponent, size: barButtonSize)
-                self.cancelBarButtonNode = cancelButtonNode
-                self.navigationItem.leftBarButtonItem = UIBarButtonItem(customDisplayNode: cancelButtonNode)
-            }
-            
-            let morehButtonNode: BarComponentHostNode
-            if let current = self.moreBarButtonNode {
-                morehButtonNode = current
-                morehButtonNode.component = moreComponent
-            } else {
-                morehButtonNode = BarComponentHostNode(component: moreComponent, size: barButtonSize)
-                self.moreBarButtonNode = morehButtonNode
-                self.navigationItem.rightBarButtonItem = UIBarButtonItem(customDisplayNode: morehButtonNode)
-            }
-        }
-            
-        self.cancelButtonNode.setState(self.controllerNode.hasBackButton ? .back : .cancel, animated: true)
-    }
-    
-    private var isVerifyAgeBot: Bool {
-        if let ageBotUsername = self.context.currentAppConfiguration.with({ $0 }).data?["verify_age_bot_username"] as? String {
-            return self.botAddress == ageBotUsername
-        }
-        return false
-    }
-    
-    private var isWhiteListedBot: Bool {
-        if let whiteListedBots = self.context.currentAppConfiguration.with({ $0 }).data?["whitelisted_bots"] as? [Double] {
-            let botId = self.botId.id._internalGetInt64Value()
-            for bot in whiteListedBots {
-                if Int64(bot) == botId {
-                    return true
-                }
-            }
-        }
-        return false
     }
     
     public func beforeMaximize(navigationController: NavigationController, completion: @escaping () -> Void) {
@@ -3723,7 +3101,6 @@ public final class WebAppController: ViewController, AttachmentContainable {
         if let backgroundColor = self.controllerNode.headerColor, let textColor = self.controllerNode.headerPrimaryTextColor {
             navigationBarPresentationData = NavigationBarPresentationData(
                 theme: NavigationBarTheme(
-                    overallDarkAppearance: false,
                     buttonColor: textColor,
                     disabledButtonColor: textColor,
                     primaryTextColor: textColor,
@@ -3742,7 +3119,7 @@ public final class WebAppController: ViewController, AttachmentContainable {
                 strings: NavigationBarStrings(back: "", close: "")
             )
         }
-        self.navigationBar?.updatePresentationData(navigationBarPresentationData, transition: .immediate)
+        self.navigationBar?.updatePresentationData(navigationBarPresentationData)
     }
     
     @objc fileprivate func cancelPressed() {
@@ -3759,7 +3136,10 @@ public final class WebAppController: ViewController, AttachmentContainable {
         self.moreButtonNode.buttonPressed()
     }
     
-    @objc fileprivate func morePressed(view: UIView, gesture: ContextGesture?) {
+    @objc fileprivate func morePressed(node: ASDisplayNode, gesture: ContextGesture?) {
+        guard let node = node as? ContextReferenceContentNode else {
+            return
+        }
         let context = self.context
         var presentationData = self.presentationData
         if !presentationData.theme.overallDarkAppearance, let headerColor = self.controllerNode.headerColor {
@@ -3945,8 +3325,14 @@ public final class WebAppController: ViewController, AttachmentContainable {
                 }, action: { [weak self] c, _ in
                     c?.dismiss(completion: nil)
                     
-                    if let self {
-                        self.removeAttachBot()
+                    if let strongSelf = self {
+                        let presentationData = context.sharedContext.currentPresentationData.with { $0 }
+                        strongSelf.present(textAlertController(context: context, title: presentationData.strings.WebApp_RemoveConfirmationTitle, text: presentationData.strings.WebApp_RemoveAllConfirmationText(strongSelf.botName).string, actions: [TextAlertAction(type: .genericAction, title: presentationData.strings.Common_Cancel, action: {}), TextAlertAction(type: .defaultAction, title: presentationData.strings.Common_OK, action: { [weak self] in
+                            if let strongSelf = self {
+                                let _ = context.engine.messages.removeBotFromAttachMenu(botId: strongSelf.botId).start()
+                                strongSelf.dismiss()
+                            }
+                        })], parseMarkdown: true), in: .window(.root))
                     }
                 })))
             }
@@ -3954,28 +3340,8 @@ public final class WebAppController: ViewController, AttachmentContainable {
             return ContextController.Items(content: .list(items))
         }
         
-        let contextController = makeContextController(presentationData: presentationData, source: .reference(WebAppContextReferenceContentSource(controller: self, sourceView: view)), items: items, gesture: gesture)
+        let contextController = ContextController(presentationData: presentationData, source: .reference(WebAppContextReferenceContentSource(controller: self, sourceNode: node)), items: items, gesture: gesture)
         self.presentInGlobalOverlay(contextController)
-    }
-    
-    private func removeAttachBot() {
-        let presentationData = self.context.sharedContext.currentPresentationData.with { $0 }
-        let alertController = AlertScreen(
-            context: self.context,
-            title: presentationData.strings.WebApp_RemoveConfirmationTitle,
-            text: presentationData.strings.WebApp_RemoveAllConfirmationText(self.botName).string,
-            actions: [
-                .init(title: presentationData.strings.Common_Cancel),
-                .init(title: presentationData.strings.Common_OK, type: .default, action: { [weak self] in
-                    guard let self else {
-                        return
-                    }
-                    let _ = self.context.engine.messages.removeBotFromAttachMenu(botId: self.botId).start()
-                    self.dismiss()
-                })
-            ]
-        )
-        self.present(alertController, in: .window(.root))
     }
     
     override public func loadDisplayNode() {
@@ -3994,17 +3360,15 @@ public final class WebAppController: ViewController, AttachmentContainable {
         self.validLayout = layout
         super.containerLayoutUpdated(layout, transition: transition)
         
-        let navigationBarHeight = self.navigationLayout(layout: layout).navigationFrame.maxY
-        
         var presentationLayout = layout
         if self.isFullscreen {
             presentationLayout.intrinsicInsets.top = (presentationLayout.statusBarHeight ?? 0.0) + 36.0
         } else {
-            presentationLayout.intrinsicInsets.top = navigationBarHeight
+            presentationLayout.intrinsicInsets.top = 56.0
         }
         self.presentationContext.containerLayoutUpdated(presentationLayout, transition: transition)
         
-        self.controllerNode.containerLayoutUpdated(layout, navigationBarHeight: navigationBarHeight, transition: transition)
+        self.controllerNode.containerLayoutUpdated(layout, navigationBarHeight: self.navigationLayout(layout: layout).navigationFrame.maxY, transition: transition)
     }
     
     override public var presentationController: UIPresentationController? {
@@ -4060,10 +3424,7 @@ public final class WebAppController: ViewController, AttachmentContainable {
                     self.controllerNode.webView?.setNeedsLayout()
                 }
                 
-                let data: JSON = [
-                    "is_visible": !self.isMinimized,
-                ]
-                self.controllerNode.webView?.sendEvent(name: "visibility_changed", data: data.string)
+                self.controllerNode.webView?.sendEvent(name: "visibility_changed", data: "{is_visible: \(self.isMinimized ? "false" : "true")}")
             }
         }
     }
@@ -4154,15 +3515,15 @@ final class WebAppPickerContext: AttachmentMediaPickerContext {
 
 private final class WebAppContextReferenceContentSource: ContextReferenceContentSource {
     private let controller: ViewController
-    private let sourceView: UIView
+    private let sourceNode: ContextReferenceContentNode
     
-    init(controller: ViewController, sourceView: UIView) {
+    init(controller: ViewController, sourceNode: ContextReferenceContentNode) {
         self.controller = controller
-        self.sourceView = sourceView
+        self.sourceNode = sourceNode
     }
     
     func transitionInfo() -> ContextControllerReferenceViewInfo? {
-        return ContextControllerReferenceViewInfo(referenceView: self.sourceView, contentAreaInScreenSpace: UIScreen.main.bounds)
+        return ContextControllerReferenceViewInfo(referenceView: self.sourceNode.view, contentAreaInScreenSpace: UIScreen.main.bounds)
     }
 }
 
@@ -4178,8 +3539,7 @@ public func standaloneWebAppController(
     willDismiss: @escaping () -> Void = {},
     didDismiss: @escaping () -> Void = {},
     getNavigationController: @escaping () -> NavigationController? = { return nil },
-    getSourceRect: (() -> CGRect?)? = nil,
-    verifyAgeCompletion: ((Int) -> Void)? = nil
+    getSourceRect: (() -> CGRect?)? = nil
 ) -> ViewController {
     let controller = AttachmentController(context: context, updatedPresentationData: updatedPresentationData, chatLocation: .peer(id: params.peerId), buttons: [.standalone], initialButton: .standalone, fromMenu: params.source == .menu, hasTextInput: false, isFullSize: params.fullSize, makeEntityInputView: {
         return nil
@@ -4190,7 +3550,6 @@ public func standaloneWebAppController(
         webAppController.completion = completion
         webAppController.getNavigationController = getNavigationController
         webAppController.requestSwitchInline = requestSwitchInline
-        webAppController.verifyAgeCompletion = verifyAgeCompletion
         present(webAppController, webAppController.mediaPickerContext)
     }
     controller.willDismiss = willDismiss

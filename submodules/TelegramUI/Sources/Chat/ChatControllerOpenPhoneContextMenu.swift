@@ -54,18 +54,11 @@ extension ChatControllerImpl: MFMessageComposeViewControllerDelegate {
             }
             params.progress?.set(.single(false))
             
-            var firstName = ""
-            var lastName = ""
             let phoneNumber: String
             if let peer, case let .user(user) = peer, let phone = user.phone {
                 phoneNumber = "+\(phone)"
             } else {
                 phoneNumber = number
-            }
-            
-            if case let .user(user) = peer {
-                firstName = user.firstName ?? ""
-                lastName = user.lastName ?? ""
             }
             
             var items: [ContextMenuItem] = []
@@ -74,7 +67,7 @@ extension ChatControllerImpl: MFMessageComposeViewControllerDelegate {
                     guard let self, let c else {
                         return
                     }
-                    let basicData = DeviceContactBasicData(firstName: firstName, lastName: lastName, phoneNumbers: [
+                    let basicData = DeviceContactBasicData(firstName: "", lastName: "", phoneNumbers: [
                         DeviceContactPhoneNumberData(label: "", value: phoneNumber)
                     ])
                     let contactData = DeviceContactExtendedData(basicData: basicData, middleName: "", prefix: "", suffix: "", organization: "", jobTitle: "", department: "", emailAddresses: [], urls: [], addresses: [], birthdayDate: nil, socialProfiles: [], instantMessagingProfiles: [], note: "")
@@ -190,7 +183,7 @@ extension ChatControllerImpl: MFMessageComposeViewControllerDelegate {
             
             self.canReadHistory.set(false)
             
-            let controller = makeContextController(presentationData: self.presentationData, source: source, items: .single(ContextController.Items(content: .list(items))), recognizer: recognizer, gesture: gesture, disableScreenshots: false)
+            let controller = ContextController(presentationData: self.presentationData, source: source, items: .single(ContextController.Items(content: .list(items))), recognizer: recognizer, gesture: gesture, disableScreenshots: false)
             controller.dismissed = { [weak self] in
                 self?.canReadHistory.set(true)
             }

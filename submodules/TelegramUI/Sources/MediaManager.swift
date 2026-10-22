@@ -15,7 +15,6 @@ import TelegramUniversalVideoContent
 import DeviceProximity
 import MediaResources
 import PhotoResources
-import PeerMessagesMediaPlaylist
 
 enum SharedMediaPlayerGroup: Int {
     case music = 0
@@ -450,17 +449,12 @@ public final class MediaManagerImpl: NSObject, MediaManager {
         self.voiceMediaPlayerStateDisposable.dispose()
     }
     
-    public func audioRecorder(
-        resumeData: AudioRecorderResumeData?,
-        beginWithTone: Bool,
-        applicationBindings: TelegramApplicationBindings,
-        beganWithTone: @escaping (Bool) -> Void
-    ) -> Signal<ManagedAudioRecorder?, NoError> {
+    public func audioRecorder(beginWithTone: Bool, applicationBindings: TelegramApplicationBindings, beganWithTone: @escaping (Bool) -> Void) -> Signal<ManagedAudioRecorder?, NoError> {
         return Signal { subscriber in
             let disposable = MetaDisposable()
             
             self.queue.async {
-                let audioRecorder = ManagedAudioRecorderImpl(mediaManager: self, resumeData: resumeData, pushIdleTimerExtension: { [weak applicationBindings] in
+                let audioRecorder = ManagedAudioRecorderImpl(mediaManager: self, pushIdleTimerExtension: { [weak applicationBindings] in
                     return applicationBindings?.pushIdleTimerExtension() ?? EmptyDisposable
                 }, beginWithTone: beginWithTone, beganWithTone: beganWithTone)
                 subscriber.putNext(audioRecorder)

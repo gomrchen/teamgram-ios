@@ -90,7 +90,7 @@ final class PeerInfoEditingAvatarNode: ASDisplayNode {
         
         var isForum = false
         let avatarCornerRadius: CGFloat
-        if let channel = peer as? TelegramChannel, channel.isForumOrMonoForum {
+        if let channel = peer as? TelegramChannel, channel.flags.contains(.isForum) {
             isForum = true
             avatarCornerRadius = floor(avatarSize * 0.25)
         } else {
@@ -196,9 +196,7 @@ final class PeerInfoEditingAvatarNode: ASDisplayNode {
                     self.videoContent = nil
                     self.videoNode = nil
                     
-                    DispatchQueue.main.async {
-                        videoNode.removeFromSupernode()
-                    }
+                    videoNode.removeFromSupernode()
                 }
             }
         } else if let videoNode = self.videoNode {

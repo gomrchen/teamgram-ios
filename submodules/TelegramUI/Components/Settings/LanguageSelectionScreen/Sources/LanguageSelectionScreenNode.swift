@@ -347,7 +347,7 @@ final class LanguageSelectionScreenNode: ViewControllerTracingNode {
         let openSearch: () -> Void = {
             requestActivateSearch()
         }
-                
+        
         let previousState = Atomic<LocalizationListState?>(value: nil)
         let previousEntriesHolder = Atomic<([LanguageListEntry], PresentationTheme, PresentationStrings)?>(value: nil)
         self.listDisposable = combineLatest(
@@ -360,7 +360,7 @@ final class LanguageSelectionScreenNode: ViewControllerTracingNode {
             guard let strongSelf = self else {
                 return
             }
-            
+                        
             var entries: [LanguageListEntry] = []
             var existingIds = Set<String>()
             
@@ -540,8 +540,7 @@ final class LanguageSelectionScreenNode: ViewControllerTracingNode {
             inline: true,
             cancel: { [weak self] in
                 self?.requestDeactivateSearch()
-            },
-            fieldStyle: placeholderNode.fieldStyle
+            }
         )
         
         self.searchDisplayController?.containerLayoutUpdated(containerLayout, navigationBarHeight: navigationBarHeight, transition: .immediate)

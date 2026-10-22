@@ -235,7 +235,7 @@ public final class PeerListItemComponent: Component {
     let subtitleAccessory: SubtitleAccessory
     let presence: EnginePeer.Presence?
     let rightAccessory: RightAccessory
-    let rightAccessoryComponent: AnyComponentWithIdentity<Empty>?
+    let rightAccessoryComponent: AnyComponent<Empty>?
     let reaction: Reaction?
     let story: EngineStoryItem?
     let message: EngineMessage?
@@ -266,7 +266,7 @@ public final class PeerListItemComponent: Component {
         subtitleAccessory: SubtitleAccessory,
         presence: EnginePeer.Presence?,
         rightAccessory: RightAccessory = .none,
-        rightAccessoryComponent: AnyComponentWithIdentity<Empty>? = nil,
+        rightAccessoryComponent: AnyComponent<Empty>? = nil,
         reaction: Reaction? = nil,
         story: EngineStoryItem? = nil,
         message: EngineMessage? = nil,
@@ -464,7 +464,6 @@ public final class PeerListItemComponent: Component {
         private var isExtractedToContextMenu: Bool = false
         
         public var customUpdateIsHighlighted: ((Bool) -> Void)?
-        public var enumerateSiblings: (((UIView) -> Void) -> Void)?
         public private(set) var separatorInset: CGFloat = 0.0
         
         override init(frame: CGRect) {
@@ -764,14 +763,9 @@ public final class PeerListItemComponent: Component {
                     height = 40.0 + verticalInset * 2.0
                 }
             }
-
-            if let rightAccessoryComponentView = self.rightAccessoryComponentView, component.rightAccessoryComponent?.id != previousComponent?.rightAccessoryComponent?.id {
-                self.rightAccessoryComponentView = nil
-                rightAccessoryComponentView.view?.removeFromSuperview()
-            }
             
             var rightAccessoryComponentSize: CGSize?
-            if let rightAccessoryComponent = component.rightAccessoryComponent?.component {
+            if let rightAccessoryComponent = component.rightAccessoryComponent {
                 var rightAccessoryComponentTransition = transition
                 let rightAccessoryComponentView: ComponentView<Empty>
                 if let current = self.rightAccessoryComponentView {
@@ -855,7 +849,7 @@ public final class PeerListItemComponent: Component {
                 } else if peer.isFake {
                     statusIcon = .text(color: component.theme.chat.message.incoming.scamColor, string: component.strings.Message_FakeAccount.uppercased())
                 } else if let emojiStatus = peer.emojiStatus {
-                    statusIcon = .animation(content: .customEmoji(fileId: emojiStatus.fileId), size: CGSize(width: 20.0, height: 20.0), placeholderColor: component.theme.list.mediaPlaceholderColor, themeColor: component.theme.list.itemAccentColor, loopMode: .count(0))
+                    statusIcon = .animation(content: .customEmoji(fileId: emojiStatus.fileId), size: CGSize(width: 20.0, height: 20.0), placeholderColor: component.theme.list.mediaPlaceholderColor, themeColor: component.theme.list.itemAccentColor, loopMode: .count(2))
                     if let color = emojiStatus.color {
                         particleColor = UIColor(rgb: UInt32(bitPattern: color))
                     }
@@ -914,7 +908,7 @@ public final class PeerListItemComponent: Component {
                 
                 if let peer = component.peer {
                     let clipStyle: AvatarNodeClipStyle
-                    if case let .channel(channel) = peer, channel.isForumOrMonoForum {
+                    if case let .channel(channel) = peer, channel.flags.contains(.isForum) {
                         clipStyle = .roundedRect
                     } else {
                         clipStyle = .round
@@ -941,8 +935,7 @@ public final class PeerListItemComponent: Component {
                         return AvatarNode.StoryStats(
                             totalCount: storyStats.totalCount == 0 ? 0 : 1,
                             unseenCount: storyStats.unseenCount == 0 ? 0 : 1,
-                            hasUnseenCloseFriendsItems: storyStats.hasUnseenCloseFriends,
-                            hasLiveItems: storyStats.hasLiveItems
+                            hasUnseenCloseFriendsItems: storyStats.hasUnseenCloseFriends
                         )
                     }, presentationParams: AvatarNode.StoryPresentationParams(
                         colors: AvatarNode.Colors(theme: component.theme),

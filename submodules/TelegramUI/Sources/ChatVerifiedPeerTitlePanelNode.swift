@@ -15,7 +15,6 @@ import AnimationCache
 import MultiAnimationRenderer
 import AccountContext
 import TelegramNotices
-import LegacyChatHeaderPanelComponent
 
 final class ChatVerifiedPeerTitlePanelNode: ChatTitleAccessoryPanelNode {
     private let context: AccountContext

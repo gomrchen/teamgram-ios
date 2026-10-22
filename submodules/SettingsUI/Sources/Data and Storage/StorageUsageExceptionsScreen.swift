@@ -401,7 +401,7 @@ public func storageUsageExceptionsScreen(
                     if currentValue == value {
                         return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Check"), color: theme.contextMenu.primaryColor)
                     } else {
-                        return UIImage()
+                        return nil
                     }
                 }, action: { _, f in
                     applyValue(value)
@@ -422,7 +422,7 @@ public func storageUsageExceptionsScreen(
                 let items: Signal<ContextController.Items, NoError> = .single(ContextController.Items(content: .list(subItems)))
                 let source: ContextContentSource = .reference(StorageUsageExceptionsContextReferenceContentSource(sourceView: sourceNode.labelNode.view))
                 
-                let contextController = makeContextController(
+                let contextController = ContextController(
                     presentationData: presentationData,
                     source: source,
                     items: items,

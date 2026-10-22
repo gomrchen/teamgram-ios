@@ -1,12 +1,12 @@
-#import <LegacyComponents/TGModernConversationInputMicButton.h>
+#import "TGModernConversationInputMicButton.h"
 
 #import "LegacyComponentsInternal.h"
 
 #import <LegacyComponents/TGModernButton.h>
-#import <LegacyComponents/TGOverlayController.h>
+#import "TGOverlayController.h"
 #import "TGColor.h"
-#import <LegacyComponents/TGImageUtils.h>
-#import <LegacyComponents/TGPhotoEditorSparseView.h>
+#import "TGImageUtils.h"
+#import "TGPhotoEditorSparseView.h"
 
 static const CGFloat innerCircleRadius = 110.0f;
 static const CGFloat outerCircleRadius = innerCircleRadius + 50.0f;
@@ -98,17 +98,6 @@ static const CGFloat outerCircleMinScale = innerCircleRadius / outerCircleRadius
 
 @end
 
-@interface TGModernConversationInputMicButtonLockPanelViewNativeImpl : UIImageView<TGModernConversationInputMicButtonLockPanelView>
-
-@end
-
-@implementation TGModernConversationInputMicButtonLockPanelViewNativeImpl
-
-- (void)updateSize:(CGSize)size {
-}
-
-@end
-
 @interface TGModernConversationInputMicButton () <UIGestureRecognizerDelegate>
 {
     CGPoint _touchLocation;
@@ -127,7 +116,7 @@ static const CGFloat outerCircleMinScale = innerCircleRadius / outerCircleRadius
     UIImageView *_innerIconView;
     
     UIView *_lockPanelWrapperView;
-    UIView<TGModernConversationInputMicButtonLockPanelView> *_lockPanelView;
+    UIView *_lockPanelView;
     UIImageView *_lockArrowView;
     TGModernConversationInputLockView *_lockView;
     UIImage *_previousIcon;
@@ -364,8 +353,8 @@ static const CGFloat outerCircleMinScale = innerCircleRadius / outerCircleRadius
     return stopButtonImage;
 }
 
-- (UIView<TGModernConversationInputMicButtonLockPanelView> *)createLockPanelView {
-    TGModernConversationInputMicButtonLockPanelViewNativeImpl *view = [[TGModernConversationInputMicButtonLockPanelViewNativeImpl alloc] initWithFrame:CGRectMake(0.0f, 0.0f, 40.0f, 72.0f)];
+- (UIView *)createLockPanelView {
+    UIImageView *view = [[UIImageView alloc] initWithFrame:CGRectMake(0.0f, 0.0f, 40.0f, 72.0f)];
     view.userInteractionEnabled = true;
     view.image = [self panelBackgroundImage];
     return view;
@@ -644,8 +633,6 @@ static const CGFloat outerCircleMinScale = innerCircleRadius / outerCircleRadius
     } completion:^(__unused BOOL finished) {
         [snapshotView removeFromSuperview];
     }];
-    
-    [_lockPanelView updateSize:CGSizeMake(_lockPanelView.frame.size.width, 72.0f - 32.0f)];
     
     [UIView animateWithDuration:0.2 animations:^
     {

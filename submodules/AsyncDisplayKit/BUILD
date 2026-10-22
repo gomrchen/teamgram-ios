@@ -4,7 +4,7 @@ public_headers = glob([
 
 private_headers = glob([
   "Source/*.h",
-], allow_empty=True)
+])
 
 objc_library(
     name = "AsyncDisplayKit",
@@ -13,13 +13,10 @@ objc_library(
     srcs = glob([
         "Source/**/*.m",
         "Source/**/*.mm",
-    ], allow_empty=True) + private_headers,
+    ]) + private_headers,
     copts = [
         "-Werror",
-    ],
-    cxxopts = [
-        "-Werror",
-        "-std=c++17",
+        "-Wno-vla-cxx-extension",
     ],
     hdrs = public_headers,
     defines = [

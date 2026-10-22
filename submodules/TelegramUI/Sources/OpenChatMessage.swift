@@ -25,7 +25,6 @@ import GalleryData
 import StoryContainerScreen
 import WallpaperGalleryScreen
 import BrowserUI
-import PeerMessagesMediaPlaylist
 
 func openChatMessageImpl(_ params: OpenChatMessageParams) -> Bool {
     var story: TelegramMediaStory?
@@ -183,11 +182,6 @@ func openChatMessageImpl(_ params: OpenChatMessageParams) -> Bool {
                 params.navigationController?.pushViewController(controller)
                 return true
             case let .stickerPack(reference, previewIconFile):
-                var previewIconFile: TelegramMediaFile? = previewIconFile
-                if let file = previewIconFile, !file.isValidForDisplay(chatPeerId: params.message.id.peerId) {
-                    previewIconFile = nil
-                }
-            
                 let controller = StickerPackScreen(context: params.context, updatedPresentationData: params.updatedPresentationData, mainStickerPack: reference, stickerPacks: [reference], previewIconFile: previewIconFile, parentNavigationController: params.navigationController, sendSticker: params.sendSticker, sendEmoji: params.sendEmoji, actionPerformed: { actions in
                     let presentationData = params.context.sharedContext.currentPresentationData.with { $0 }
                     
@@ -237,7 +231,7 @@ func openChatMessageImpl(_ params: OpenChatMessageParams) -> Bool {
                     params.present(controller, nil, .window(.root))
                 } else if let rootController = params.navigationController?.view.window?.rootViewController {
                     let proceed = {
-                        let canShare = !params.message.isCopyProtected() && !params.copyProtected
+                        let canShare = !params.message.isCopyProtected()
                         var useBrowserScreen = false
                         if BrowserScreen.supportedDocumentMimeTypes.contains(file.mimeType) {
                             useBrowserScreen = true
@@ -261,10 +255,7 @@ func openChatMessageImpl(_ params: OpenChatMessageParams) -> Bool {
                                 subject = .document(file: .message(message: MessageReference(params.message), media: file), canShare: canShare)
                             }
                             let controller = BrowserScreen(context: params.context, subject: subject)
-                            controller.openDocument = { [weak controller] file, canShare in
-                                guard let controller else {
-                                    return
-                                }
+                            controller.openDocument = { file, canShare in
                                 controller.dismiss()
                                 
                                 presentDocumentPreviewController(rootController: rootController, theme: presentationData.theme, strings: presentationData.strings, postbox: params.context.account.postbox, file: file, canShare: canShare)
@@ -334,14 +325,6 @@ func openChatMessageImpl(_ params: OpenChatMessageParams) -> Bool {
             
                 params.blockInteraction.set(.single(true))
             
-                var presentInCurrent = false
-                if let channel = params.message.peers[params.message.id.peerId] as? TelegramChannel, case .broadcast = channel.info {
-                    if let layout = params.navigationController?.validLayout, case .regular = layout.metrics.widthClass {   
-                    } else {
-                        presentInCurrent = true
-                    }
-                }
-
                 let _ = (gallery
                 |> deliverOnMainQueue).startStandalone(next: { gallery in
                     params.blockInteraction.set(.single(false))
@@ -349,20 +332,13 @@ func openChatMessageImpl(_ params: OpenChatMessageParams) -> Bool {
                     gallery.centralItemUpdated = { messageId in
                         params.centralItemUpdated?(messageId)
                     }
-                    
-                    let arguments = GalleryControllerPresentationArguments(transitionArguments: { messageId, media in
+                    params.present(gallery, GalleryControllerPresentationArguments(transitionArguments: { messageId, media in
                         let selectedTransitionNode = params.transitionNode(messageId, media, false)
                         if let selectedTransitionNode = selectedTransitionNode {
                             return GalleryTransitionArguments(transitionNode: selectedTransitionNode, addToTransitionSurface: params.addToTransitionSurface)
                         }
                         return nil
-                    })
-                    
-                    gallery.navigateToMessageContext = { message in
-                        params.navigateToMessageContext?(message)
-                    }
-                    
-                    params.present(gallery, arguments, presentInCurrent ? .current : .window(.root))
+                    }), params.message.adAttribute != nil ? .current : .window(.root))
                 })
                 return true
             case let .secretGallery(gallery):

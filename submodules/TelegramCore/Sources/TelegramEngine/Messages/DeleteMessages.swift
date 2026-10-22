@@ -129,8 +129,7 @@ func _internal_clearCallHistory(account: Account, forEveryone: Bool) -> Signal<N
         |> mapToSignal { result -> Signal<Void, Bool> in
             if let result = result {
                 switch result {
-                case let .affectedFoundMessages(affectedFoundMessagesData):
-                    let (pts, ptsCount, offset) = (affectedFoundMessagesData.pts, affectedFoundMessagesData.ptsCount, affectedFoundMessagesData.offset)
+                case let .affectedFoundMessages(pts, ptsCount, offset, _):
                     account.stateManager.addUpdateGroups([.updatePts(pts: pts, ptsCount: ptsCount)])
                     if offset == 0 {
                         return .fail(true)

@@ -62,7 +62,7 @@ public func addSavedSticker(postbox: Postbox, network: Network, file: TelegramMe
                         if !found {
                             fetchReference = packReference
                         }
-                    case .animatedEmoji, .animatedEmojiAnimations, .dice, .premiumGifts, .emojiGenericAnimations, .iconStatusEmoji, .iconChannelStatusEmoji, .iconTopicEmoji, .tonGifts:
+                    case .animatedEmoji, .animatedEmojiAnimations, .dice, .premiumGifts, .emojiGenericAnimations, .iconStatusEmoji, .iconChannelStatusEmoji, .iconTopicEmoji:
                         break
                     }
                     if let fetchReference = fetchReference {
@@ -75,13 +75,11 @@ public func addSavedSticker(postbox: Postbox, network: Network, file: TelegramMe
                             switch result {
                             case .stickerSetNotModified:
                                 break
-                            case let .stickerSet(stickerSetData):
-                                let packs = stickerSetData.packs
+                            case let .stickerSet(_, packs, _, _):
                                 var stringRepresentationsByFile: [MediaId: [String]] = [:]
                                 for pack in packs {
                                     switch pack {
-                                    case let .stickerPack(stickerPackData):
-                                        let (text, fileIds) = (stickerPackData.emoticon, stickerPackData.documents)
+                                    case let .stickerPack(text, fileIds):
                                         for fileId in fileIds {
                                             let mediaId = MediaId(namespace: Namespaces.Media.CloudFile, id: fileId)
                                             if stringRepresentationsByFile[mediaId] == nil {

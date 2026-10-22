@@ -1,5 +1,4 @@
 import Foundation
-import UIKit
 import AsyncDisplayKit
 import Display
 import ComponentFlow
@@ -20,7 +19,6 @@ public final class PeerInfoGiftsCoverComponent: Component {
     public let giftsContext: ProfileGiftsContext
     public let hasBackground: Bool
     public let avatarCenter: CGPoint
-    public let avatarSize: CGSize
     public let defaultHeight: CGFloat
     public let avatarTransitionFraction: CGFloat
     public let statusBarHeight: CGFloat
@@ -36,7 +34,6 @@ public final class PeerInfoGiftsCoverComponent: Component {
         giftsContext: ProfileGiftsContext,
         hasBackground: Bool,
         avatarCenter: CGPoint,
-        avatarSize: CGSize,
         defaultHeight: CGFloat,
         avatarTransitionFraction: CGFloat,
         statusBarHeight: CGFloat,
@@ -51,7 +48,6 @@ public final class PeerInfoGiftsCoverComponent: Component {
         self.giftsContext = giftsContext
         self.hasBackground = hasBackground
         self.avatarCenter = avatarCenter
-        self.avatarSize = avatarSize
         self.defaultHeight = defaultHeight
         self.avatarTransitionFraction = avatarTransitionFraction
         self.statusBarHeight = statusBarHeight
@@ -73,9 +69,6 @@ public final class PeerInfoGiftsCoverComponent: Component {
             return false
         }
         if lhs.avatarCenter != rhs.avatarCenter {
-            return false
-        }
-        if lhs.avatarSize != rhs.avatarSize {
             return false
         }
         if lhs.defaultHeight != rhs.defaultHeight {
@@ -184,31 +177,6 @@ public final class PeerInfoGiftsCoverComponent: Component {
                 index += 1
             }
         }
-        
-        private var scheduledAnimateIn = false
-        public func willAnimateIn() {
-            self.scheduledAnimateIn = true
-            for (_, layer) in self.iconLayers {
-                layer.opacity = 0.0
-            }
-        }
-        
-        public func animateIn() {
-            guard let _ = self.currentSize, let component = self.component else {
-                return
-            }
-            self.scheduledAnimateIn = false
-            
-            for (_, layer) in self.iconLayers {
-                layer.opacity = 1.0
-                layer.animatePosition(
-                    from: component.avatarCenter,
-                    to: layer.position,
-                    duration: 0.4,
-                    timingFunction: kCAMediaTimingFunctionSpring
-                )
-            }
-        }
     
         func update(component: PeerInfoGiftsCoverComponent, availableSize: CGSize, state: EmptyComponentState, environment: Environment<Empty>, transition: ComponentTransition) -> CGSize {
             self.isUpdating = true
@@ -245,21 +213,23 @@ public final class PeerInfoGiftsCoverComponent: Component {
                 }
                 excludeRects.append(CGRect(origin: CGPoint(x: 0.0, y: component.statusBarHeight), size: component.topLeftButtonsSize))
                 excludeRects.append(CGRect(origin: CGPoint(x: availableSize.width - component.topRightButtonsSize.width, y: component.statusBarHeight), size: component.topRightButtonsSize))
-                excludeRects.append(CGRect(origin: CGPoint(x: floor((availableSize.width - component.titleWidth) / 2.0), y: avatarCenter.y + component.avatarSize.height / 2.0 + 6.0), size: CGSize(width: component.titleWidth, height: 100.0)))
+                excludeRects.append(CGRect(origin: CGPoint(x: floor((availableSize.width - component.titleWidth) / 2.0), y: avatarCenter.y + 56.0), size: CGSize(width: component.titleWidth, height: 72.0)))
                 if component.bottomHeight > 0.0 {
                     excludeRects.append(CGRect(origin: CGPoint(x: 0.0, y: component.defaultHeight - component.bottomHeight), size: CGSize(width: availableSize.width, height: component.bottomHeight)))
                 }
                                                 
                 let positionGenerator = PositionGenerator(
                     containerSize: CGSize(width: availableSize.width, height: component.defaultHeight),
-                    centerFrame: component.avatarSize.centered(around: avatarCenter),
+                    centerFrame: CGSize(width: 100, height: 100).centered(around: avatarCenter),
                     exclusionZones: excludeRects,
                     minimumDistance: 42.0,
                     edgePadding: 5.0,
                     seed: self.seed
                 )
                 
+                let start = CACurrentMediaTime()
                 self.iconPositions = positionGenerator.generatePositions(count: 12, itemSize: iconSize)
+                print("generated icon positions in \( CACurrentMediaTime() - start )s")
             }
             self.appliedGiftIds = giftIds
             
@@ -321,44 +291,35 @@ public final class PeerInfoGiftsCoverComponent: Component {
                     self.iconLayers[id] = iconLayer
                     self.layer.addSublayer(iconLayer)
                     
-                    if self.scheduledAnimateIn {
-                        iconLayer.opacity = 0.0
-                    } else {
-                        iconLayer.animateAlpha(from: 0.0, to: 1.0, duration: 0.2)
-                        iconLayer.animateScale(from: 0.01, to: 1.0, duration: 0.2)
-                    }
+                    iconLayer.animateAlpha(from: 0.0, to: 1.0, duration: 0.2)
+                    iconLayer.animateScale(from: 0.01, to: 1.0, duration: 0.2)
                     
                     iconLayer.startAnimations(index: index)
                 }
                 iconLayer.glowing = component.hasBackground
                 
-                let itemDistanceFraction = max(0.0, min(0.5, (iconPosition.distance - component.avatarSize.width / 2.0) / 144.0))
-                let itemScaleFraction = patternScaleValueAt(fraction: min(1.0, component.avatarTransitionFraction * 1.33), t: itemDistanceFraction, reverse: false)
+                let centerPosition = component.avatarCenter
+                let finalPosition = iconPosition.center.offsetBy(dx: component.avatarCenter.x, dy: component.avatarCenter.y)
+                let itemScaleFraction = patternScaleValueAt(fraction: component.avatarTransitionFraction, t: 0.0, reverse: false)
                
-                func interpolatePosition(from: PositionGenerator.Position, to: PositionGenerator.Position, t: CGFloat) -> PositionGenerator.Position {
+                func interpolateRect(from: CGPoint, to: CGPoint, t: CGFloat) -> CGPoint {
                     let clampedT = max(0, min(1, t))
                     
-                    let interpolatedDistance = from.distance + (to.distance - from.distance) * clampedT
-                    let interpolatedAngle = from.angle + (to.angle - from.angle) * clampedT
+                    let interpolatedX = from.x + (to.x - from.x) * clampedT
+                    let interpolatedY = from.y + (to.y - from.y) * clampedT
                     
-                    return PositionGenerator.Position(distance: interpolatedDistance, angle: interpolatedAngle, scale: from.scale)
+                    return CGPoint(
+                        x: interpolatedX,
+                        y: interpolatedY
+                    )
                 }
                 
-                let toAngle: CGFloat = .pi * 0.18
-                let centerPosition = PositionGenerator.Position(distance: 0.0, angle: iconPosition.angle + toAngle, scale: iconPosition.scale)
-                let effectivePosition = interpolatePosition(from: iconPosition, to: centerPosition, t: itemScaleFraction)
-                let effectiveAngle = toAngle * itemScaleFraction
+                let effectivePosition = interpolateRect(from: finalPosition, to: centerPosition, t: itemScaleFraction)
                 
-                let absolutePosition = getAbsolutePosition(position: effectivePosition, centerPoint: component.avatarCenter)
-                                
                 iconTransition.setBounds(layer: iconLayer, bounds: CGRect(origin: .zero, size: iconSize))
-                iconTransition.setPosition(layer: iconLayer, position: absolutePosition)
-                iconLayer.updateRotation(effectiveAngle, transition: iconTransition)
+                iconTransition.setPosition(layer: iconLayer, position: effectivePosition)
                 iconTransition.setScale(layer: iconLayer, scale: iconPosition.scale * (1.0 - itemScaleFraction))
-                
-                if !self.scheduledAnimateIn {
-                    iconTransition.setAlpha(layer: iconLayer, alpha: 1.0 - itemScaleFraction)
-                }
+                iconTransition.setAlpha(layer: iconLayer, alpha: 1.0 - itemScaleFraction)
                 
                 index += 1
             }
@@ -504,9 +465,9 @@ private class GiftIconLayer: SimpleLayer {
             file = gift.file
         case let .unique(gift):
             for attribute in gift.attributes {
-                if case let .model(_, fileValue, _, _) = attribute {
+                if case let .model(_, fileValue, _) = attribute {
                     file = fileValue
-                } else if case let .backdrop(_, _, innerColor, _, _, _, _) = attribute {
+                } else if case let .backdrop(_, innerColor, _, _, _, _) = attribute {
                     color = UIColor(rgb: UInt32(bitPattern: innerColor))
                 }
             }
@@ -570,9 +531,9 @@ private class GiftIconLayer: SimpleLayer {
             file = gift.file
         case let .unique(gift):
             for attribute in gift.attributes {
-                if case let .model(_, fileValue, _, _) = attribute {
+                if case let .model(_, fileValue, _) = attribute {
                     file = fileValue
-                } else if case let .backdrop(_, _, innerColor, _, _, _, _) = attribute {
+                } else if case let .backdrop(_, innerColor, _, _, _, _) = attribute {
                     color = UIColor(rgb: UInt32(bitPattern: innerColor))
                 }
             }
@@ -619,12 +580,7 @@ private class GiftIconLayer: SimpleLayer {
     
     override func layoutSublayers() {
         self.shadowLayer.frame = CGRect(origin: .zero, size: self.bounds.size).insetBy(dx: -8.0, dy: -8.0)
-        self.animationLayer.bounds = CGRect(origin: .zero, size: self.bounds.size)
-        self.animationLayer.position = CGPoint(x: self.bounds.width / 2.0, y: self.bounds.height / 2.0)
-    }
-    
-    func updateRotation(_ angle: CGFloat, transition: ComponentTransition) {
-        self.animationLayer.transform = CATransform3DMakeRotation(angle, 0.0, 0.0, 1.0)
+        self.animationLayer.frame = CGRect(origin: .zero, size: self.bounds.size)
     }
     
     func startAnimations(index: Int) {
@@ -682,16 +638,8 @@ private class GiftIconLayer: SimpleLayer {
 
 private struct PositionGenerator {
     struct Position {
-        let distance: CGFloat
-        let angle: CGFloat
+        let center: CGPoint
         let scale: CGFloat
-        
-        var relativeCartesian: CGPoint {
-            return CGPoint(
-                x: self.distance * cos(self.angle),
-                y: self.distance * sin(self.angle)
-            )
-        }
     }
     
     let containerSize: CGSize
@@ -752,13 +700,15 @@ private struct PositionGenerator {
             
             let orbitRangeSize = self.innerOrbitRange.max - self.innerOrbitRange.min
             let orbitDistanceFactor = self.innerOrbitRange.min + orbitRangeSize * CGFloat(self.lokiRng.next())
-            let distance = orbitDistanceFactor * centerRadius
+            let orbitDistance = orbitDistanceFactor * centerRadius
             
             let angleRange: CGFloat = placeOnLeftSide ? .pi : .pi
             let angleOffset: CGFloat = placeOnLeftSide ? .pi/2 : -(.pi/2)
             let angle = angleOffset + angleRange * CGFloat(self.lokiRng.next())
             
-            let absolutePosition = getAbsolutePosition(distance: distance, angle: angle, centerPoint: centerPoint)
+            let absoluteX = centerPoint.x + orbitDistance * cos(angle)
+            let absoluteY = centerPoint.y + orbitDistance * sin(angle)
+            let absolutePosition = CGPoint(x: absoluteX, y: absoluteY)
             
             if absolutePosition.x - itemSize.width/2 < self.edgePadding ||
                 absolutePosition.x + itemSize.width/2 > self.containerSize.width - self.edgePadding ||
@@ -767,6 +717,11 @@ private struct PositionGenerator {
                 continue
             }
             
+            let relativePosition = CGPoint(
+                x: absolutePosition.x - centerPoint.x,
+                y: absolutePosition.y - centerPoint.y
+            )
+            
             let itemRect = CGRect(
                 x: absolutePosition.x - itemSize.width/2,
                 y: absolutePosition.y - itemSize.height/2,
@@ -774,12 +729,10 @@ private struct PositionGenerator {
                 height: itemSize.height
             )
             
-            if self.isValidPosition(itemRect, existingPositions: positions.map {
-                getAbsolutePosition(distance: $0.distance, angle: $0.angle, centerPoint: centerPoint)
-            }, itemSize: itemSize) {
+            if self.isValidPosition(itemRect, existingPositions: positions.map { self.posToAbsolute($0.center, centerPoint: centerPoint) }, itemSize: itemSize) {
                 let scaleRangeSize = max(self.scaleRange.min + 0.1, 0.75) - self.scaleRange.max
                 let scale = self.scaleRange.max + scaleRangeSize * CGFloat(self.lokiRng.next())
-                positions.append(Position(distance: distance, angle: angle, scale: scale))
+                positions.append(Position(center: relativePosition, scale: scale))
                 
                 if absolutePosition.x < centerPoint.x {
                     leftPositions += 1
@@ -798,19 +751,27 @@ private struct PositionGenerator {
             
             let orbitRangeSize = self.outerOrbitRange.max - self.outerOrbitRange.min
             let orbitDistanceFactor = self.outerOrbitRange.min + orbitRangeSize * CGFloat(self.lokiRng.next())
-            let distance = orbitDistanceFactor * centerRadius
+            let orbitDistance = orbitDistanceFactor * centerRadius
             
             let angleRange: CGFloat = placeOnLeftSide ? .pi : .pi
             let angleOffset: CGFloat = placeOnLeftSide ? .pi/2 : -(.pi/2)
             let angle = angleOffset + angleRange * CGFloat(self.lokiRng.next())
             
-            let absolutePosition = getAbsolutePosition(distance: distance, angle: angle, centerPoint: centerPoint)
+            let absoluteX = centerPoint.x + orbitDistance * cos(angle)
+            let absoluteY = centerPoint.y + orbitDistance * sin(angle)
+            let absolutePosition = CGPoint(x: absoluteX, y: absoluteY)
+            
             if absolutePosition.x - itemSize.width/2 < self.edgePadding ||
                 absolutePosition.x + itemSize.width/2 > self.containerSize.width - self.edgePadding ||
                 absolutePosition.y - itemSize.height/2 < self.edgePadding ||
                 absolutePosition.y + itemSize.height/2 > self.containerSize.height - self.edgePadding {
                 continue
             }
+            
+            let relativePosition = CGPoint(
+                x: absolutePosition.x - centerPoint.x,
+                y: absolutePosition.y - centerPoint.y
+            )
             
             let itemRect = CGRect(
                 x: absolutePosition.x - itemSize.width/2,
@@ -819,12 +780,12 @@ private struct PositionGenerator {
                 height: itemSize.height
             )
             
-            if self.isValidPosition(itemRect, existingPositions: positions.map {
-                getAbsolutePosition(distance: $0.distance, angle: $0.angle, centerPoint: centerPoint)
-            }, itemSize: itemSize) {
+            if self.isValidPosition(itemRect, existingPositions: positions.map { self.posToAbsolute($0.center, centerPoint: centerPoint) }, itemSize: itemSize) {
+                let distance = hypot(absolutePosition.x - centerPoint.x, absolutePosition.y - centerPoint.y)
+                
                 let normalizedDistance = min(distance / maxPossibleDistance, 1.0)
                 let scale = self.scaleRange.max - normalizedDistance * (self.scaleRange.max - self.scaleRange.min)
-                positions.append(Position(distance: distance, angle: angle, scale: scale))
+                positions.append(Position(center: relativePosition, scale: scale))
                 
                 if absolutePosition.x < centerPoint.x {
                     leftPositions += 1
@@ -837,11 +798,8 @@ private struct PositionGenerator {
         return positions
     }
     
-    func getAbsolutePosition(distance: CGFloat, angle: CGFloat, centerPoint: CGPoint) -> CGPoint {
-        return CGPoint(
-            x: centerPoint.x + distance * cos(angle),
-            y: centerPoint.y + distance * sin(angle)
-        )
+    private func posToAbsolute(_ relativePos: CGPoint, centerPoint: CGPoint) -> CGPoint {
+        return CGPoint(x: relativePos.x + centerPoint.x, y: relativePos.y + centerPoint.y)
     }
     
     private func isValidPosition(_ rect: CGRect, existingPositions: [CGPoint], itemSize: CGSize) -> Bool {
@@ -867,20 +825,6 @@ private struct PositionGenerator {
         
         return true
     }
-}
-
-private func getAbsolutePosition(position: PositionGenerator.Position, centerPoint: CGPoint) -> CGPoint {
-    return CGPoint(
-        x: centerPoint.x + position.distance * cos(position.angle),
-        y: centerPoint.y + position.distance * sin(position.angle)
-    )
-}
-
-private func getAbsolutePosition(distance: CGFloat, angle: CGFloat, centerPoint: CGPoint) -> CGPoint {
-    return CGPoint(
-        x: centerPoint.x + distance * cos(angle),
-        y: centerPoint.y + distance * sin(angle)
-    )
 }
 
 private func windowFunction(t: CGFloat) -> CGFloat {

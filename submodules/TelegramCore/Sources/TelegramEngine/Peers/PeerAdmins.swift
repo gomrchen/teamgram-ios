@@ -24,8 +24,8 @@ func _internal_removeGroupAdmin(account: Account, peerId: PeerId, adminId: PeerI
                                         for i in 0 ..< updatedParticipants.count {
                                             if updatedParticipants[i].peerId == adminId {
                                                 switch updatedParticipants[i] {
-                                                    case let .admin(id, invitedBy, invitedAt, rank):
-                                                        updatedParticipants[i] = .member(id: id, invitedBy: invitedBy, invitedAt: invitedAt, rank: rank)
+                                                    case let .admin(id, invitedBy, invitedAt):
+                                                        updatedParticipants[i] = .member(id: id, invitedBy: invitedBy, invitedAt: invitedAt)
                                                     default:
                                                         break
                                                 }
@@ -93,8 +93,8 @@ func _internal_addGroupAdmin(account: Account, peerId: PeerId, adminId: PeerId) 
                                     for i in 0 ..< updatedParticipants.count {
                                         if updatedParticipants[i].peerId == adminId {
                                             switch updatedParticipants[i] {
-                                                case let .member(id, invitedBy, invitedAt, rank):
-                                                    updatedParticipants[i] = .admin(id: id, invitedBy: invitedBy, invitedAt: invitedAt, rank: rank)
+                                                case let .member(id, invitedBy, invitedAt):
+                                                    updatedParticipants[i] = .admin(id: id, invitedBy: invitedBy, invitedAt: invitedAt)
                                                 default:
                                                     break
                                             }
@@ -133,8 +133,7 @@ func _internal_fetchChannelParticipant(account: Account, peerId: PeerId, partici
                 return account.network.request(Api.functions.channels.getParticipant(channel: inputChannel, participant: inputPeer))
                 |> map { result -> ChannelParticipant? in
                     switch result {
-                        case let .channelParticipant(channelParticipantData):
-                            let participant = channelParticipantData.participant
+                        case let .channelParticipant(participant, _, _):
                             return ChannelParticipant(apiParticipant: participant)
                     }
                 }
@@ -184,12 +183,7 @@ func _internal_updateChannelAdminRights(account: Account, peerId: PeerId, adminI
                         }
                         updatedParticipant = .member(id: adminId, invitedAt: Int32(Date().timeIntervalSince1970), adminInfo: adminInfo, banInfo: nil, rank: rank, subscriptionUntilDate: nil)
                     }
-                    
-                    var flags: Int32 = 0
-                    if let _ = rank {
-                        flags = (1 << 0)
-                    }
-                    return account.network.request(Api.functions.channels.editAdmin(flags: flags, channel: inputChannel, userId: inputUser, adminRights: rights?.apiAdminRights ?? .chatAdminRights(Api.ChatAdminRights.Cons_chatAdminRights(flags: 0)), rank: rank ?? ""))
+                    return account.network.request(Api.functions.channels.editAdmin(channel: inputChannel, userId: inputUser, adminRights: rights?.apiAdminRights ?? .chatAdminRights(flags: 0), rank: rank ?? ""))
                     |> map { [$0] }
                     |> `catch` { error -> Signal<[Api.Updates], UpdateChannelAdminRightsError> in
                         if error.errorDescription == "USER_NOT_PARTICIPANT" {
@@ -201,7 +195,7 @@ func _internal_updateChannelAdminRights(account: Account, peerId: PeerId, adminI
                                 return .addMemberError(error)
                             }
                             |> then(
-                                account.network.request(Api.functions.channels.editAdmin(flags: flags, channel: inputChannel, userId: inputUser, adminRights: rights?.apiAdminRights ?? .chatAdminRights(Api.ChatAdminRights.Cons_chatAdminRights(flags: 0)), rank: rank ?? ""))
+                                account.network.request(Api.functions.channels.editAdmin(channel: inputChannel, userId: inputUser, adminRights: rights?.apiAdminRights ?? .chatAdminRights(flags: 0), rank: rank ?? ""))
                                 |> mapError { error -> UpdateChannelAdminRightsError in
                                     return .generic
                                 }

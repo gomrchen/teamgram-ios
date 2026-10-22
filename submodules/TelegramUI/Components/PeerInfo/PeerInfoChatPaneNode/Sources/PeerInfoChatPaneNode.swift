@@ -1,4 +1,3 @@
-import UIKit
 import AsyncDisplayKit
 import Display
 import TelegramCore
@@ -54,7 +53,7 @@ private final class SearchNavigationContentNode: ASDisplayNode, PeerInfoPanelNod
         
         let size = CGSize(width: width, height: defaultHeight)
         transition.updateFrame(node: self.contentNode, frame: CGRect(origin: CGPoint(x: 0.0, y: 10.0), size: size))
-        let _ = self.contentNode.updateLayout(size: size, leftInset: insets.left, rightInset: insets.right, transition: transition)
+        self.contentNode.updateLayout(size: size, leftInset: insets.left, rightInset: insets.right, transition: transition)
         
         var contentHeight: CGFloat = size.height + 10.0
         
@@ -150,7 +149,7 @@ public final class PeerInfoChatPaneNode: ASDisplayNode, PeerInfoPaneNode, ASScro
         
         self.coveringView = UIView()
         
-        self.chatController = context.sharedContext.makeChatController(context: context, chatLocation: .replyThread(message: ChatReplyThreadMessage(peerId: context.account.peerId, threadId: peerId.toInt64(), channelMessageId: nil, isChannelPost: false, isForumPost: false, isMonoforumPost: false, maxMessage: nil, maxReadIncomingMessageId: nil, maxReadOutgoingMessageId: nil, unreadCount: 0, initialFilledHoles: IndexSet(), initialAnchor: .automatic, isNotAvailable: false)), subject: nil, botStart: nil, mode: .standard(.embedded(invertDirection: true)), params: nil)
+        self.chatController = context.sharedContext.makeChatController(context: context, chatLocation: .replyThread(message: ChatReplyThreadMessage(peerId: context.account.peerId, threadId: peerId.toInt64(), channelMessageId: nil, isChannelPost: false, isForumPost: false, maxMessage: nil, maxReadIncomingMessageId: nil, maxReadOutgoingMessageId: nil, unreadCount: 0, initialFilledHoles: IndexSet(), initialAnchor: .automatic, isNotAvailable: false)), subject: nil, botStart: nil, mode: .standard(.embedded(invertDirection: true)), params: nil)
         self.chatController.navigation_setNavigationController(navigationController())
         
         super.init()
@@ -181,6 +180,8 @@ public final class PeerInfoChatPaneNode: ASDisplayNode, PeerInfoPaneNode, ASScro
         
         self.addSubnode(self.chatController.displayNode)
         self.chatController.displayNode.clipsToBounds = true
+        
+        self.view.addSubview(self.coveringView)
         
         self.chatController.stateUpdated = { [weak self] transition in
             guard let self else {
@@ -274,9 +275,9 @@ public final class PeerInfoChatPaneNode: ASDisplayNode, PeerInfoPaneNode, ASScro
     public func update(size: CGSize, topInset: CGFloat, sideInset: CGFloat, bottomInset: CGFloat, deviceMetrics: DeviceMetrics, visibleHeight: CGFloat, isScrollingLockedAtTop: Bool, expandProgress: CGFloat, navigationHeight: CGFloat, presentationData: PresentationData, synchronous: Bool, transition: ContainedViewLayoutTransition) {
         self.currentParams = (size, topInset, sideInset, bottomInset, visibleHeight, isScrollingLockedAtTop, expandProgress, presentationData)
         
-        let fullHeight = size.height - topInset
+        let fullHeight = navigationHeight + size.height
         
-        let chatFrame = CGRect(origin: CGPoint(x: 0.0, y: topInset), size: CGSize(width: size.width, height: fullHeight))
+        let chatFrame = CGRect(origin: CGPoint(x: 0.0, y: -navigationHeight), size: CGSize(width: size.width, height: fullHeight))
         
         if !self.chatController.displayNode.bounds.isEmpty {
             if let contextController = self.chatController.visibleContextController as? ContextController {
@@ -291,7 +292,7 @@ public final class PeerInfoChatPaneNode: ASDisplayNode, PeerInfoPaneNode, ASScro
         let combinedBottomInset = bottomInset
         transition.updateFrame(node: self.chatController.displayNode, frame: chatFrame)
         self.chatController.updateIsScrollingLockedAtTop(isScrollingLockedAtTop: isScrollingLockedAtTop)
-        self.chatController.containerLayoutUpdated(ContainerViewLayout(size: chatFrame.size, metrics: LayoutMetrics(widthClass: .compact, heightClass: .compact, orientation: nil), deviceMetrics: deviceMetrics, intrinsicInsets: UIEdgeInsets(top: 0.0, left: sideInset, bottom: combinedBottomInset, right: sideInset), safeInsets: UIEdgeInsets(top: 0.0 + 4.0, left: sideInset, bottom: combinedBottomInset, right: sideInset), additionalInsets: UIEdgeInsets(), statusBarHeight: nil, inputHeight: nil, inputHeightIsInteractivellyChanging: false, inVoiceOver: false), transition: transition)
+        self.chatController.containerLayoutUpdated(ContainerViewLayout(size: chatFrame.size, metrics: LayoutMetrics(widthClass: .compact, heightClass: .compact, orientation: nil), deviceMetrics: deviceMetrics, intrinsicInsets: UIEdgeInsets(top: topInset + navigationHeight, left: sideInset, bottom: combinedBottomInset, right: sideInset), safeInsets: UIEdgeInsets(top: navigationHeight + topInset + 4.0, left: sideInset, bottom: combinedBottomInset, right: sideInset), additionalInsets: UIEdgeInsets(), statusBarHeight: nil, inputHeight: nil, inputHeightIsInteractivellyChanging: false, inVoiceOver: false), transition: transition)
     }
     
     override public func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {

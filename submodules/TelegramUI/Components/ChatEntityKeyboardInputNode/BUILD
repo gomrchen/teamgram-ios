@@ -41,7 +41,6 @@ swift_library(
         "//submodules/TelegramUI/Components/LegacyMessageInputPanelInputView:LegacyMessageInputPanelInputView",
         "//submodules/AttachmentTextInputPanelNode",
         "//submodules/TelegramUI/Components/BatchVideoRendering",
-        "//submodules/TelegramUI/Components/GlassBackgroundComponent",
     ],
     visibility = [
         "//visibility:public",

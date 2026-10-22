@@ -51,7 +51,7 @@ final class ListViewReorderingItemNode: ASDisplayNode {
     var currentState: (Int, Int)?
     
     private let copyView: CopyView
-    let initialLocation: CGPoint
+    private let initialLocation: CGPoint
     
     init(itemNode: ListViewItemNode, initialLocation: CGPoint, hasShadow: Bool) {
         self.itemNode = itemNode

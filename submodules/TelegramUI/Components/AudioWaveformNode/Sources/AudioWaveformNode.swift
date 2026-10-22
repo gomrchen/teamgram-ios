@@ -6,19 +6,15 @@ import AudioWaveform
 
 private final class AudioWaveformNodeParameters: NSObject {
     let waveform: AudioWaveform?
-    let drawFakeSamplesIfNeeded: Bool
     let color: UIColor?
     let gravity: AudioWaveformNode.Gravity?
     let progress: CGFloat?
-    let trimRange: Range<CGFloat>?
     
-    init(waveform: AudioWaveform?, drawFakeSamplesIfNeeded: Bool, color: UIColor?, gravity: AudioWaveformNode.Gravity?, progress: CGFloat?, trimRange: Range<CGFloat>?) {
+    init(waveform: AudioWaveform?, color: UIColor?, gravity: AudioWaveformNode.Gravity?, progress: CGFloat?) {
         self.waveform = waveform
-        self.drawFakeSamplesIfNeeded = drawFakeSamplesIfNeeded
         self.color = color
         self.gravity = gravity
         self.progress = progress
-        self.trimRange = trimRange
         
         super.init()
     }
@@ -33,19 +29,10 @@ public final class AudioWaveformNode: ASDisplayNode {
     private var waveform: AudioWaveform?
     private var color: UIColor?
     private var gravity: Gravity?
-    public var drawFakeSamplesIfNeeded = false
     
     public var progress: CGFloat? {
         didSet {
             if self.progress != oldValue {
-                self.setNeedsDisplay()
-            }
-        }
-    }
-    
-    public var trimRange: Range<CGFloat>? {
-        didSet {
-            if self.trimRange != oldValue {
                 self.setNeedsDisplay()
             }
         }
@@ -80,7 +67,7 @@ public final class AudioWaveformNode: ASDisplayNode {
     }
     
     override public func drawParameters(forAsyncLayer layer: _ASDisplayLayer) -> NSObjectProtocol? {
-        return AudioWaveformNodeParameters(waveform: self.waveform, drawFakeSamplesIfNeeded: self.drawFakeSamplesIfNeeded, color: self.color, gravity: self.gravity, progress: self.progress, trimRange: self.trimRange)
+        return AudioWaveformNodeParameters(waveform: self.waveform, color: self.color, gravity: self.gravity, progress: self.progress)
     }
     
     @objc override public class func draw(_ bounds: CGRect, withParameters parameters: Any?, isCancelled: () -> Bool, isRasterizing: Bool) {
@@ -120,12 +107,18 @@ public final class AudioWaveformNode: ASDisplayNode {
                     
                     let numSamples = Int(floor(size.width / (sampleWidth + distance)))
                     
-                    var adjustedSamples = Array<UInt16>(repeating: 0, count: numSamples)
+                    let adjustedSamplesMemory = malloc(numSamples * 2)!
+                    let adjustedSamples = adjustedSamplesMemory.assumingMemoryBound(to: UInt16.self)
+                    defer {
+                        free(adjustedSamplesMemory)
+                    }
+                    memset(adjustedSamplesMemory, 0, numSamples * 2)
+                    
                     var generateFakeSamples = false
                     
                     var bins: [UInt16: Int] = [:]
                     for i in 0 ..< maxReadSamples {
-                        let index = min(i * numSamples / max(1, maxReadSamples), numSamples - 1)
+                        let index = i * numSamples / maxReadSamples
                         let sample = samples[i]
                         if adjustedSamples[index] < sample {
                             adjustedSamples[index] = sample
@@ -155,7 +148,7 @@ public final class AudioWaveformNode: ASDisplayNode {
                         topCountPercent = Float(topCount) / Float(totalCount)
                     }
                     
-                    if parameters.drawFakeSamplesIfNeeded && topCountPercent > 0.75 {
+                    if topCountPercent > 0.75 {
                         generateFakeSamples = true
                     }
                     
@@ -171,19 +164,8 @@ public final class AudioWaveformNode: ASDisplayNode {
                     
                     let invScale = 1.0 / max(1.0, CGFloat(maxSample))
                     
-                    var clipRange: Range<CGFloat>?
-                    if let trimRange = parameters.trimRange {
-                        clipRange = trimRange.lowerBound * size.width ..< trimRange.upperBound * size.width
-                    }
-                    
                     for i in 0 ..< numSamples {
                         let offset = CGFloat(i) * (sampleWidth + distance)
-                        if let clipRange {
-                            if !clipRange.contains(offset) {
-                                continue
-                            }
-                        }
-                        
                         let peakSample = adjustedSamples[i]
                         
                         var sampleHeight = CGFloat(peakSample) * peakHeight * invScale

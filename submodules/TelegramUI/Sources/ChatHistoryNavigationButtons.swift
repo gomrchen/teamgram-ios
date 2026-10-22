@@ -26,7 +26,6 @@ final class ChatHistoryNavigationButtons: ASDisplayNode {
     }
     
     private var theme: PresentationTheme
-    private var preferClearGlass: Bool
     private var dateTimeFormat: PresentationDateTimeFormat
     private let isChatRotated: Bool
     
@@ -96,25 +95,24 @@ final class ChatHistoryNavigationButtons: ASDisplayNode {
         }
     }
     
-    init(theme: PresentationTheme, preferClearGlass: Bool, dateTimeFormat: PresentationDateTimeFormat, backgroundNode: WallpaperBackgroundNode, isChatRotated: Bool) {
+    init(theme: PresentationTheme, dateTimeFormat: PresentationDateTimeFormat, backgroundNode: WallpaperBackgroundNode, isChatRotated: Bool) {
         self.isChatRotated = isChatRotated
         self.theme = theme
-        self.preferClearGlass = preferClearGlass
         self.dateTimeFormat = dateTimeFormat
         
-        self.mentionsButton = ChatHistoryNavigationButtonNode(theme: theme, preferClearGlass: preferClearGlass, backgroundNode: backgroundNode, type: .mentions)
+        self.mentionsButton = ChatHistoryNavigationButtonNode(theme: theme, backgroundNode: backgroundNode, type: .mentions)
         self.mentionsButton.alpha = 0.0
         self.mentionsButton.isHidden = true
         
-        self.reactionsButton = ChatHistoryNavigationButtonNode(theme: theme, preferClearGlass: preferClearGlass, backgroundNode: backgroundNode, type: .reactions)
+        self.reactionsButton = ChatHistoryNavigationButtonNode(theme: theme, backgroundNode: backgroundNode, type: .reactions)
         self.reactionsButton.alpha = 0.0
         self.reactionsButton.isHidden = true
         
-        self.downButton = ChatHistoryNavigationButtonNode(theme: theme, preferClearGlass: preferClearGlass, backgroundNode: backgroundNode, type: isChatRotated ? .down : .up)
+        self.downButton = ChatHistoryNavigationButtonNode(theme: theme, backgroundNode: backgroundNode, type: isChatRotated ? .down : .up)
         self.downButton.alpha = 0.0
         self.downButton.isHidden = true
         
-        self.upButton = ChatHistoryNavigationButtonNode(theme: theme, preferClearGlass: preferClearGlass, backgroundNode: backgroundNode, type: isChatRotated ? .up : .down)
+        self.upButton = ChatHistoryNavigationButtonNode(theme: theme, backgroundNode: backgroundNode, type: isChatRotated ? .up : .down)
         self.upButton.alpha = 0.0
         self.upButton.isHidden = true
         
@@ -141,15 +139,14 @@ final class ChatHistoryNavigationButtons: ASDisplayNode {
         super.didLoad()
     }
     
-    func update(theme: PresentationTheme, preferClearGlass: Bool, dateTimeFormat: PresentationDateTimeFormat, backgroundNode: WallpaperBackgroundNode) {
+    func update(theme: PresentationTheme, dateTimeFormat: PresentationDateTimeFormat, backgroundNode: WallpaperBackgroundNode) {
         self.theme = theme
-        self.preferClearGlass = preferClearGlass
         self.dateTimeFormat = dateTimeFormat
         
-        self.reactionsButton.updateTheme(theme: theme, preferClearGlass: preferClearGlass, backgroundNode: backgroundNode)
-        self.mentionsButton.updateTheme(theme: theme, preferClearGlass: preferClearGlass, backgroundNode: backgroundNode)
-        self.downButton.updateTheme(theme: theme, preferClearGlass: preferClearGlass, backgroundNode: backgroundNode)
-        self.upButton.updateTheme(theme: theme, preferClearGlass: preferClearGlass, backgroundNode: backgroundNode)
+        self.reactionsButton.updateTheme(theme: theme, backgroundNode: backgroundNode)
+        self.mentionsButton.updateTheme(theme: theme, backgroundNode: backgroundNode)
+        self.downButton.updateTheme(theme: theme, backgroundNode: backgroundNode)
+        self.upButton.updateTheme(theme: theme, backgroundNode: backgroundNode)
     }
     
     private var absoluteRect: (CGRect, CGSize)?
@@ -178,15 +175,15 @@ final class ChatHistoryNavigationButtons: ASDisplayNode {
     }
     
     func updateLayout(transition: ContainedViewLayoutTransition) -> CGSize {
-        let buttonSize = CGSize(width: 40.0, height: 40.0)
-        let completeSize = CGSize(width: buttonSize.width, height: buttonSize.height * 2.0 + 8.0)
+        let buttonSize = CGSize(width: 38.0, height: 38.0)
+        let completeSize = CGSize(width: buttonSize.width, height: buttonSize.height * 2.0 + 12.0)
         var upOffset: CGFloat = 0.0
         var mentionsOffset: CGFloat = 0.0
         var reactionsOffset: CGFloat = 0.0
         
         if let down = self.directionButtonState.down {
-            self.downButton.imageView.alpha = down.isEnabled ? 1.0 : 0.5
-            self.downButton.isEnabled = down.isEnabled
+            self.downButton.imageNode.alpha = down.isEnabled ? 1.0 : 0.5
+            self.downButton.buttonNode.isEnabled = down.isEnabled
             
             mentionsOffset += buttonSize.height + 12.0
             upOffset += buttonSize.height + 12.0
@@ -205,8 +202,8 @@ final class ChatHistoryNavigationButtons: ASDisplayNode {
         }
         
         if let up = self.directionButtonState.up {
-            self.upButton.imageView.alpha = up.isEnabled ? 1.0 : 0.5
-            self.upButton.isEnabled = up.isEnabled
+            self.upButton.imageNode.alpha = up.isEnabled ? 1.0 : 0.5
+            self.upButton.buttonNode.isEnabled = up.isEnabled
             
             mentionsOffset += buttonSize.height + 12.0
 

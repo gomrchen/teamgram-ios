@@ -438,7 +438,7 @@ public struct NetworkInitializationArguments {
     public let externalRecaptchaRequestVerification: (String, String) -> Signal<String?, NoError>
     public let autolockDeadine: Signal<Int32?, NoError>
     public let encryptionProvider: EncryptionProvider
-    public let deviceModelName: String?
+    public let deviceModelName:String?
     public let useBetaFeatures: Bool
     public let isICloudEnabled: Bool
     
@@ -530,14 +530,14 @@ func initializedNetwork(accountId: AccountRecordId, arguments: NetworkInitializa
             
             if testingEnvironment {
                 seedAddressList = [
-                    1: ["43.155.11.190"]
+                    1: TeamgramGatewayLanHost.seedDatacenter1Ips
                     // 1: ["149.154.175.10"],
                     // 2: ["149.154.167.40"],
                     // 3: ["149.154.175.117"]
                 ]
             } else {
                 seedAddressList = [
-                    1: ["43.155.11.190"]
+                    1: TeamgramGatewayLanHost.seedDatacenter1Ips
                     // 1: ["149.154.175.50", "2001:b28:f23d:f001::a"],
                     // 2: ["149.154.167.50", "95.161.76.100", "2001:67c:4e8:f002::a"],
                     // 3: ["149.154.175.100", "2001:b28:f23d:f003::a"],
@@ -903,12 +903,10 @@ public final class Network: NSObject, MTRequestMessageServiceDelegate {
                     let array = NSMutableArray()
                     if let result = result {
                         switch result {
-                        case let .cdnConfig(cdnConfigData):
-                            let publicKeys = cdnConfigData.publicKeys
+                        case let .cdnConfig(publicKeys):
                             for key in publicKeys {
                                 switch key {
-                                case let .cdnPublicKey(cdnPublicKeyData):
-                                    let (dcId, publicKey) = (cdnPublicKeyData.dcId, cdnPublicKeyData.publicKey)
+                                case let .cdnPublicKey(dcId, publicKey):
                                     if id == Int(dcId) {
                                         let dict = NSMutableDictionary()
                                         dict["key"] = publicKey
@@ -1071,22 +1069,6 @@ public final class Network: NSObject, MTRequestMessageServiceDelegate {
         }
     }
     
-    public func getAuthKeyId() -> Signal<Int64, NoError> {
-        let mtContext = self.mtProto.context
-        let datacenterId = self.datacenterId
-        return Signal { subscriber in
-            MTContext.contextQueue().dispatch(onQueue: {
-                var result: Int64 = 0
-                if let authInfo = mtContext?.authInfoForDatacenter(withId: datacenterId, selector: .persistent) {
-                    result = authInfo.authKeyId
-                }
-                subscriber.putNext(result)
-            })
-            
-            return EmptyDisposable
-        }
-    }
-    
     public func requestWithAdditionalInfo<T>(_ data: (FunctionDescription, Buffer, DeserializeFunctionResponse<T>), info: NetworkRequestAdditionalInfo, tag: NetworkRequestDependencyTag? = nil, automaticFloodWait: Bool = true, onFloodWaitError: ((String) -> Void)? = nil) -> Signal<NetworkRequestResult<T>, MTRpcError> {
         let requestService = self.requestService
         return Signal { subscriber in
@@ -1244,20 +1226,6 @@ public final class Network: NSObject, MTRequestMessageServiceDelegate {
 public func retryRequest<T>(signal: Signal<T, MTRpcError>) -> Signal<T, NoError> {
     return signal
     |> retry(0.2, maxDelay: 5.0, onQueue: Queue.concurrentDefaultQueue())
-}
-
-public func retryRequestIfNotFrozen<T>(signal: Signal<T, MTRpcError>) -> Signal<T?, NoError> {
-    return signal
-    |> retry(retryOnError: { error in
-        if error.errorDescription == "FROZEN_METHOD_INVALID" {
-            return false
-        }
-        return true
-    }, delayIncrement: 0.2, maxDelay: 5.0, maxRetries: nil, onQueue: .concurrentDefaultQueue())
-    |> map(Optional.init)
-    |> `catch` { _ in
-        return .single(nil)
-    }
 }
 
 class Keychain: NSObject, MTKeychain {

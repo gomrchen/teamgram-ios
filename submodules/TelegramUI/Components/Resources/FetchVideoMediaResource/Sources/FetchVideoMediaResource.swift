@@ -1,7 +1,6 @@
 import Foundation
 import UIKit
 import Postbox
-import SSignalKit
 import SwiftSignalKit
 import TelegramCore
 import LegacyComponents
@@ -786,7 +785,7 @@ public func fetchLocalFileGifMediaResource(resource: LocalFileGifMediaResource) 
         
         let disposable = MetaDisposable()
         if let data = try? Data(contentsOf: URL(fileURLWithPath: resource.path), options: Data.ReadingOptions.mappedIfSafe) {
-            let signal = TGGifConverter.convertGif(toMp4: data)
+            let signal = TGGifConverter.convertGif(toMp4: data)!
             let signalDisposable = signal.start(next: { next in
                 if let result = next as? NSDictionary, let path = result["path"] as? String {
                     var value = stat()
@@ -885,7 +884,6 @@ private extension MediaEditorValues {
             cropOrientation: nil,
             gradientColors: nil,
             videoTrimRange: nil,
-            videoBounce: false,
             videoIsMuted: false,
             videoIsFullHd: true,
             videoIsMirrored: false,
@@ -922,7 +920,6 @@ private extension MediaEditorValues {
         if legacyAdjustments.trimStartValue > 0.0 || !legacyAdjustments.trimEndValue.isZero {
             videoTrimRange = legacyAdjustments.trimStartValue ..< legacyAdjustments.trimEndValue
         }
-        let videoBounce = legacyAdjustments.bounce
         
         var entities: [CodableDrawingEntity] = []
         var drawing: UIImage?
@@ -1034,7 +1031,6 @@ private extension MediaEditorValues {
             cropOrientation: legacyAdjustments.cropOrientation.cropOrientation,
             gradientColors: nil,
             videoTrimRange: videoTrimRange,
-            videoBounce: videoBounce,
             videoIsMuted: legacyAdjustments.sendAsGif,
             videoIsFullHd: true,
             videoIsMirrored: false,

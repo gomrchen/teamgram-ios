@@ -5,6 +5,7 @@ objc_library(
     module_name = "WebPBinding",
     srcs = glob([
         "Sources/**/*.m",
+        "Sources/**/*.h",
     ]),
     hdrs = glob([
         "PublicHeaders/**/*.h",

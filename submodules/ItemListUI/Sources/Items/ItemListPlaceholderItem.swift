@@ -93,7 +93,7 @@ public class ItemListPlaceholderItemNode: ListViewItemNode, ItemListItemNode {
         self.textNode = TextNode()
         self.textNode.isUserInteractionEnabled = false
         
-        super.init(layerBacked: false)
+        super.init(layerBacked: false, dynamicBounce: false)
         
         self.addSubnode(self.textNode)
     }

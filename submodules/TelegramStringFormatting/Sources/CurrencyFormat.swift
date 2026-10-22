@@ -63,17 +63,6 @@ private func loadCurrencyFormatterEntries() -> [String: CurrencyFormatterEntry] 
         }
     }
     
-    let tonEntry = CurrencyFormatterEntry(
-        symbol: "TON",
-        thousandsSeparator: ".",
-        decimalSeparator: ",",
-        symbolOnLeft: true,
-        spaceBetweenAmountAndSymbol: false,
-        decimalDigits: 9
-    )
-    result["TON"] = tonEntry
-    result["ton"] = tonEntry
-    
     return result
 }
 
@@ -156,23 +145,6 @@ public func currencyToFractionalAmount(value: Int64, currency: String) -> Double
     return Double(value) / factor
 }
 
-private func formatIntegerWithThousandsSeparator(_ number: Int64, separator: String) -> String {
-    if number == 0 {
-        return "0"
-    }
-    let numberString = String(number)
-    var result = ""
-    let digits = Array(numberString)
-    for (index, digit) in digits.enumerated() {
-        let remainingDigits = digits.count - index
-        if remainingDigits % 3 == 0 && index > 0 {
-            result.append(separator)
-        }
-        result.append(digit)
-    }
-    return result
-}
-
 public func formatCurrencyAmount(_ amount: Int64, currency: String) -> String {
     if let entry = currencyFormatterEntries[currency] ?? currencyFormatterEntries["USD"] {
         var result = ""
@@ -194,13 +166,12 @@ public func formatCurrencyAmount(_ amount: Int64, currency: String) -> String {
                 fractional.append(Character(scalar))
             }
         }
-        let integerString = formatIntegerWithThousandsSeparator(integerPart, separator: entry.thousandsSeparator)
-        result.append(integerString)
+        result.append("\(integerPart)")
         if !fractional.isEmpty {
             result.append(entry.decimalSeparator)
-            for i in 0 ..< fractional.count {
-                result.append(fractional[fractional.count - i - 1])
-            }
+        }
+        for i in 0 ..< fractional.count {
+            result.append(fractional[fractional.count - i - 1])
         }
         if !entry.symbolOnLeft {
             if entry.spaceBetweenAmountAndSymbol {
@@ -208,6 +179,7 @@ public func formatCurrencyAmount(_ amount: Int64, currency: String) -> String {
             }
             result.append(entry.symbol)
         }
+        
         return result
     } else {
         assertionFailure()

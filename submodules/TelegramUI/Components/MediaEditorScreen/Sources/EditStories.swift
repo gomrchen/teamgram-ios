@@ -42,7 +42,7 @@ public extension MediaEditorScreenImpl {
                     if let image = UIImage(contentsOfFile: data.path) {
                         return .single(nil)
                         |> then(
-                            .single(.image(image: image, dimensions: PixelDimensions(image.size), additionalImage: nil, additionalImagePosition: .bottomRight, fromCamera: false))
+                            .single(.image(image: image, dimensions: PixelDimensions(image.size), additionalImage: nil, additionalImagePosition: .bottomRight))
                             |> delay(0.1, queue: Queue.mainQueue())
                         )
                     } else {
@@ -56,7 +56,7 @@ public extension MediaEditorScreenImpl {
                         }
                         return .single(nil)
                         |> then(
-                            .single(.video(videoPath: symlinkPath, thumbnail: nil, mirror: false, additionalVideoPath: nil, additionalThumbnail: nil, dimensions: PixelDimensions(width: 720, height: 1280), duration: duration ?? 0.0, videoPositionChanges: [], additionalVideoPosition: .bottomRight, fromCamera: false))
+                            .single(.video(videoPath: symlinkPath, thumbnail: nil, mirror: false, additionalVideoPath: nil, additionalThumbnail: nil, dimensions: PixelDimensions(width: 720, height: 1280), duration: duration ?? 0.0, videoPositionChanges: [], additionalVideoPosition: .bottomRight))
                         )
                     }
                 }
@@ -97,7 +97,7 @@ public extension MediaEditorScreenImpl {
         var updateProgressImpl: ((Float) -> Void)?
         let controller = MediaEditorScreenImpl(
             context: context,
-            mode: .storyEditor(remainingCount: 1),
+            mode: .storyEditor,
             subject: subject,
             isEditing: !repost,
             isEditingCover: cover,
@@ -122,10 +122,7 @@ public extension MediaEditorScreenImpl {
                     return transitionOut
                 }
             },
-            completion: { results, commit in
-                guard let result = results.first else {
-                    return
-                }
+            completion: { result, commit in
                 let entities = generateChatInputTextEntities(result.caption)
                 
                 if repost {
@@ -163,7 +160,7 @@ public extension MediaEditorScreenImpl {
                             } else {
                                 existingMedia = storyItem.media
                             }
-                            rootController.proceedWithStoryUpload(target: target, results: [result as! MediaEditorScreenResult], existingMedia: existingMedia, forwardInfo: forwardInfo, externalState: externalState, commit: commit)
+                            rootController.proceedWithStoryUpload(target: target, result: result as! MediaEditorScreenResult, existingMedia: existingMedia, forwardInfo: forwardInfo, externalState: externalState, commit: commit)
                         }
                     })
                 } else {

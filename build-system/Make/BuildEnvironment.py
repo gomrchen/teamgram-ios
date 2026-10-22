@@ -11,26 +11,25 @@ def is_apple_silicon():
         return False
 
 
-def get_clean_env(use_clean_env=True):
+def get_clean_env():
     clean_env = os.environ.copy()
-    if use_clean_env:
-        clean_env['PATH'] = '/usr/bin:/bin:/usr/sbin:/sbin'
+    clean_env['PATH'] = '/usr/bin:/bin:/usr/sbin:/sbin'
     return clean_env
 
 
-def resolve_executable(program, use_clean_env=True):
+def resolve_executable(program):
     def is_executable(fpath):
         return os.path.isfile(fpath) and os.access(fpath, os.X_OK)
 
-    for path in get_clean_env(use_clean_env=use_clean_env)["PATH"].split(os.pathsep):
+    for path in get_clean_env()["PATH"].split(os.pathsep):
         executable_file = os.path.join(path, program)
         if is_executable(executable_file):
             return executable_file
     return None
 
 
-def run_executable_with_output(path, arguments, use_clean_env=True, decode=True, input=None, stderr_to_stdout=True, print_command=False, check_result=False):
-    executable_path = resolve_executable(path, use_clean_env=use_clean_env)
+def run_executable_with_output(path, arguments, decode=True, input=None, stderr_to_stdout=True, print_command=False, check_result=False):
+    executable_path = resolve_executable(path)
     if executable_path is None:
         raise Exception('Could not resolve {} to a valid executable file'.format(path))
 
@@ -46,7 +45,7 @@ def run_executable_with_output(path, arguments, use_clean_env=True, decode=True,
         stdout=subprocess.PIPE,
         stderr=stderr_assignment,
         stdin=subprocess.PIPE,
-        env=get_clean_env(use_clean_env=use_clean_env)
+        env=get_clean_env()
     )
     if input is not None:
         output_data, _ = process.communicate(input=input)

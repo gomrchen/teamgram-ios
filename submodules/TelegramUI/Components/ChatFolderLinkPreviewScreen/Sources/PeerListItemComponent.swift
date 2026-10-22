@@ -205,7 +205,7 @@ final class PeerListItemComponent: Component {
             }
             if let peer = component.peer {
                 let clipStyle: AvatarNodeClipStyle
-                if case let .channel(channel) = peer, channel.isForumOrMonoForum {
+                if case let .channel(channel) = peer, channel.flags.contains(.isForum) {
                     clipStyle = .roundedRect
                 } else {
                     clipStyle = .round

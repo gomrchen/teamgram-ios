@@ -10,7 +10,7 @@ objc_library(
     srcs = glob([
         "Sources/*.c",
         "Sources/*.h",
-    ], exclude = public_headers, allow_empty=True),
+    ], exclude = public_headers),
     hdrs = public_headers,
     includes = [
         "PublicHeaders",
@@ -29,7 +29,6 @@ objc_library(
         "-DNDEBUG=1",
         "-DSQLITE_MAX_MMAP_SIZE=0",
         "-Wno-all",
-        "-Wno-#warnings",
     ],
     sdk_frameworks = [
       "Foundation",

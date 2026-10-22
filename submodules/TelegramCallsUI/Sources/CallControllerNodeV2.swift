@@ -1,5 +1,4 @@
 import Foundation
-import UIKit
 import AsyncDisplayKit
 import Display
 import TelegramCore
@@ -167,10 +166,13 @@ final class CallControllerNodeV2: ViewControllerTracingNode, CallControllerNodeP
             }
             self.conferenceAddParticipant?()
         }
-
-        var enableVideoSharpening = false
-        if let data = call.context.currentAppConfiguration.with({ $0 }).data, let value = data["ios_call_video_sharpening"] as? Double {
-            enableVideoSharpening = value != 0.0
+        
+        var isConferencePossible = false
+        if self.call.context.sharedContext.immediateExperimentalUISettings.conferenceDebug {
+            isConferencePossible = true
+        }
+        if let data = self.call.context.currentAppConfiguration.with({ $0 }).data, let value = data["ios_enable_conference"] as? Double {
+            isConferencePossible = value != 0.0
         }
         
         self.callScreenState = PrivateCallScreen.State(
@@ -186,8 +188,7 @@ final class CallControllerNodeV2: ViewControllerTracingNode, CallControllerNodeP
             remoteVideo: nil,
             isRemoteBatteryLow: false,
             isEnergySavingEnabled: !self.sharedContext.energyUsageSettings.fullTranslucency,
-            isConferencePossible: false,
-            enableVideoSharpening: enableVideoSharpening
+            isConferencePossible: isConferencePossible
         )
         
         self.isMicrophoneMutedDisposable = (call.isMuted
@@ -550,8 +551,6 @@ final class CallControllerNodeV2: ViewControllerTracingNode, CallControllerNodeP
             case .active:
                 callScreenState.isRemoteAudioMuted = false
             }
-
-            callScreenState.isConferencePossible = callState.supportsConferenceCalls
             
             if self.callScreenState != callScreenState {
                 self.callScreenState = callScreenState

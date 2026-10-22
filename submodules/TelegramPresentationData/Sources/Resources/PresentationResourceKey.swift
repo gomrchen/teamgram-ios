@@ -43,7 +43,6 @@ public enum PresentationResourceKey: Int32 {
     case itemListDisclosureLocked
     case itemListCheckIcon
     case itemListSecondaryCheckIcon
-    case itemListDisabledCheckIcon
     case itemListPlusIcon
     case itemListRoundPlusIcon
     case itemListAccentDeleteIcon
@@ -68,9 +67,6 @@ public enum PresentationResourceKey: Int32 {
     case itemListCornersTop
     case itemListCornersBottom
     case itemListCornersBoth
-    case itemListCornersTopGlass
-    case itemListCornersBottomGlass
-    case itemListCornersBothGlass
     case itemListKnob
     case itemListBlockAccentIcon
     case itemListBlockDestructiveIcon
@@ -78,7 +74,6 @@ public enum PresentationResourceKey: Int32 {
     case itemListResetIcon
     case itemListImageIcon
     case itemListCloudIcon
-    case itemListScanIcon
     case itemListTopicArrowIcon
     case itemListAddBoostsIcon
     case itemListPremiumIcon
@@ -131,11 +126,7 @@ public enum PresentationResourceKey: Int32 {
     case chatListLocationIcon
     
     case chatListGeneralTopicIcon
-    case chatListGeneralTopicTemplateIcon
-    case chatListNewTopicTemplateIcon
     case chatListGeneralTopicSmallIcon
-    
-    case searchAdIcon
 
     case chatTitleLockIcon
     case chatTitleMuteIcon
@@ -173,15 +164,6 @@ public enum PresentationResourceKey: Int32 {
     case chatBubbleFileCloudFetchOutgoingIcon
     case chatBubbleFileCloudFetchedIncomingIcon
     case chatBubbleFileCloudFetchedOutgoingIcon
-    
-    case chatBubbleTodoDotIncomingIcon
-    case chatBubbleTodoDotOutgoingIcon
-    case chatBubbleTodoCheckIncomingIcon
-    case chatBubbleTodoCheckOutgoingIcon
-    
-    case chatServiceMessageTodoCompletedIcon
-    case chatServiceMessageTodoIncompletedIcon
-    case chatServiceMessageTodoAppendedIcon
     
     case chatBubbleReplyThumbnailPlayImage
     
@@ -234,7 +216,6 @@ public enum PresentationResourceKey: Int32 {
     case chatInputTextFieldTimerImage
     case chatInputTextFieldScheduleImage
     case chatInputTextFieldGiftImage
-    case chatInputTextFieldSuggestPostImage
     
     case chatInputSearchPanelUpImage
     case chatInputSearchPanelUpDisabledImage
@@ -268,9 +249,6 @@ public enum PresentationResourceKey: Int32 {
     case chatMessageAttachedContentButtonIconLinkOutgoing
     case chatMessageAttachedContentHighlightedButtonIconLinkOutgoingWithWallpaper
     case chatMessageAttachedContentHighlightedButtonIconLinkOutgoingWithoutWallpaper
-    
-    case chatMessageAttachedContentButtonIconBidIncoming
-    case chatMessageAttachedContentButtonIconBidOutgoing
     
     case chatCommandPanelArrowImage
     
@@ -309,8 +287,6 @@ public enum PresentationResourceKey: Int32 {
     case chatFreeShareButtonIcon
     case chatFreeCloseButtonIcon
     case chatFreeMoreButtonIcon
-    case chatFreeExpandButtonIcon
-    case chatFreeCollapseButtonIcon
     
     case chatKeyboardActionButtonMessageIcon
     case chatKeyboardActionButtonLinkIcon
@@ -357,14 +333,6 @@ public enum PresentationResourceKey: Int32 {
     case peerStatusLockedImage
     case expandDownArrowImage
     case expandSmallDownArrowImage
-    
-    case callListCallIcon
-    
-    case chatFreeNavigateToThreadButtonIcon
-    
-    case messageButtonsPostReject
-    case messageButtonsPostApprove
-    case messageButtonsPostEdit
 }
 
 public enum ChatExpiredStoryIndicatorType: Hashable {

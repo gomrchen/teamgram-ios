@@ -9,7 +9,7 @@ final class PostboxTransaction {
     let currentUpdatedPeers: [PeerId: Peer]
     let currentUpdatedPeerNotificationSettings: [PeerId: (PeerNotificationSettings?, PeerNotificationSettings)]
     let currentUpdatedPeerNotificationBehaviorTimestamps: [PeerId: PeerNotificationSettingsBehaviorTimestamp]
-    let currentUpdatedCachedPeerData: [PeerId: (previous: CachedPeerData?, updated: CachedPeerData)]
+    let currentUpdatedCachedPeerData: [PeerId: CachedPeerData]
     let currentUpdatedPeerPresences: [PeerId: PeerPresence]
     let currentUpdatedPeerChatListEmbeddedStates: Set<PeerId>
     let currentUpdatedTotalUnreadStates: [PeerGroupId: ChatListTotalUnreadState]
@@ -47,7 +47,6 @@ final class PostboxTransaction {
     let updatedMessageThreadPeerIds: Set<PeerId>
     let updatedPeerThreadCombinedStates: Set<PeerId>
     let updatedPeerThreadsSummaries: Set<PeerId>
-    let updatedPeerThreadInfos: Set<MessageHistoryThreadsTable.ItemId>
     let updatedPinnedThreads: Set<PeerId>
     let updatedHiddenPeerIds: Bool
     let storyGeneralStatesEvents: [StoryGeneralStatesTable.Event]
@@ -56,7 +55,6 @@ final class PostboxTransaction {
     let storyItemsEvents: [StoryItemsTable.Event]
     let currentStoryTopItemEvents: [StoryTopItemsTable.Event]
     let storyEvents: [StoryTable.Event]
-    let updatedTypingDrafts: [PeerAndThreadId: PostboxImpl.TypingDraftUpdate]
     
     var isEmpty: Bool {
         if currentUpdatedState != nil {
@@ -197,9 +195,6 @@ final class PostboxTransaction {
         if !self.updatedPeerThreadsSummaries.isEmpty {
             return false
         }
-        if !self.updatedPeerThreadInfos.isEmpty {
-            return false
-        }
         if !self.updatedPinnedThreads.isEmpty {
             return false
         }
@@ -224,9 +219,6 @@ final class PostboxTransaction {
         if !self.storyEvents.isEmpty {
             return false
         }
-        if !self.updatedTypingDrafts.isEmpty {
-            return false
-        }
         return true
     }
     
@@ -240,7 +232,7 @@ final class PostboxTransaction {
         currentUpdatedPeerNotificationSettings: [PeerId: (PeerNotificationSettings?,
         PeerNotificationSettings)],
         currentUpdatedPeerNotificationBehaviorTimestamps: [PeerId: PeerNotificationSettingsBehaviorTimestamp],
-        currentUpdatedCachedPeerData: [PeerId: (previous: CachedPeerData?, updated: CachedPeerData)],
+        currentUpdatedCachedPeerData: [PeerId: CachedPeerData],
         currentUpdatedPeerPresences: [PeerId: PeerPresence],
         currentUpdatedPeerChatListEmbeddedStates: Set<PeerId>,
         currentUpdatedTotalUnreadStates: [PeerGroupId: ChatListTotalUnreadState],
@@ -277,7 +269,6 @@ final class PostboxTransaction {
         updatedMessageThreadPeerIds: Set<PeerId>,
         updatedPeerThreadCombinedStates: Set<PeerId>,
         updatedPeerThreadsSummaries: Set<PeerId>,
-        updatedPeerThreadInfos: Set<MessageHistoryThreadsTable.ItemId>,
         updatedPinnedThreads: Set<PeerId>,
         updatedHiddenPeerIds: Bool,
         storyGeneralStatesEvents: [StoryGeneralStatesTable.Event],
@@ -285,8 +276,7 @@ final class PostboxTransaction {
         storySubscriptionsEvents: [StorySubscriptionsTable.Event],
         storyItemsEvents: [StoryItemsTable.Event],
         currentStoryTopItemEvents: [StoryTopItemsTable.Event],
-        storyEvents: [StoryTable.Event],
-        updatedTypingDrafts: [PeerAndThreadId: PostboxImpl.TypingDraftUpdate]
+        storyEvents: [StoryTable.Event]
     ) {
         self.currentUpdatedState = currentUpdatedState
         self.currentPeerHoleOperations = currentPeerHoleOperations
@@ -333,7 +323,6 @@ final class PostboxTransaction {
         self.updatedMessageThreadPeerIds = updatedMessageThreadPeerIds
         self.updatedPeerThreadCombinedStates = updatedPeerThreadCombinedStates
         self.updatedPeerThreadsSummaries = updatedPeerThreadsSummaries
-        self.updatedPeerThreadInfos = updatedPeerThreadInfos
         self.updatedPinnedThreads = updatedPinnedThreads
         self.updatedHiddenPeerIds = updatedHiddenPeerIds
         self.storyGeneralStatesEvents = storyGeneralStatesEvents
@@ -342,6 +331,5 @@ final class PostboxTransaction {
         self.storyItemsEvents = storyItemsEvents
         self.currentStoryTopItemEvents = currentStoryTopItemEvents
         self.storyEvents = storyEvents
-        self.updatedTypingDrafts = updatedTypingDrafts
     }
 }

@@ -27,18 +27,18 @@ public struct ExperimentalUISettings: Codable, Equatable {
     
     public var keepChatNavigationStack: Bool
     public var skipReadHistory: Bool
-    public var alwaysDisplayTyping: Bool
     public var crashOnLongQueries: Bool
     public var chatListPhotos: Bool
     public var knockoutWallpaper: Bool
     public var foldersTabAtBottom: Bool
+    public var playerEmbedding: Bool
     public var preferredVideoCodec: String?
     public var disableVideoAspectScaling: Bool
     public var enableVoipTcp: Bool
     public var experimentalCompatibility: Bool
     public var enableDebugDataDisplay: Bool
-    public var fakeGlass: Bool
-    public var compressedEmojiCache: Bool
+    public var rippleEffect: Bool
+    public var inlineStickers: Bool
     public var localTranscription: Bool
     public var enableReactionOverrides: Bool
     public var browserExperiment: Bool
@@ -65,30 +65,23 @@ public struct ExperimentalUISettings: Codable, Equatable {
     public var devRequests: Bool
     public var fakeAds: Bool
     public var conferenceDebug: Bool
-    public var checkSerializedData: Bool
-    public var allForumsHaveTabs: Bool
-    public var debugRatingLayout: Bool
-    public var enableUpdates: Bool
-    public var enablePWA: Bool
-    public var forceClearGlass: Bool
-    public var debugRipple: Bool
     
     public static var defaultSettings: ExperimentalUISettings {
         return ExperimentalUISettings(
             keepChatNavigationStack: false,
             skipReadHistory: false,
-            alwaysDisplayTyping: false,
             crashOnLongQueries: false,
             chatListPhotos: false,
             knockoutWallpaper: false,
             foldersTabAtBottom: false,
+            playerEmbedding: false,
             preferredVideoCodec: nil,
             disableVideoAspectScaling: false,
             enableVoipTcp: false,
             experimentalCompatibility: false,
             enableDebugDataDisplay: false,
-            fakeGlass: false,
-            compressedEmojiCache: false,
+            rippleEffect: false,
+            inlineStickers: false,
             localTranscription: false,
             enableReactionOverrides: false,
             browserExperiment: false,
@@ -114,32 +107,25 @@ public struct ExperimentalUISettings: Codable, Equatable {
             playerV2: false,
             devRequests: false,
             fakeAds: false,
-            conferenceDebug: false,
-            checkSerializedData: false,
-            allForumsHaveTabs: false,
-            debugRatingLayout: false,
-            enableUpdates: false,
-            enablePWA: false,
-            forceClearGlass: false,
-            debugRipple: false
+            conferenceDebug: false
         )
     }
     
     public init(
         keepChatNavigationStack: Bool,
         skipReadHistory: Bool,
-        alwaysDisplayTyping: Bool,
         crashOnLongQueries: Bool,
         chatListPhotos: Bool,
         knockoutWallpaper: Bool,
         foldersTabAtBottom: Bool,
+        playerEmbedding: Bool,
         preferredVideoCodec: String?,
         disableVideoAspectScaling: Bool,
         enableVoipTcp: Bool,
         experimentalCompatibility: Bool,
         enableDebugDataDisplay: Bool,
-        fakeGlass: Bool,
-        compressedEmojiCache: Bool,
+        rippleEffect: Bool,
+        inlineStickers: Bool,
         localTranscription: Bool,
         enableReactionOverrides: Bool,
         browserExperiment: Bool,
@@ -165,29 +151,22 @@ public struct ExperimentalUISettings: Codable, Equatable {
         playerV2: Bool,
         devRequests: Bool,
         fakeAds: Bool,
-        conferenceDebug: Bool,
-        checkSerializedData: Bool,
-        allForumsHaveTabs: Bool,
-        debugRatingLayout: Bool,
-        enableUpdates: Bool,
-        enablePWA: Bool,
-        forceClearGlass: Bool,
-        debugRipple: Bool
+        conferenceDebug: Bool
     ) {
         self.keepChatNavigationStack = keepChatNavigationStack
         self.skipReadHistory = skipReadHistory
-        self.alwaysDisplayTyping = alwaysDisplayTyping
         self.crashOnLongQueries = crashOnLongQueries
         self.chatListPhotos = chatListPhotos
         self.knockoutWallpaper = knockoutWallpaper
         self.foldersTabAtBottom = foldersTabAtBottom
+        self.playerEmbedding = playerEmbedding
         self.preferredVideoCodec = preferredVideoCodec
         self.disableVideoAspectScaling = disableVideoAspectScaling
         self.enableVoipTcp = enableVoipTcp
         self.experimentalCompatibility = experimentalCompatibility
         self.enableDebugDataDisplay = enableDebugDataDisplay
-        self.fakeGlass = fakeGlass
-        self.compressedEmojiCache = compressedEmojiCache
+        self.rippleEffect = rippleEffect
+        self.inlineStickers = inlineStickers
         self.localTranscription = localTranscription
         self.enableReactionOverrides = enableReactionOverrides
         self.browserExperiment = browserExperiment
@@ -214,13 +193,6 @@ public struct ExperimentalUISettings: Codable, Equatable {
         self.devRequests = devRequests
         self.fakeAds = fakeAds
         self.conferenceDebug = conferenceDebug
-        self.checkSerializedData = checkSerializedData
-        self.allForumsHaveTabs = allForumsHaveTabs
-        self.debugRatingLayout = debugRatingLayout
-        self.enableUpdates = enableUpdates
-        self.enablePWA = enablePWA
-        self.forceClearGlass = forceClearGlass
-        self.debugRipple = debugRipple
     }
     
     public init(from decoder: Decoder) throws {
@@ -228,18 +200,18 @@ public struct ExperimentalUISettings: Codable, Equatable {
 
         self.keepChatNavigationStack = (try container.decodeIfPresent(Int32.self, forKey: "keepChatNavigationStack") ?? 0) != 0
         self.skipReadHistory = (try container.decodeIfPresent(Int32.self, forKey: "skipReadHistory") ?? 0) != 0
-        self.alwaysDisplayTyping = (try container.decodeIfPresent(Int32.self, forKey: "alwaysDisplayTyping") ?? 0) != 0
         self.crashOnLongQueries = (try container.decodeIfPresent(Int32.self, forKey: "crashOnLongQueries") ?? 0) != 0
         self.chatListPhotos = (try container.decodeIfPresent(Int32.self, forKey: "chatListPhotos") ?? 0) != 0
         self.knockoutWallpaper = (try container.decodeIfPresent(Int32.self, forKey: "knockoutWallpaper") ?? 0) != 0
         self.foldersTabAtBottom = (try container.decodeIfPresent(Int32.self, forKey: "foldersTabAtBottom") ?? 0) != 0
+        self.playerEmbedding = (try container.decodeIfPresent(Int32.self, forKey: "playerEmbedding") ?? 0) != 0
         self.preferredVideoCodec = try container.decodeIfPresent(String.self.self, forKey: "preferredVideoCodec")
         self.disableVideoAspectScaling = (try container.decodeIfPresent(Int32.self, forKey: "disableVideoAspectScaling") ?? 0) != 0
         self.enableVoipTcp = (try container.decodeIfPresent(Int32.self, forKey: "enableVoipTcp") ?? 0) != 0
         self.experimentalCompatibility = (try container.decodeIfPresent(Int32.self, forKey: "experimentalCompatibility") ?? 0) != 0
         self.enableDebugDataDisplay = (try container.decodeIfPresent(Int32.self, forKey: "enableDebugDataDisplay") ?? 0) != 0
-        self.fakeGlass = (try container.decodeIfPresent(Int32.self, forKey: "fakeGlass") ?? 0) != 0
-        self.compressedEmojiCache = (try container.decodeIfPresent(Int32.self, forKey: "compressedEmojiCache") ?? 0) != 0
+        self.rippleEffect = (try container.decodeIfPresent(Int32.self, forKey: "rippleEffect") ?? 0) != 0
+        self.inlineStickers = (try container.decodeIfPresent(Int32.self, forKey: "inlineStickers") ?? 0) != 0
         self.localTranscription = (try container.decodeIfPresent(Int32.self, forKey: "localTranscription") ?? 0) != 0
         self.enableReactionOverrides = try container.decodeIfPresent(Bool.self, forKey: "enableReactionOverrides") ?? false
         self.browserExperiment = try container.decodeIfPresent(Bool.self, forKey: "browserExperiment") ?? false
@@ -266,13 +238,6 @@ public struct ExperimentalUISettings: Codable, Equatable {
         self.devRequests = try container.decodeIfPresent(Bool.self, forKey: "devRequests") ?? false
         self.fakeAds = try container.decodeIfPresent(Bool.self, forKey: "fakeAds") ?? false
         self.conferenceDebug = try container.decodeIfPresent(Bool.self, forKey: "conferenceDebug") ?? false
-        self.checkSerializedData = try container.decodeIfPresent(Bool.self, forKey: "checkSerializedData") ?? false
-        self.allForumsHaveTabs = try container.decodeIfPresent(Bool.self, forKey: "allForumsHaveTabs") ?? false
-        self.debugRatingLayout = try container.decodeIfPresent(Bool.self, forKey: "debugRatingLayout") ?? false
-        self.enableUpdates = try container.decodeIfPresent(Bool.self, forKey: "enableUpdates") ?? false
-        self.enablePWA = try container.decodeIfPresent(Bool.self, forKey: "enablePWA") ?? false
-        self.forceClearGlass = try container.decodeIfPresent(Bool.self, forKey: "forceClearGlass") ?? false
-        self.debugRipple = try container.decodeIfPresent(Bool.self, forKey: "debugRipple") ?? false
     }
     
     public func encode(to encoder: Encoder) throws {
@@ -280,18 +245,18 @@ public struct ExperimentalUISettings: Codable, Equatable {
 
         try container.encode((self.keepChatNavigationStack ? 1 : 0) as Int32, forKey: "keepChatNavigationStack")
         try container.encode((self.skipReadHistory ? 1 : 0) as Int32, forKey: "skipReadHistory")
-        try container.encode((self.alwaysDisplayTyping ? 1 : 0) as Int32, forKey: "alwaysDisplayTyping")
         try container.encode((self.crashOnLongQueries ? 1 : 0) as Int32, forKey: "crashOnLongQueries")
         try container.encode((self.chatListPhotos ? 1 : 0) as Int32, forKey: "chatListPhotos")
         try container.encode((self.knockoutWallpaper ? 1 : 0) as Int32, forKey: "knockoutWallpaper")
         try container.encode((self.foldersTabAtBottom ? 1 : 0) as Int32, forKey: "foldersTabAtBottom")
+        try container.encode((self.playerEmbedding ? 1 : 0) as Int32, forKey: "playerEmbedding")
         try container.encodeIfPresent(self.preferredVideoCodec, forKey: "preferredVideoCodec")
         try container.encode((self.disableVideoAspectScaling ? 1 : 0) as Int32, forKey: "disableVideoAspectScaling")
         try container.encode((self.enableVoipTcp ? 1 : 0) as Int32, forKey: "enableVoipTcp")
         try container.encode((self.experimentalCompatibility ? 1 : 0) as Int32, forKey: "experimentalCompatibility")
         try container.encode((self.enableDebugDataDisplay ? 1 : 0) as Int32, forKey: "enableDebugDataDisplay")
-        try container.encode((self.fakeGlass ? 1 : 0) as Int32, forKey: "fakeGlass")
-        try container.encode((self.compressedEmojiCache ? 1 : 0) as Int32, forKey: "compressedEmojiCache")
+        try container.encode((self.rippleEffect ? 1 : 0) as Int32, forKey: "rippleEffect")
+        try container.encode((self.inlineStickers ? 1 : 0) as Int32, forKey: "inlineStickers")
         try container.encode((self.localTranscription ? 1 : 0) as Int32, forKey: "localTranscription")
         try container.encode(self.enableReactionOverrides, forKey: "enableReactionOverrides")
         try container.encode(self.browserExperiment, forKey: "browserExperiment")
@@ -318,13 +283,6 @@ public struct ExperimentalUISettings: Codable, Equatable {
         try container.encodeIfPresent(self.devRequests, forKey: "devRequests")
         try container.encodeIfPresent(self.fakeAds, forKey: "fakeAds")
         try container.encodeIfPresent(self.conferenceDebug, forKey: "conferenceDebug")
-        try container.encodeIfPresent(self.checkSerializedData, forKey: "checkSerializedData")
-        try container.encodeIfPresent(self.allForumsHaveTabs, forKey: "allForumsHaveTabs")
-        try container.encodeIfPresent(self.debugRatingLayout, forKey: "debugRatingLayout")
-        try container.encodeIfPresent(self.enableUpdates, forKey: "enableUpdates")
-        try container.encodeIfPresent(self.enablePWA, forKey: "enablePWA")
-        try container.encodeIfPresent(self.forceClearGlass, forKey: "forceClearGlass")
-        try container.encodeIfPresent(self.debugRipple, forKey: "debugRipple")
     }
 }
 

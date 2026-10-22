@@ -333,13 +333,6 @@ public final class MediaBox {
         }
     }
     
-    public func moveResourceData(_ id: MediaResourceId, toTempPath: String) {
-        self.dataQueue.async {
-            let paths = self.storePathsForId(id)
-            let _ = try? FileManager.default.moveItem(at: URL(fileURLWithPath: paths.complete), to: URL(fileURLWithPath: toTempPath))
-        }
-    }
-    
     public func copyResourceData(_ id: MediaResourceId, fromTempPath: String) {
         self.dataQueue.async {
             let paths = self.storePathsForId(id)
@@ -347,22 +340,17 @@ public final class MediaBox {
         }
     }
     
-    public func moveResourceData(from: MediaResourceId, to: MediaResourceId, synchronous: Bool = false) {
+    public func moveResourceData(from: MediaResourceId, to: MediaResourceId) {
         if from == to {
             return
         }
-        let begin = {
+        self.dataQueue.async {
             let pathsFrom = self.storePathsForId(from)
             let pathsTo = self.storePathsForId(to)
             link(pathsFrom.partial, pathsTo.partial)
             link(pathsFrom.complete, pathsTo.complete)
             unlink(pathsFrom.partial)
             unlink(pathsFrom.complete)
-        }
-        if synchronous {
-            begin()
-        } else {
-            self.dataQueue.async(begin)
         }
     }
     

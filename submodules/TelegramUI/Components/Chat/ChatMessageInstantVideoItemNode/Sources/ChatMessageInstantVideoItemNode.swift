@@ -277,7 +277,7 @@ public class ChatMessageInstantVideoItemNode: ChatMessageItemView, ASGestureReco
         }
     }
     
-    override public func asyncLayout() -> (_ item: ChatMessageItem, _ params: ListViewItemLayoutParams, _ mergedTop: ChatMessageMerge, _ mergedBottom: ChatMessageMerge, _ dateHeaderAtBottom: ChatMessageHeaderSpec) -> (ListViewItemNodeLayout, (ListViewItemUpdateAnimation, ListViewItemApply, Bool) -> Void) {
+    override public func asyncLayout() -> (_ item: ChatMessageItem, _ params: ListViewItemLayoutParams, _ mergedTop: ChatMessageMerge, _ mergedBottom: ChatMessageMerge, _ dateHeaderAtBottom: Bool) -> (ListViewItemNodeLayout, (ListViewItemUpdateAnimation, ListViewItemApply, Bool) -> Void) {
         let layoutConstants = self.layoutConstants
         
         let makeVideoLayout = self.interactiveVideoNode.asyncLayout()
@@ -296,7 +296,7 @@ public class ChatMessageInstantVideoItemNode: ChatMessageItemView, ASGestureReco
         let currentForwardInfo = self.appliedForwardInfo
         let currentPlaying = self.appliedCurrentlyPlaying
         
-        func continueAsyncLayout(_ weakSelf: Weak<ChatMessageInstantVideoItemNode>, _ item: ChatMessageItem, _ params: ListViewItemLayoutParams, _ mergedTop: ChatMessageMerge, _ mergedBottom: ChatMessageMerge, _ dateHeaderAtBottom: ChatMessageHeaderSpec) -> (ListViewItemNodeLayout, (ListViewItemUpdateAnimation, ListViewItemApply, Bool) -> Void) {
+        func continueAsyncLayout(_ weakSelf: Weak<ChatMessageInstantVideoItemNode>, _ item: ChatMessageItem, _ params: ListViewItemLayoutParams, _ mergedTop: ChatMessageMerge, _ mergedBottom: ChatMessageMerge, _ dateHeaderAtBottom: Bool) -> (ListViewItemNodeLayout, (ListViewItemUpdateAnimation, ListViewItemApply, Bool) -> Void) {
             let accessibilityData = ChatMessageAccessibilityData(item: item, isSelected: nil)
             
             let layoutConstants = chatMessageItemLayoutConstants(layoutConstants, params: params, presentationData: item.presentationData)
@@ -331,7 +331,7 @@ public class ChatMessageInstantVideoItemNode: ChatMessageItemView, ASGestureReco
             }
             
             if hasAvatar {
-                avatarInset = layoutConstants.avatarInset
+                avatarInset = layoutConstants.avatarDiameter
             } else {
                 avatarInset = 0.0
             }
@@ -391,15 +391,8 @@ public class ChatMessageInstantVideoItemNode: ChatMessageItemView, ASGestureReco
             }
             
             var layoutInsets = layoutConstants.instantVideo.insets
-            if dateHeaderAtBottom.hasDate && dateHeaderAtBottom.hasTopic {
-                layoutInsets.top += layoutConstants.timestampDateAndTopicHeaderHeight
-            } else {
-                if dateHeaderAtBottom.hasDate {
-                    layoutInsets.top += layoutConstants.timestampHeaderHeight
-                }
-                if dateHeaderAtBottom.hasTopic {
-                    layoutInsets.top += layoutConstants.timestampHeaderHeight
-                }
+            if dateHeaderAtBottom {
+                layoutInsets.top += layoutConstants.timestampHeaderHeight
             }
             
             var deliveryFailedInset: CGFloat = 0.0
@@ -464,7 +457,6 @@ public class ChatMessageInstantVideoItemNode: ChatMessageItemView, ASGestureReco
             var replyMessage: Message?
             var replyForward: QuotedReplyMessageAttribute?
             var replyQuote: (quote: EngineMessageReplyQuote, isQuote: Bool)?
-            var replyTodoItemId: Int32?
             var replyStory: StoryId?
             for attribute in item.message.attributes {
                 if let attribute = attribute as? InlineBotMessageAttribute {
@@ -508,7 +500,6 @@ public class ChatMessageInstantVideoItemNode: ChatMessageItemView, ASGestureReco
                         replyMessage = item.message.associatedMessages[replyAttribute.messageId]
                     }
                     replyQuote = replyAttribute.quote.flatMap { ($0, replyAttribute.isQuote) }
-                    replyTodoItemId = replyAttribute.todoItemId
                 } else if let attribute = attribute as? QuotedReplyMessageAttribute {
                     replyForward = attribute
                 } else if let attribute = attribute as? ReplyStoryAttribute {
@@ -528,9 +519,7 @@ public class ChatMessageInstantVideoItemNode: ChatMessageItemView, ASGestureReco
                     message: replyMessage,
                     replyForward: replyForward,
                     quote: replyQuote,
-                    todoItemId: replyTodoItemId,
                     story: replyStory,
-                    isSummarized: false,
                     parentMessage: item.message,
                     constrainedSize: CGSize(width: max(0, availableWidth), height: CGFloat.greatestFiniteMagnitude),
                     animationCache: item.controllerInteraction.presentationContext.animationCache,
@@ -594,7 +583,7 @@ public class ChatMessageInstantVideoItemNode: ChatMessageItemView, ASGestureReco
             var maxContentWidth = normalDisplaySize.width
             var actionButtonsFinalize: ((CGFloat) -> (CGSize, (_ animation: ListViewItemUpdateAnimation) -> ChatMessageActionButtonsNode))?
             if let replyMarkup = replyMarkup {
-                let (minWidth, buttonsLayout) = actionButtonsLayout(item.context, item.presentationData.theme, item.presentationData.chatBubbleCorners, item.presentationData.strings, item.controllerInteraction.presentationContext.backgroundNode, replyMarkup, [:], item.message, maxContentWidth)
+                let (minWidth, buttonsLayout) = actionButtonsLayout(item.context, item.presentationData.theme, item.presentationData.chatBubbleCorners, item.presentationData.strings, item.controllerInteraction.presentationContext.backgroundNode, replyMarkup, item.message, maxContentWidth)
                 maxContentWidth = max(maxContentWidth, minWidth)
                 actionButtonsFinalize = buttonsLayout
             }
@@ -894,9 +883,9 @@ public class ChatMessageInstantVideoItemNode: ChatMessageItemView, ASGestureReco
                             actionButtonsNode.frame = actionButtonsFrame
                             if actionButtonsNode !== strongSelf.actionButtonsNode {
                                 strongSelf.actionButtonsNode = actionButtonsNode
-                                actionButtonsNode.buttonPressed = { button, progress in
+                                actionButtonsNode.buttonPressed = { button in
                                     if let strongSelf = weakSelf.value {
-                                        strongSelf.performMessageButtonAction(button: button, progress: progress)
+                                        strongSelf.performMessageButtonAction(button: button)
                                     }
                                 }
                                 actionButtonsNode.buttonLongTapped = { button in
@@ -1344,7 +1333,7 @@ public class ChatMessageInstantVideoItemNode: ChatMessageItemView, ASGestureReco
         
         let avatarInset: CGFloat
         if self.appliedHasAvatar {
-            avatarInset = layoutConstants.avatarInset
+            avatarInset = layoutConstants.avatarDiameter
         } else {
             avatarInset = 0.0
         }

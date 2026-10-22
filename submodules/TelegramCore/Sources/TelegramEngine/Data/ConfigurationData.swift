@@ -62,7 +62,6 @@ public enum EngineConfiguration {
         public let maxGiveawayCountriesCount: Int32
         public let maxGiveawayPeriodSeconds: Int32
         public let maxChannelRecommendationsCount: Int32
-        public let maxConferenceParticipantCount: Int32
         
         public static var defaultValue: UserLimits {
             return UserLimits(UserLimitsConfiguration.defaultValue)
@@ -94,8 +93,7 @@ public enum EngineConfiguration {
             maxGiveawayChannelsCount: Int32,
             maxGiveawayCountriesCount: Int32,
             maxGiveawayPeriodSeconds: Int32,
-            maxChannelRecommendationsCount: Int32,
-            maxConferenceParticipantCount: Int32
+            maxChannelRecommendationsCount: Int32
         ) {
             self.maxPinnedChatCount = maxPinnedChatCount
             self.maxPinnedSavedChatCount = maxPinnedSavedChatCount
@@ -123,7 +121,6 @@ public enum EngineConfiguration {
             self.maxGiveawayCountriesCount = maxGiveawayCountriesCount
             self.maxGiveawayPeriodSeconds = maxGiveawayPeriodSeconds
             self.maxChannelRecommendationsCount = maxChannelRecommendationsCount
-            self.maxConferenceParticipantCount = maxConferenceParticipantCount
         }
     }
 }
@@ -186,8 +183,7 @@ public extension EngineConfiguration.UserLimits {
             maxGiveawayChannelsCount: userLimitsConfiguration.maxGiveawayChannelsCount,
             maxGiveawayCountriesCount: userLimitsConfiguration.maxGiveawayCountriesCount,
             maxGiveawayPeriodSeconds: userLimitsConfiguration.maxGiveawayPeriodSeconds,
-            maxChannelRecommendationsCount: userLimitsConfiguration.maxChannelRecommendationsCount,
-            maxConferenceParticipantCount: userLimitsConfiguration.maxConferenceParticipantCount
+            maxChannelRecommendationsCount: userLimitsConfiguration.maxChannelRecommendationsCount
         )
     }
 }
@@ -569,27 +565,6 @@ public extension TelegramEngine.EngineData.Item {
                     return EngineAvailableColorOptions(hash: 0, options: [])
                 }
                 return value
-            }
-        }
-        
-        public struct EmojiGame: TelegramEngineDataItem, PostboxViewDataItem {
-            public typealias Result = EmojiGameInfo
-
-            public init() {
-            }
-
-            var key: PostboxViewKey {
-                return .preferences(keys: Set([PreferencesKeys.emojiGameInfo()]))
-            }
-
-            func extract(view: PostboxView) -> Result {
-                guard let view = view as? PreferencesView else {
-                    preconditionFailure()
-                }
-                guard let emojiGameInfo = view.values[PreferencesKeys.emojiGameInfo()]?.get(EmojiGameInfo.self) else {
-                    return .unavailable
-                }
-                return emojiGameInfo
             }
         }
     }

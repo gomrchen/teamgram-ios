@@ -55,9 +55,3 @@
 #import <MtProtoKit/MTTransport.h>
 #import <MtProtoKit/MTTransportScheme.h>
 #import <MtProtoKit/MTTransportTransaction.h>
-#import <MtProtoKit/MTProtoInstance.h>
-#import <MtProtoKit/MTProtoPersistenceInterface.h>
-#import <MtProtoKit/MTProtoEngine.h>
-#import <MtProtoKit/MTBindKeyMessageService.h>
-#import <MtProtoKit/MTFileBasedKeychain.h>
-

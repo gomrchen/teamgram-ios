@@ -43,8 +43,8 @@ public extension TelegramEngine {
             return _internal_observeAvailableColorOptions(postbox: self.account.postbox, scope: scope)
         }
         
-        public func updateNameColorAndEmoji(nameColor: UpdateNameColor, profileColor: PeerNameColor?, profileBackgroundEmojiId: Int64?) -> Signal<Void, UpdateNameColorAndEmojiError> {
-            return _internal_updateNameColorAndEmoji(account: self.account, nameColor: nameColor, profileColor: profileColor, profileBackgroundEmojiId: profileBackgroundEmojiId)
+        public func updateNameColorAndEmoji(nameColor: PeerNameColor, backgroundEmojiId: Int64?, profileColor: PeerNameColor?, profileBackgroundEmojiId: Int64?) -> Signal<Void, UpdateNameColorAndEmojiError> {
+            return _internal_updateNameColorAndEmoji(account: self.account, nameColor: nameColor, backgroundEmojiId: backgroundEmojiId, profileColor: profileColor, profileBackgroundEmojiId: profileBackgroundEmojiId)
         }
 
         public func unregisterNotificationToken(token: Data, type: NotificationTokenType, otherAccountUserIds: [PeerId.Id]) -> Signal<Never, NoError> {
@@ -90,11 +90,11 @@ public extension TelegramEngine {
             var textColor: Int32?
             for attribute in starGift.attributes {
                 switch attribute {
-                case let .model(_, fileValue, _, _):
+                case let .model(_, fileValue, _):
                     file = fileValue
                 case let .pattern(_, patternFileValue, _):
                     patternFile = patternFileValue
-                case let .backdrop(_, _, innerColorValue, outerColorValue, patternColorValue, textColorValue, _):
+                case let .backdrop(_, innerColorValue, outerColorValue, patternColorValue, textColorValue, _):
                     innerColor = innerColorValue
                     outerColor = outerColorValue
                     patternColor = patternColorValue
@@ -106,7 +106,7 @@ public extension TelegramEngine {
             let apiEmojiStatus: Api.EmojiStatus
             var emojiStatus: PeerEmojiStatus?
             if let file, let patternFile, let innerColor, let outerColor, let patternColor, let textColor {
-                apiEmojiStatus = .inputEmojiStatusCollectible(.init(flags: flags, collectibleId: starGift.id, until: expirationDate))
+                apiEmojiStatus = .inputEmojiStatusCollectible(flags: flags, collectibleId: starGift.id, until: expirationDate)
                 emojiStatus = PeerEmojiStatus(content: .starGift(id: starGift.id, fileId: file.fileId.id, title: starGift.title, slug: starGift.slug, patternFileId: patternFile.fileId.id, innerColor: innerColor, outerColor: outerColor, patternColor: patternColor, textColor: textColor), expirationDate: expirationDate)
             } else {
                 apiEmojiStatus = .emojiStatusEmpty
@@ -143,7 +143,7 @@ public extension TelegramEngine {
                 if let _ = expirationDate {
                     flags |= (1 << 0)
                 }
-                return Api.EmojiStatus.emojiStatus(.init(flags: flags, documentId: file.fileId.id, until: expirationDate))
+                return Api.EmojiStatus.emojiStatus(flags: flags, documentId: file.fileId.id, until: expirationDate)
             }) ?? Api.EmojiStatus.emojiStatusEmpty))
             |> `catch` { _ -> Signal<Api.Bool, NoError> in
                 return .single(.boolFalse)

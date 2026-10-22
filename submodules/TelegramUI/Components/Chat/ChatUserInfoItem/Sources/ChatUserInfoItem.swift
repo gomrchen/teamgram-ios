@@ -16,6 +16,7 @@ import ChatMessageBubbleContentNode
 import CountrySelectionUI
 import TelegramStringFormatting
 import MergedAvatarsNode
+import ChatControllerInteraction
 import TextNodeWithEntities
 
 public final class ChatUserInfoItem: ListViewItem {
@@ -170,7 +171,7 @@ public final class ChatUserInfoItemNode: ListViewItemNode, ASGestureRecognizerDe
         self.disclaimerTextNode.textNode.isUserInteractionEnabled = false
         self.disclaimerTextNode.textNode.displaysAsynchronously = false
         
-        super.init(layerBacked: false, rotated: true)
+        super.init(layerBacked: false, dynamicBounce: true, rotated: true)
         
         self.transform = CATransform3DMakeRotation(CGFloat.pi, 0.0, 0.0, 1.0)
         
@@ -288,8 +289,15 @@ public final class ChatUserInfoItemNode: ListViewItemNode, ASGestureRecognizerDe
             backgroundSize.height += verticalInset
             
             let constrainedWidth = params.width - (horizontalInset + horizontalContentInset) * 2.0
-           
-            let infoConstrainedSize = CGSize(width: floor(constrainedWidth * 0.7), height: CGFloat.greatestFiniteMagnitude)
+            let (titleLayout, titleApply) = makeTitleLayout(TextNodeLayoutArguments(attributedString: NSAttributedString(string: item.peer.displayTitle(strings: item.presentationData.strings, displayOrder: item.presentationData.nameDisplayOrder), font: Font.semibold(15.0), textColor: primaryTextColor), backgroundColor: nil, maximumNumberOfLines: 0, truncationType: .end, constrainedSize: CGSize(width: constrainedWidth, height: CGFloat.greatestFiniteMagnitude), alignment: .natural, cutout: nil, insets: UIEdgeInsets()))
+            backgroundSize.height += titleLayout.size.height
+            backgroundSize.height += verticalSpacing
+            
+            let (subtitleLayout, subtitleApply) = makeSubtitleLayout(TextNodeLayoutArguments(attributedString: NSAttributedString(string: item.presentationData.strings.Chat_NonContactUser_Subtitle, font: Font.regular(13.0), textColor: subtitleColor), backgroundColor: nil, maximumNumberOfLines: 0, truncationType: .end, constrainedSize: CGSize(width: constrainedWidth, height: CGFloat.greatestFiniteMagnitude), alignment: .natural, cutout: nil, insets: UIEdgeInsets()))
+            backgroundSize.height += subtitleLayout.size.height
+            backgroundSize.height += verticalSpacing + paragraphSpacing
+            
+            let infoConstrainedSize = CGSize(width: constrainedWidth * 0.7, height: CGFloat.greatestFiniteMagnitude)
             
             var maxTitleWidth: CGFloat = 0.0
             var maxValueWidth: CGFloat = 0.0
@@ -380,21 +388,12 @@ public final class ChatUserInfoItemNode: ListViewItemNode, ASGestureRecognizerDe
                 groupsTitleLayoutAndApply = nil
                 groupsValueLayoutAndApply = nil
             }
-            
-            let titleConstrainedWidth = maxTitleWidth + attributeSpacing + maxValueWidth
-            let (titleLayout, titleApply) = makeTitleLayout(TextNodeLayoutArguments(attributedString: NSAttributedString(string: item.peer.displayTitle(strings: item.presentationData.strings, displayOrder: item.presentationData.nameDisplayOrder), font: Font.semibold(15.0), textColor: primaryTextColor), backgroundColor: nil, maximumNumberOfLines: 3, truncationType: .end, constrainedSize: CGSize(width: titleConstrainedWidth, height: CGFloat.greatestFiniteMagnitude), alignment: .center, cutout: nil, insets: UIEdgeInsets()))
-            backgroundSize.height += titleLayout.size.height
-            backgroundSize.height += verticalSpacing
-            
-            let (subtitleLayout, subtitleApply) = makeSubtitleLayout(TextNodeLayoutArguments(attributedString: NSAttributedString(string: item.presentationData.strings.Chat_NonContactUser_Subtitle, font: Font.regular(13.0), textColor: subtitleColor), backgroundColor: nil, maximumNumberOfLines: 0, truncationType: .end, constrainedSize: CGSize(width: titleConstrainedWidth, height: CGFloat.greatestFiniteMagnitude), alignment: .natural, cutout: nil, insets: UIEdgeInsets()))
-            backgroundSize.height += subtitleLayout.size.height
-            backgroundSize.height += verticalSpacing + paragraphSpacing
 
             backgroundSize.width = horizontalContentInset * 2.0 + maxTitleWidth + attributeSpacing + maxValueWidth
             
             let disclaimerText: NSMutableAttributedString
             if let verification = item.verification {
-                disclaimerText = NSMutableAttributedString(string: " #  \(verification.description)", font: Font.regular(13.0), textColor: subtitleColor)
+                disclaimerText = NSMutableAttributedString(string: " #   \(verification.description)", font: Font.regular(13.0), textColor: subtitleColor)
                 if let range = disclaimerText.string.range(of: "#") {
                     disclaimerText.addAttribute(ChatTextInputAttributes.customEmoji, value: ChatTextInputTextCustomEmojiAttribute(interactivelySelectedFromPackId: nil, fileId: verification.iconFileId, file: nil), range: NSRange(range, in: disclaimerText.string))
                     disclaimerText.addAttribute(.foregroundColor, value: subtitleColor, range: NSRange(range, in: disclaimerText.string))

@@ -144,7 +144,7 @@ final class VideoChatExpandedSpeakingToastComponent: Component {
             let avatarSize = CGSize(width: avatarWidth, height: avatarWidth)
             
             let clipStyle: AvatarNodeClipStyle
-            if case let .channel(channel) = component.peer, channel.isForumOrMonoForum {
+            if case let .channel(channel) = component.peer, channel.flags.contains(.isForum) {
                 clipStyle = .roundedRect
             } else {
                 clipStyle = .round

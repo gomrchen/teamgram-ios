@@ -10,7 +10,7 @@ import AvatarNode
 import AccountContext
 
 private enum PeerAvatarReference: Equatable {
-    case letters(PeerId, PeerColor?, [String])
+    case letters(PeerId, PeerNameColor?, [String])
     case image(PeerReference, TelegramMediaImageRepresentation)
     
     var peerId: PeerId {

@@ -35,7 +35,6 @@ public enum PermissionContentIcon: Equatable {
 public final class PermissionContentNode: ASDisplayNode {
     private var theme: PresentationTheme
     public let kind: Int32
-    private let filterHitTest: Bool
 
     private let iconNode: ASImageNode
     private let nearbyIconNode: PeersNearbyIconNode?
@@ -56,13 +55,12 @@ public final class PermissionContentNode: ASDisplayNode {
     
     public var validLayout: (CGSize, UIEdgeInsets)?
     
-    public init(context: AccountContext, theme: PresentationTheme, strings: PresentationStrings, kind: Int32, icon: PermissionContentIcon, title: String, subtitle: String? = nil, text: String, buttonTitle: String, secondaryButtonTitle: String? = nil, footerText: String? = nil, buttonAction: @escaping () -> Void, openPrivacyPolicy: (() -> Void)?, filterHitTest: Bool = false) {
+    public init(context: AccountContext, theme: PresentationTheme, strings: PresentationStrings, kind: Int32, icon: PermissionContentIcon, title: String, subtitle: String? = nil, text: String, buttonTitle: String, secondaryButtonTitle: String? = nil, footerText: String? = nil, buttonAction: @escaping () -> Void, openPrivacyPolicy: (() -> Void)?) {
         self.theme = theme
         self.kind = kind
         
         self.buttonAction = buttonAction
         self.openPrivacyPolicy = openPrivacyPolicy
-        self.filterHitTest = filterHitTest
         
         self.icon = icon
         self.title = title
@@ -107,7 +105,7 @@ public final class PermissionContentNode: ASDisplayNode {
         self.textNode.displaysAsynchronously = false
         self.textNode.isAccessibilityElement = true
         
-        self.actionButton = SolidRoundedButtonNode(theme: SolidRoundedButtonTheme(theme: theme), glass: true, height: 52.0, cornerRadius: 26.0, isShimmering: true)
+        self.actionButton = SolidRoundedButtonNode(theme: SolidRoundedButtonTheme(theme: theme), height: 52.0, cornerRadius: 9.0, gloss: true)
         
         self.footerNode = ImmediateTextNode()
         self.footerNode.textAlignment = .center
@@ -163,18 +161,6 @@ public final class PermissionContentNode: ASDisplayNode {
         }
         
         self.privacyPolicyButton.addTarget(self, action: #selector(self.privacyPolicyPressed), forControlEvents: .touchUpInside)
-    }
-    
-    override public func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
-        guard let result = super.hitTest(point, with: event) else {
-            return nil
-        }
-        if self.filterHitTest {
-            if result === self.view {
-                return nil
-            }
-        }
-        return result
     }
     
     public func updatePresentationData(_ presentationData: PresentationData) {

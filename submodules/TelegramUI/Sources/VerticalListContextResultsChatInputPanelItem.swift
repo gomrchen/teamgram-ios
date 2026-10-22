@@ -85,6 +85,7 @@ final class VerticalListContextResultsChatInputPanelItemNode: ListViewItemNode {
     private let iconImageNode: TransformImageNode
     private let titleNode: TextNode
     private let textNode: TextNode
+    private let topSeparatorNode: ASDisplayNode
     private let separatorNode: ASDisplayNode
     private let highlightedBackgroundNode: ASDisplayNode
     private var statusDisposable = MetaDisposable()
@@ -98,6 +99,9 @@ final class VerticalListContextResultsChatInputPanelItemNode: ListViewItemNode {
     init() {
         self.titleNode = TextNode()
         self.textNode = TextNode()
+        
+        self.topSeparatorNode = ASDisplayNode()
+        self.topSeparatorNode.isLayerBacked = true
         
         self.separatorNode = ASDisplayNode()
         self.separatorNode.isLayerBacked = true
@@ -118,8 +122,9 @@ final class VerticalListContextResultsChatInputPanelItemNode: ListViewItemNode {
         self.iconImageNode.isLayerBacked = !smartInvertColorsEnabled()
         self.iconImageNode.displaysAsynchronously = false
         
-        super.init(layerBacked: false)
+        super.init(layerBacked: false, dynamicBounce: false)
         
+        self.addSubnode(self.topSeparatorNode)
         self.addSubnode(self.separatorNode)
         
         self.addSubnode(self.iconImageNode)
@@ -275,11 +280,13 @@ final class VerticalListContextResultsChatInputPanelItemNode: ListViewItemNode {
             
             let nodeLayout = ListViewItemNodeLayout(contentSize: CGSize(width: params.width, height: VerticalListContextResultsChatInputPanelItemNode.itemHeight), insets: UIEdgeInsets())
             
-            return (nodeLayout, { animation in
+            return (nodeLayout, { _ in
                 if let strongSelf = self {
                     strongSelf.item = item
                     
                     strongSelf.separatorNode.backgroundColor = item.theme.list.itemPlainSeparatorColor
+                    strongSelf.topSeparatorNode.backgroundColor = item.theme.list.itemPlainSeparatorColor
+                    strongSelf.backgroundColor = item.theme.list.plainBackgroundColor
                     strongSelf.highlightedBackgroundNode.backgroundColor = item.theme.list.itemHighlightedBackgroundColor
                     
                     let _ = titleApply()
@@ -331,9 +338,11 @@ final class VerticalListContextResultsChatInputPanelItemNode: ListViewItemNode {
                         }
                     }
                     
+                    strongSelf.topSeparatorNode.isHidden = mergedTop
                     strongSelf.separatorNode.isHidden = !mergedBottom
                     
-                    animation.animator.updateFrame(layer: strongSelf.separatorNode.layer, frame: CGRect(origin: CGPoint(x: leftInset, y: nodeLayout.contentSize.height - UIScreenPixel), size: CGSize(width: params.width - leftInset, height: UIScreenPixel)), completion: nil)
+                    strongSelf.topSeparatorNode.frame = CGRect(origin: CGPoint(x: 0.0, y: 0.0), size: CGSize(width: params.width, height: UIScreenPixel))
+                    strongSelf.separatorNode.frame = CGRect(origin: CGPoint(x: leftInset, y: nodeLayout.contentSize.height - UIScreenPixel), size: CGSize(width: params.width - leftInset, height: UIScreenPixel))
                     
                     strongSelf.highlightedBackgroundNode.frame = CGRect(origin: CGPoint(x: 0.0, y: 0.0), size: CGSize(width: params.width, height: nodeLayout.size.height + UIScreenPixel))
                     
@@ -379,7 +388,7 @@ final class VerticalListContextResultsChatInputPanelItemNode: ListViewItemNode {
         if highlighted {
             self.highlightedBackgroundNode.alpha = 1.0
             if self.highlightedBackgroundNode.supernode == nil {
-                //self.insertSubnode(self.highlightedBackgroundNode, aboveSubnode: self.separatorNode)
+                self.insertSubnode(self.highlightedBackgroundNode, aboveSubnode: self.separatorNode)
             }
         } else {
             if self.highlightedBackgroundNode.supernode != nil {

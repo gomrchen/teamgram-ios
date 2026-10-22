@@ -259,31 +259,31 @@ enum BotCheckoutEntry: ItemListNodeEntry {
                     }
                 })
             case let .paymentMethod(_, text, value):
-                return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: value, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
+                return ItemListDisclosureItem(presentationData: presentationData, title: text, label: value, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
                     arguments.openPaymentMethod()
                 })
             case let .shippingInfo(_, text, value):
-                return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: value, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
+                return ItemListDisclosureItem(presentationData: presentationData, title: text, label: value, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
                     arguments.openInfo(.address(.street1))
                 })
             case let .shippingMethod(_, text, value):
-                return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: value, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
+                return ItemListDisclosureItem(presentationData: presentationData, title: text, label: value, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
                     arguments.openShippingMethod()
                 })
             case let .nameInfo(_, text, value):
-                return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: value, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
+                return ItemListDisclosureItem(presentationData: presentationData, title: text, label: value, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
                     arguments.openInfo(.name)
                 })
             case let .emailInfo(_, text, value):
-                return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: value, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
+                return ItemListDisclosureItem(presentationData: presentationData, title: text, label: value, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
                     arguments.openInfo(.email)
                 })
             case let .phoneInfo(_, text, value):
-                return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: value, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
+                return ItemListDisclosureItem(presentationData: presentationData, title: text, label: value, sectionId: self.section, style: .blocks, disclosureStyle: .arrow, action: {
                     arguments.openInfo(.phone)
                 })
             case let .actionPlaceholder(_, shimmeringIndex):
-                return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: " ", label: " ", sectionId: self.section, style: .blocks, disclosureStyle: .none, action: {
+                return ItemListDisclosureItem(presentationData: presentationData, title: " ", label: " ", sectionId: self.section, style: .blocks, disclosureStyle: .none, action: {
                 }, shimmeringIndex: shimmeringIndex)
         }
     }
@@ -331,7 +331,19 @@ private func currentTotalPrice(paymentForm: BotPaymentForm?, validatedFormInfo: 
     return totalPrice
 }
 
-private func botCheckoutControllerEntries(presentationData: PresentationData, state: BotCheckoutControllerState, invoice: TelegramMediaInvoice, paymentForm: BotPaymentForm?, formInfo: BotPaymentRequestedInfo?, validatedFormInfo: BotPaymentValidatedFormInfo?, currentShippingOptionId: String?, currentPaymentMethod: BotCheckoutPaymentMethod?, currentTip: Int64?, botPeer: EnginePeer?) -> [BotCheckoutEntry] {
+private func isReviewOrderCheckout(source: BotPaymentInvoiceSource, paymentForm: BotPaymentForm) -> Bool {
+    guard paymentForm.providerId == nil && paymentForm.nativeProvider == nil else {
+        return false
+    }
+    switch source {
+    case .stars, .starsGift, .premiumSubscription, .giftCode:
+        return true
+    default:
+        return false
+    }
+}
+
+private func botCheckoutControllerEntries(presentationData: PresentationData, state: BotCheckoutControllerState, invoice: TelegramMediaInvoice, source: BotPaymentInvoiceSource, paymentForm: BotPaymentForm?, formInfo: BotPaymentRequestedInfo?, validatedFormInfo: BotPaymentValidatedFormInfo?, currentShippingOptionId: String?, currentPaymentMethod: BotCheckoutPaymentMethod?, currentTip: Int64?, botPeer: EnginePeer?) -> [BotCheckoutEntry] {
     var entries: [BotCheckoutEntry] = []
     
     var botName = ""
@@ -394,11 +406,13 @@ private func botCheckoutControllerEntries(presentationData: PresentationData, st
         
         entries.append(.price(index, presentationData.theme, presentationData.strings.Checkout_TotalAmount, formatCurrencyAmount(totalPrice, currency: paymentForm.invoice.currency), true, true, nil))
         
-        var paymentMethodTitle = ""
-        if let currentPaymentMethod = currentPaymentMethod {
-            paymentMethodTitle = currentPaymentMethod.title
+        if !isReviewOrderCheckout(source: source, paymentForm: paymentForm) {
+            var paymentMethodTitle = ""
+            if let currentPaymentMethod = currentPaymentMethod {
+                paymentMethodTitle = currentPaymentMethod.title
+            }
+            entries.append(.paymentMethod(presentationData.theme, presentationData.strings.Checkout_PaymentMethod, paymentMethodTitle))
         }
-        entries.append(.paymentMethod(presentationData.theme, presentationData.strings.Checkout_PaymentMethod, paymentMethodTitle))
         if paymentForm.invoice.requestedFields.contains(.shippingAddress) {
             var addressString = ""
             if let address = formInfo?.shippingAddress {
@@ -611,7 +625,7 @@ private final class ActionButtonPanelNode: ASDisplayNode {
     private(set) var isAccepted: Bool = false
     var isAcceptedUpdated: (() -> Void)?
     var openRecurrentTerms: (() -> Void)?
-    var recurrentConfirmationNode: RecurrentConfirmationNode?
+    private var recurrentConfirmationNode: RecurrentConfirmationNode?
     
     func update(presentationData: PresentationData, layout: ContainerViewLayout, invoice: BotPaymentInvoice?, botName: String?) -> (CGFloat, CGFloat) {
         let bottomPanelVerticalInset: CGFloat = 16.0
@@ -657,6 +671,7 @@ final class BotCheckoutControllerNode: ItemListControllerNode, PKPaymentAuthoriz
     private weak var controller: BotCheckoutController?
     private let navigationBar: NavigationBar
     private let context: AccountContext
+    private let invoice: TelegramMediaInvoice
     private let source: BotPaymentInvoiceSource
     private let present: (ViewController, Any?) -> Void
     private let dismissAnimated: () -> Void
@@ -699,6 +714,7 @@ final class BotCheckoutControllerNode: ItemListControllerNode, PKPaymentAuthoriz
         self.controller = controller
         self.navigationBar = navigationBar
         self.context = context
+        self.invoice = invoice
         self.source = source
         self.present = present
         self.dismissAnimated = dismissAnimated
@@ -745,7 +761,7 @@ final class BotCheckoutControllerNode: ItemListControllerNode, PKPaymentAuthoriz
         
         let signal: Signal<(ItemListPresentationData, (ItemListNodeState, Any)), NoError> = combineLatest(queue: .mainQueue(), context.sharedContext.presentationData, self.state.get(), paymentFormAndInfo.get(), paymentBotPeer)
         |> map { presentationData, state, paymentFormAndInfo, botPeer -> (ItemListPresentationData, (ItemListNodeState, Any)) in
-            let nodeState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: botCheckoutControllerEntries(presentationData: presentationData, state: state, invoice: invoice, paymentForm: paymentFormAndInfo?.0, formInfo: paymentFormAndInfo?.1, validatedFormInfo: paymentFormAndInfo?.2, currentShippingOptionId: paymentFormAndInfo?.3, currentPaymentMethod: paymentFormAndInfo?.4, currentTip: paymentFormAndInfo?.5, botPeer: botPeer), style: .blocks, focusItemTag: nil, emptyStateItem: nil, animateChanges: false)
+            let nodeState = ItemListNodeState(presentationData: ItemListPresentationData(presentationData), entries: botCheckoutControllerEntries(presentationData: presentationData, state: state, invoice: invoice, source: source, paymentForm: paymentFormAndInfo?.0, formInfo: paymentFormAndInfo?.1, validatedFormInfo: paymentFormAndInfo?.2, currentShippingOptionId: paymentFormAndInfo?.3, currentPaymentMethod: paymentFormAndInfo?.4, currentTip: paymentFormAndInfo?.5, botPeer: botPeer), style: .blocks, focusItemTag: nil, emptyStateItem: nil, animateChanges: false)
 
             return (ItemListPresentationData(presentationData), (nodeState, arguments))
         }
@@ -1211,8 +1227,7 @@ final class BotCheckoutControllerNode: ItemListControllerNode, PKPaymentAuthoriz
             payString = self.presentationData.strings.CheckoutInfo_Pay
         }
         
-        self.actionButton.isEnabled = true
-        self.actionButton.isImplicitlyDisabled = !isButtonEnabled
+        self.actionButton.isEnabled = isButtonEnabled
         
         if let currentPaymentMethod = self.currentPaymentMethod {
             switch currentPaymentMethod {
@@ -1245,7 +1260,7 @@ final class BotCheckoutControllerNode: ItemListControllerNode, PKPaymentAuthoriz
     override func containerLayoutUpdated(_ layout: ContainerViewLayout, navigationBarHeight: CGFloat, transition: ContainedViewLayoutTransition, additionalInsets: UIEdgeInsets) {
         var updatedInsets = layout.intrinsicInsets
 
-        let bottomPanelHorizontalInset: CGFloat = 30.0
+        let bottomPanelHorizontalInset: CGFloat = 16.0
         
         var botName: String?
         if let botPeer = self.botPeerValue {
@@ -1269,11 +1284,7 @@ final class BotCheckoutControllerNode: ItemListControllerNode, PKPaymentAuthoriz
     }
     
     @objc func actionButtonPressed() {
-        if let recurrentConfirmationNode = self.actionButtonPanelNode.recurrentConfirmationNode, !self.actionButtonPanelNode.isAccepted {
-            recurrentConfirmationNode.layer.addShakeAnimation()
-        } else {
-            self.pay()
-        }
+        self.pay()
     }
     
     private func pay(savedCredentialsToken: TemporaryTwoStepPasswordToken? = nil, liabilityNoticeAccepted: Bool = false, receivedCredentials: BotPaymentCredentials? = nil) {
@@ -1303,11 +1314,6 @@ final class BotCheckoutControllerNode: ItemListControllerNode, PKPaymentAuthoriz
             }
         }
         
-        guard let paymentMethod = self.currentPaymentMethod else {
-            self.arguments?.openPaymentMethod()
-            return
-        }
-        
         let totalAmount = currentTotalPrice(paymentForm: paymentForm, validatedFormInfo: self.currentValidatedFormInfo, currentShippingOptionId: self.currentShippingOptionId, currentTip: self.currentTipAmount)
         let currencyValue = formatCurrencyAmount(totalAmount, currency: paymentForm.invoice.currency)
         
@@ -1322,6 +1328,70 @@ final class BotCheckoutControllerNode: ItemListControllerNode, PKPaymentAuthoriz
             } else {
                 strongSelf.dismissAnimated()
             }
+        }
+        
+        if isReviewOrderCheckout(source: self.source, paymentForm: paymentForm) {
+            self.inProgressDimNode.isUserInteractionEnabled = true
+            self.inProgressDimNode.alpha = 1.0
+            self.actionButton.isEnabled = false
+            self.updateActionButton()
+            self.updateIsInProgress(true)
+            
+            self.payDisposable.set((self.context.engine.payments.sendStarsPaymentForm(formId: paymentForm.id, source: self.source) |> deliverOnMainQueue).start(next: { [weak self] result in
+                guard let strongSelf = self else {
+                    return
+                }
+                strongSelf.inProgressDimNode.isUserInteractionEnabled = false
+                strongSelf.inProgressDimNode.alpha = 0.0
+                strongSelf.actionButton.isEnabled = true
+                strongSelf.updateIsInProgress(false)
+                
+                switch result {
+                case .done:
+                    let message = strongSelf.invoice.description.isEmpty ? "Order submitted. Please wait for admin review." : strongSelf.invoice.description
+                    strongSelf.present(textAlertController(context: strongSelf.context, title: strongSelf.presentationData.strings.Checkout_Title, text: message, actions: [TextAlertAction(type: .defaultAction, title: strongSelf.presentationData.strings.Common_OK, action: {
+                        proceedWithCompletion(true, nil)
+                    })]), nil)
+                case .externalVerificationRequired:
+                    strongSelf.updateActionButton()
+                    strongSelf.failed()
+                }
+            }, error: { [weak self] error in
+                guard let strongSelf = self else {
+                    return
+                }
+                strongSelf.inProgressDimNode.isUserInteractionEnabled = false
+                strongSelf.inProgressDimNode.alpha = 0.0
+                strongSelf.actionButton.isEnabled = true
+                strongSelf.updateIsInProgress(false)
+                strongSelf.updateActionButton()
+                
+                let text: String?
+                switch error {
+                case .precheckoutFailed:
+                    text = strongSelf.presentationData.strings.Checkout_ErrorPrecheckoutFailed
+                case .paymentFailed:
+                    text = strongSelf.presentationData.strings.Checkout_ErrorPaymentFailed
+                case .alreadyPaid:
+                    text = strongSelf.presentationData.strings.Checkout_ErrorInvoiceAlreadyPaid
+                case .generic:
+                    text = strongSelf.presentationData.strings.Checkout_ErrorGeneric
+                default:
+                    text = nil
+                }
+                
+                if let text {
+                    strongSelf.present(textAlertController(context: strongSelf.context, title: nil, text: text, actions: [TextAlertAction(type: .defaultAction, title: strongSelf.presentationData.strings.Common_OK, action: {})]), nil)
+                }
+                
+                strongSelf.failed()
+            }))
+            return
+        }
+        
+        guard let paymentMethod = self.currentPaymentMethod else {
+            self.arguments?.openPaymentMethod()
+            return
         }
         
         let credentials: BotPaymentCredentials

@@ -37,11 +37,6 @@ func _internal_createGroup(account: Account, title: String, peerIds: [PeerId], t
             }
         }
         
-        var ttlPeriod = ttlPeriod
-        if ttlPeriod == nil {
-            ttlPeriod = 0
-        }
-        
         var flags: Int32 = 0
         if let _ = ttlPeriod {
             flags |= 1 << 0
@@ -58,8 +53,7 @@ func _internal_createGroup(account: Account, title: String, peerIds: [PeerId], t
             let updatesValue: Api.Updates
             let missingInviteesValue: [Api.MissingInvitee]
             switch result {
-            case let .invitedUsers(invitedUsersData):
-                let (updates, missingInvitees) = (invitedUsersData.updates, invitedUsersData.missingInvitees)
+            case let .invitedUsers(updates, missingInvitees):
                 updatesValue = updates
                 missingInviteesValue = missingInvitees
             }
@@ -78,8 +72,7 @@ func _internal_createGroup(account: Account, title: String, peerIds: [PeerId], t
                             peerId: peerId,
                             result: TelegramInvitePeersResult(forbiddenPeers: missingInviteesValue.compactMap { invitee -> TelegramForbiddenInvitePeer? in
                                 switch invitee {
-                                case let .missingInvitee(missingInviteeData):
-                                    let (flags, userId) = (missingInviteeData.flags, missingInviteeData.userId)
+                                case let .missingInvitee(flags, userId):
                                     guard let peer = transaction.getPeer(PeerId(namespace: Namespaces.Peer.CloudUser, id: PeerId.Id._internalFromInt64Value(userId))) else {
                                         return nil
                                     }

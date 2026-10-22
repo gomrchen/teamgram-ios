@@ -19,7 +19,6 @@ final class AccountTaskManager {
         private var stateDisposable: Disposable?
         private let tasksDisposable = MetaDisposable()
         private let configurationDisposable = MetaDisposable()
-        private let promoDisposable = MetaDisposable()
         
         private let managedTopReactionsDisposable = MetaDisposable()
         
@@ -123,9 +122,7 @@ final class AccountTaskManager {
                     tasks.add(managedDisabledChannelStatusIconEmoji(postbox: self.stateManager.postbox, network: self.stateManager.network).start())
                     tasks.add(_internal_loadedStickerPack(postbox: self.stateManager.postbox, network: self.stateManager.network, reference: .iconTopicEmoji, forceActualized: true).start())
                     tasks.add(managedPeerColorUpdates(postbox: self.stateManager.postbox, network: self.stateManager.network).start())
-                    tasks.add(managedStarGiftsUpdates(postbox: self.stateManager.postbox, network: self.stateManager.network, accountPeerId: self.stateManager.accountPeerId).start())
-                    tasks.add(managedSavedMusicIdsUpdates(postbox: self.stateManager.postbox, network: self.stateManager.network, accountPeerId: self.stateManager.accountPeerId).start())
-                    tasks.add(managedEmojiGameUpdates(postbox: self.stateManager.postbox, network: self.stateManager.network).start())
+                    tasks.add(managedStarGiftsUpdates(postbox: self.stateManager.postbox, network: self.stateManager.network).start())
                     
                     self.managedTopReactionsDisposable.set(managedTopReactions(postbox: self.stateManager.postbox, network: self.stateManager.network).start())
                     
@@ -135,6 +132,7 @@ final class AccountTaskManager {
                     tasks.add(managedAutodownloadSettingsUpdates(accountManager: self.accountManager, network: self.stateManager.network).start())
                     tasks.add(managedTermsOfServiceUpdates(postbox: self.stateManager.postbox, network: self.stateManager.network, stateManager: self.stateManager).start())
                     tasks.add(managedAppUpdateInfo(network: self.stateManager.network, stateManager: self.stateManager).start())
+                    tasks.add(managedPromoInfoUpdates(accountPeerId: self.accountPeerId, postbox: self.stateManager.postbox, network: self.stateManager.network, viewTracker: self.viewTracker).start())
                     tasks.add(managedLocalizationUpdatesOperations(accountManager: self.accountManager, postbox: self.stateManager.postbox, network: self.stateManager.network).start())
                     tasks.add(managedPendingPeerNotificationSettings(postbox: self.stateManager.postbox, network: self.stateManager.network).start())
                     tasks.add(managedSynchronizeAppLogEventsOperations(postbox: self.stateManager.postbox, network: self.stateManager.network).start())
@@ -156,12 +154,10 @@ final class AccountTaskManager {
             self.tasksDisposable.dispose()
             self.configurationDisposable.dispose()
             self.managedTopReactionsDisposable.dispose()
-            self.promoDisposable.dispose()
         }
         
         func reloadAppConfiguration() {
             self.configurationDisposable.set(managedAppConfigurationUpdates(postbox: self.stateManager.postbox, network: self.stateManager.network).start())
-            self.promoDisposable.set(managedPromoInfoUpdates(accountPeerId: self.accountPeerId, postbox: self.stateManager.postbox, network: self.stateManager.network, viewTracker: self.viewTracker).start())
         }
     }
     

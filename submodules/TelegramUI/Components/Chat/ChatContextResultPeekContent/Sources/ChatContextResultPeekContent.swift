@@ -10,21 +10,17 @@ import PhotoResources
 import AppBundle
 import ContextUI
 import SoftwareVideo
-import BatchVideoRendering
-import GifVideoLayer
-import AccountContext
+import MultiplexedVideoNode
 
 public final class ChatContextResultPeekContent: PeekControllerContent {
-    public let context: AccountContext
+    public let account: Account
     public let contextResult: ChatContextResult
     public let menu: [ContextMenuItem]
-    public let batchVideoContext: BatchVideoRenderingContext
     
-    public init(context: AccountContext, contextResult: ChatContextResult, menu: [ContextMenuItem], batchVideoContext: BatchVideoRenderingContext) {
-        self.context = context
+    public init(account: Account, contextResult: ChatContextResult, menu: [ContextMenuItem]) {
+        self.account = account
         self.contextResult = contextResult
         self.menu = menu
-        self.batchVideoContext = batchVideoContext
     }
     
     public func presentation() -> PeekControllerContentPresentation {
@@ -40,7 +36,7 @@ public final class ChatContextResultPeekContent: PeekControllerContent {
     }
     
     public func node() -> PeekControllerContentNode & ASDisplayNode {
-        return ChatContextResultPeekNode(context: self.context, contextResult: self.contextResult, batchVideoContext: self.batchVideoContext)
+        return ChatContextResultPeekNode(account: self.account, contextResult: self.contextResult)
     }
     
     public func topAccessoryNode() -> ASDisplayNode? {
@@ -66,29 +62,62 @@ public final class ChatContextResultPeekContent: PeekControllerContent {
 }
 
 private final class ChatContextResultPeekNode: ASDisplayNode, PeekControllerContentNode {
-    private let context: AccountContext
+    private let account: Account
     private let contextResult: ChatContextResult
-    private let batchVideoContext: BatchVideoRenderingContext
     
     private let imageNodeBackground: ASDisplayNode
     private let imageNode: TransformImageNode
-    private var videoLayer: GifVideoLayer?
+    private var videoLayer: (SoftwareVideoThumbnailNode, SoftwareVideoLayerFrameManager, SampleBufferLayer)?
     
     private var currentImageResource: TelegramMediaResource?
     private var currentVideoFile: TelegramMediaFile?
     
+    private let timebase: CMTimebase
+    
+    private var displayLink: CADisplayLink?
     private var ticking: Bool = false {
         didSet {
             if self.ticking != oldValue {
-                self.videoLayer?.shouldBeAnimating = self.ticking
+                if self.ticking {
+                    class DisplayLinkProxy: NSObject {
+                        weak var target: ChatContextResultPeekNode?
+                        init(target: ChatContextResultPeekNode) {
+                            self.target = target
+                        }
+                        
+                        @objc func displayLinkEvent() {
+                            self.target?.displayLinkEvent()
+                        }
+                    }
+                    
+                    let displayLink = CADisplayLink(target: DisplayLinkProxy(target: self), selector: #selector(DisplayLinkProxy.displayLinkEvent))
+                    self.displayLink = displayLink
+                    displayLink.add(to: RunLoop.main, forMode: .common)
+                    if #available(iOS 10.0, *) {
+                        displayLink.preferredFramesPerSecond = 25
+                    } else {
+                        displayLink.frameInterval = 2
+                    }
+                    displayLink.isPaused = false
+                    CMTimebaseSetRate(self.timebase, rate: 1.0)
+                } else if let displayLink = self.displayLink {
+                    self.displayLink = nil
+                    displayLink.isPaused = true
+                    displayLink.invalidate()
+                    CMTimebaseSetRate(self.timebase, rate: 0.0)
+                }
             }
         }
     }
     
-    init(context: AccountContext, contextResult: ChatContextResult, batchVideoContext: BatchVideoRenderingContext) {
-        self.context = context
+    private func displayLinkEvent() {
+        let timestamp = CMTimebaseGetTime(self.timebase).seconds
+        self.videoLayer?.1.tick(timestamp: timestamp)
+    }
+    
+    init(account: Account, contextResult: ChatContextResult) {
+        self.account = account
         self.contextResult = contextResult
-        self.batchVideoContext = batchVideoContext
         
         self.imageNodeBackground = ASDisplayNode()
         self.imageNodeBackground.isLayerBacked = true
@@ -99,6 +128,11 @@ private final class ChatContextResultPeekNode: ASDisplayNode, PeekControllerCont
         self.imageNode.isLayerBacked = !smartInvertColorsEnabled()
         self.imageNode.displaysAsynchronously = false
         
+        var timebase: CMTimebase?
+        CMTimebaseCreateWithSourceClock(allocator: nil, sourceClock: CMClockGetHostTimeClock(), timebaseOut: &timebase)
+        CMTimebaseSetRate(timebase!, rate: 0.0)
+        self.timebase = timebase!
+        
         super.init()
         
         self.addSubnode(self.imageNodeBackground)
@@ -108,6 +142,10 @@ private final class ChatContextResultPeekNode: ASDisplayNode, PeekControllerCont
     }
     
     deinit {
+        if let displayLink = self.displayLink {
+            displayLink.isPaused = true
+            displayLink.invalidate()
+        }
     }
     
     func ready() -> Signal<Bool, NoError> {
@@ -198,7 +236,7 @@ private final class ChatContextResultPeekNode: ASDisplayNode, PeekControllerCont
             if let imageResource = imageResource {
                 let tmpRepresentation = TelegramMediaImageRepresentation(dimensions: PixelDimensions(width: Int32(fittedImageDimensions.width * 2.0), height: Int32(fittedImageDimensions.height * 2.0)), resource: imageResource, progressiveSizes: [], immediateThumbnailData: nil, hasVideo: false, isPersonal: false)
                 let tmpImage = TelegramMediaImage(imageId: MediaId(namespace: 0, id: 0), representations: [tmpRepresentation], immediateThumbnailData: nil, reference: nil, partialReference: nil, flags: [])
-                updateImageSignal = chatMessagePhoto(postbox: self.context.account.postbox, userLocation: .other, photoReference: .standalone(media: tmpImage))
+                updateImageSignal = chatMessagePhoto(postbox: self.account.postbox, userLocation: .other, photoReference: .standalone(media: tmpImage))
             } else {
                 updateImageSignal = .complete()
             }
@@ -218,26 +256,33 @@ private final class ChatContextResultPeekNode: ASDisplayNode, PeekControllerCont
         }
         
         if updatedVideoFile {
-            if let videoLayer = self.videoLayer {
+            if let (thumbnailLayer, _, layer) = self.videoLayer {
                 self.videoLayer = nil
-                videoLayer.removeFromSuperlayer()
+                thumbnailLayer.removeFromSupernode()
+                layer.layer.removeFromSuperlayer()
             }
             
-            if let videoFileReference {
-                let videoLayer = GifVideoLayer(
-                    context: self.context,
-                    batchVideoContext: self.batchVideoContext,
-                    userLocation: .other,
-                    file: videoFileReference,
-                    synchronousLoad: false
-                )
-                self.videoLayer = videoLayer
-                self.layer.addSublayer(videoLayer)
+            if let videoFileReference = videoFileReference {
+                let thumbnailLayer = SoftwareVideoThumbnailNode(account: self.account, fileReference: videoFileReference, synchronousLoad: false)
+                self.addSubnode(thumbnailLayer)
+                let layerHolder = takeSampleBufferLayer()
+                layerHolder.layer.videoGravity = AVLayerVideoGravity.resizeAspectFill
+                self.layer.addSublayer(layerHolder.layer)
+                let manager = SoftwareVideoLayerFrameManager(account: self.account, userLocation: .other, userContentType: .other, fileReference: videoFileReference, layerHolder: layerHolder)
+                self.videoLayer = (thumbnailLayer, manager, layerHolder)
+                thumbnailLayer.ready = { [weak self, weak thumbnailLayer, weak manager] in
+                    if let strongSelf = self, let thumbnailLayer = thumbnailLayer, let manager = manager {
+                        if strongSelf.videoLayer?.0 === thumbnailLayer && strongSelf.videoLayer?.1 === manager {
+                            manager.start()
+                        }
+                    }
+                }
             }
         }
         
-        if let videoLayer = self.videoLayer {
-            videoLayer.frame = CGRect(origin: CGPoint(), size: CGSize(width: croppedImageDimensions.width, height: croppedImageDimensions.height))
+        if let (thumbnailLayer, _, layer) = self.videoLayer {
+            thumbnailLayer.frame = CGRect(origin: CGPoint(), size: croppedImageDimensions)
+            layer.layer.frame = CGRect(origin: CGPoint(), size: CGSize(width: croppedImageDimensions.width, height: croppedImageDimensions.height))
         }
         
         if !self.ticking {

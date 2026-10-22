@@ -1,5 +1,4 @@
 import Foundation
-import UIKit
 import AsyncDisplayKit
 import Display
 import AnimatedStickerNode
@@ -487,12 +486,7 @@ public final class ReactionContextNode: ASDisplayNode, ASScrollViewDelegate {
         }
     }
     
-    public enum Style {
-        case legacy
-        case glass(isTinted: Bool)
-    }
-    
-    public init(context: AccountContext, animationCache: AnimationCache, presentationData: PresentationData, style: Style = .legacy, items: [ReactionContextItem], selectedItems: Set<AnyHashable>, title: String? = nil, reactionsLocked: Bool, alwaysAllowPremiumReactions: Bool, allPresetReactionsAreAvailable: Bool, getEmojiContent: ((AnimationCache, MultiAnimationRenderer) -> Signal<EmojiPagerContentComponent, NoError>)?, isExpandedUpdated: @escaping (ContainedViewLayoutTransition) -> Void, requestLayout: @escaping (ContainedViewLayoutTransition) -> Void, requestUpdateOverlayWantsToBeBelowKeyboard: @escaping (ContainedViewLayoutTransition) -> Void) {
+    public init(context: AccountContext, animationCache: AnimationCache, presentationData: PresentationData, items: [ReactionContextItem], selectedItems: Set<AnyHashable>, title: String? = nil, reactionsLocked: Bool, alwaysAllowPremiumReactions: Bool, allPresetReactionsAreAvailable: Bool, getEmojiContent: ((AnimationCache, MultiAnimationRenderer) -> Signal<EmojiPagerContentComponent, NoError>)?, isExpandedUpdated: @escaping (ContainedViewLayoutTransition) -> Void, requestLayout: @escaping (ContainedViewLayoutTransition) -> Void, requestUpdateOverlayWantsToBeBelowKeyboard: @escaping (ContainedViewLayoutTransition) -> Void) {
         self.context = context
         self.presentationData = presentationData
         self.items = items
@@ -505,14 +499,9 @@ public final class ReactionContextNode: ASDisplayNode, ASScrollViewDelegate {
         
         self.animationCache = animationCache
         self.animationRenderer = MultiAnimationRendererImpl()
-        (self.animationRenderer as? MultiAnimationRendererImpl)?.useYuvA = context.sharedContext.immediateExperimentalUISettings.compressedEmojiCache
         
         self.backgroundMaskNode = ASDisplayNode()
-        var backgroundGlassParams: ReactionContextBackgroundNode.GlassParams?
-        if case let .glass(isTinted) = style {
-            backgroundGlassParams = ReactionContextBackgroundNode.GlassParams(isDark: presentationData.theme.overallDarkAppearance, isTinted: isTinted)
-        }
-        self.backgroundNode = ReactionContextBackgroundNode(glass: backgroundGlassParams, largeCircleSize: largeCircleSize, smallCircleSize: smallCircleSize, maskNode: self.backgroundMaskNode)
+        self.backgroundNode = ReactionContextBackgroundNode(largeCircleSize: largeCircleSize, smallCircleSize: smallCircleSize, maskNode: self.backgroundMaskNode)
         self.leftBackgroundMaskNode = ASDisplayNode()
         self.leftBackgroundMaskNode.backgroundColor = .black
         self.rightBackgroundMaskNode = ASDisplayNode()
@@ -1099,7 +1088,7 @@ public final class ReactionContextNode: ASDisplayNode, ASScrollViewDelegate {
                     if isSelected {
                         if selectionView.superview == nil {
                             self.mirrorContentScrollView.addSubview(selectionTintView)
-                            self.scrollNode.view.insertSubview(selectionView, belowSubview: itemNode.view)
+                            self.scrollNode.view.addSubview(selectionView)
                             
                             selectionView.alpha = 1.0
                             selectionTintView.alpha = 1.0
@@ -1216,7 +1205,7 @@ public final class ReactionContextNode: ASDisplayNode, ASScrollViewDelegate {
             let expandTintOffset: CGFloat
             if self.highlightedReaction != nil {
                 expandItemSize = floor(30.0 * 0.9)
-                expandTintOffset = 0.0
+                expandTintOffset = contentHeight - containerHeight
             } else {
                 expandItemSize = 30.0
                 expandTintOffset = 0.0
@@ -1904,7 +1893,7 @@ public final class ReactionContextNode: ASDisplayNode, ASScrollViewDelegate {
                                     for i in 0 ..< 2 {
                                         let groupId = i == 0 ? "reactions" : "stickers"
                                         for item in i == 0 ? reactionEffects : stickerEffects {
-                                            let itemFile = item.effectSticker
+                                            let itemFile: TelegramMediaFile = item.effectSticker
                                             
                                             var tintMode: EmojiPagerContentComponent.Item.TintMode = .none
                                             if itemFile.isCustomTemplateEmoji {
@@ -1928,11 +1917,11 @@ public final class ReactionContextNode: ASDisplayNode, ASScrollViewDelegate {
                                                 }
                                             }
                                             
-                                            let animationData = EntityKeyboardAnimationData(file: itemFile, partialReference: .none)
+                                            let animationData = EntityKeyboardAnimationData(file: TelegramMediaFile.Accessor(itemFile), partialReference: .none)
                                             let resultItem = EmojiPagerContentComponent.Item(
                                                 animationData: animationData,
                                                 content: .animation(animationData),
-                                                itemFile: itemFile,
+                                                itemFile: TelegramMediaFile.Accessor(itemFile),
                                                 subgroupId: nil,
                                                 icon: icon,
                                                 tintMode: tintMode
@@ -2268,7 +2257,7 @@ public final class ReactionContextNode: ASDisplayNode, ASScrollViewDelegate {
                                 for i in 0 ..< 2 {
                                     let groupId = i == 0 ? "reactions" : "stickers"
                                     for item in i == 0 ? reactionEffects : stickerEffects {
-                                        let itemFile = item.effectSticker
+                                        let itemFile: TelegramMediaFile = item.effectSticker
                                         
                                         var tintMode: EmojiPagerContentComponent.Item.TintMode = .none
                                         if itemFile.isCustomTemplateEmoji {
@@ -2292,11 +2281,11 @@ public final class ReactionContextNode: ASDisplayNode, ASScrollViewDelegate {
                                             }
                                         }
                                         
-                                        let animationData = EntityKeyboardAnimationData(file: itemFile, partialReference: .none)
+                                        let animationData = EntityKeyboardAnimationData(file: TelegramMediaFile.Accessor(itemFile), partialReference: .none)
                                         let resultItem = EmojiPagerContentComponent.Item(
                                             animationData: animationData,
                                             content: .animation(animationData),
-                                            itemFile: itemFile,
+                                            itemFile: TelegramMediaFile.Accessor(itemFile),
                                             subgroupId: nil,
                                             icon: icon,
                                             tintMode: tintMode

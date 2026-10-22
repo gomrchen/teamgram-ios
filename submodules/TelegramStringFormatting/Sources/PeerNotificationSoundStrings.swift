@@ -14,18 +14,7 @@ private let modernSoundsNamePaths: [KeyPath<PresentationStrings, String>] = [
     \.NotificationsSound_Keys,
     \.NotificationsSound_Popcorn,
     \.NotificationsSound_Pulse,
-    \.NotificationsSound_Synth,
-    \.NotificationsSound_Rebound,
-    \.NotificationsSound_Antic,
-    \.NotificationsSound_Cheers,
-    \.NotificationsSound_Droplet,
-    \.NotificationsSound_Handoff,
-    \.NotificationsSound_Milestone,
-    \.NotificationsSound_Passage,
-    \.NotificationsSound_Portal,
-    \.NotificationsSound_Rattle,
-    \.NotificationsSound_Slide,
-    \.NotificationsSound_Welcome
+    \.NotificationsSound_Synth
 ]
 
 private let classicSoundNamePaths: [KeyPath<PresentationStrings, String>] = [

@@ -20,7 +20,7 @@ import AsyncDisplayKit
 import UndoUI
 import PeerNameColorItem
 import EntityKeyboard
-import ListComposePollOptionComponent
+import ComposePollUI
 import ChatEntityKeyboardInputNode
 import ComponentFlow
 import ChatPresentationInterfaceState
@@ -389,7 +389,6 @@ private enum ChatListFilterPresetEntry: ItemListNodeEntry {
             return ItemListFilterTitleInputItem(
                 context: arguments.context,
                 presentationData: presentationData,
-                systemStyle: .glass,
                 text: value,
                 enableAnimations: enableAnimations,
                 placeholder: placeholder,
@@ -408,13 +407,12 @@ private enum ChatListFilterPresetEntry: ItemListNodeEntry {
         case .includePeerInfo(let text), .excludePeerInfo(let text):
             return ItemListTextItem(presentationData: presentationData, text: .plain(text), sectionId: self.section)
         case let .addIncludePeer(title):
-            return ItemListPeerActionItem(presentationData: presentationData, systemStyle: .glass, icon: PresentationResourcesItemList.plusIconImage(presentationData.theme), title: title, alwaysPlain: false, sectionId: self.section, height: .peerList, editing: false, action: {
+            return ItemListPeerActionItem(presentationData: presentationData, icon: PresentationResourcesItemList.plusIconImage(presentationData.theme), title: title, alwaysPlain: false, sectionId: self.section, height: .peerList, editing: false, action: {
                 arguments.openAddIncludePeer()
             })
         case let .includeCategory(_, category, title, isRevealed):
             return ChatListFilterPresetCategoryItem(
                 presentationData: presentationData,
-                systemStyle: .glass,
                 title: title,
                 icon: ChatListFilterCategoryIcon(category: category),
                 isRevealed: isRevealed,
@@ -431,13 +429,12 @@ private enum ChatListFilterPresetEntry: ItemListNodeEntry {
                 }
             )
         case let .addExcludePeer(title):
-            return ItemListPeerActionItem(presentationData: presentationData, systemStyle: .glass, icon: PresentationResourcesItemList.plusIconImage(presentationData.theme), title: title, alwaysPlain: false, sectionId: self.section, height: .peerList, editing: false, action: {
+            return ItemListPeerActionItem(presentationData: presentationData, icon: PresentationResourcesItemList.plusIconImage(presentationData.theme), title: title, alwaysPlain: false, sectionId: self.section, height: .peerList, editing: false, action: {
                 arguments.openAddExcludePeer()
             })
         case let .excludeCategory(_, category, title, isRevealed):
             return ChatListFilterPresetCategoryItem(
                 presentationData: presentationData,
-                systemStyle: .glass,
                 title: title,
                 icon: ChatListFilterCategoryIcon(category: category),
                 isRevealed: isRevealed,
@@ -454,7 +451,7 @@ private enum ChatListFilterPresetEntry: ItemListNodeEntry {
                 }
             )
         case let .includePeer(_, peer, isRevealed):
-            return ItemListPeerItem(presentationData: presentationData, systemStyle: .glass, dateTimeFormat: PresentationDateTimeFormat(), nameDisplayOrder: .firstLast, context: arguments.context, peer: peer.chatMainPeer!, height: .peerList, aliasHandling: .threatSelfAsSaved, presence: nil, text: .none, label: .none, editing: ItemListPeerItemEditing(editable: true, editing: false, revealed: isRevealed), revealOptions: ItemListPeerItemRevealOptions(options: [ItemListPeerItemRevealOption(type: .destructive, title: presentationData.strings.Common_Delete, action: {
+            return ItemListPeerItem(presentationData: presentationData, dateTimeFormat: PresentationDateTimeFormat(), nameDisplayOrder: .firstLast, context: arguments.context, peer: peer.chatMainPeer!, height: .peerList, aliasHandling: .threatSelfAsSaved, presence: nil, text: .none, label: .none, editing: ItemListPeerItemEditing(editable: true, editing: false, revealed: isRevealed), revealOptions: ItemListPeerItemRevealOptions(options: [ItemListPeerItemRevealOption(type: .destructive, title: presentationData.strings.Common_Delete, action: {
                 arguments.deleteIncludePeer(peer.peerId)
             })]), switchValue: nil, enabled: true, selectable: false, sectionId: self.section, action: nil, setPeerIdWithRevealedOptions: { lhs, rhs in
                 arguments.setItemIdWithRevealedOptions(lhs.flatMap { .peer($0) }, rhs.flatMap { .peer($0) })
@@ -468,7 +465,7 @@ private enum ChatListFilterPresetEntry: ItemListNodeEntry {
                 arguments.peerContextAction(peer, sourceNode, gesture, nil)
             })
         case let .excludePeer(_, peer, isRevealed):
-            return ItemListPeerItem(presentationData: presentationData, systemStyle: .glass, dateTimeFormat: PresentationDateTimeFormat(), nameDisplayOrder: .firstLast, context: arguments.context, peer: peer.chatMainPeer!, height: .peerList, aliasHandling: .threatSelfAsSaved, presence: nil, text: .none, label: .none, editing: ItemListPeerItemEditing(editable: true, editing: false, revealed: isRevealed), revealOptions: ItemListPeerItemRevealOptions(options: [ItemListPeerItemRevealOption(type: .destructive, title: presentationData.strings.Common_Delete, action: {
+            return ItemListPeerItem(presentationData: presentationData, dateTimeFormat: PresentationDateTimeFormat(), nameDisplayOrder: .firstLast, context: arguments.context, peer: peer.chatMainPeer!, height: .peerList, aliasHandling: .threatSelfAsSaved, presence: nil, text: .none, label: .none, editing: ItemListPeerItemEditing(editable: true, editing: false, revealed: isRevealed), revealOptions: ItemListPeerItemRevealOptions(options: [ItemListPeerItemRevealOption(type: .destructive, title: presentationData.strings.Common_Delete, action: {
                 arguments.deleteExcludePeer(peer.peerId)
             })]), switchValue: nil, enabled: true, selectable: false, sectionId: self.section, action: nil, setPeerIdWithRevealedOptions: { lhs, rhs in
                 arguments.setItemIdWithRevealedOptions(lhs.flatMap { .peer($0) }, rhs.flatMap { .peer($0) })
@@ -482,11 +479,11 @@ private enum ChatListFilterPresetEntry: ItemListNodeEntry {
                 arguments.peerContextAction(peer, sourceNode, gesture, nil)
             })
         case let .includeExpand(text):
-            return ItemListPeerActionItem(presentationData: presentationData, systemStyle: .glass, icon: PresentationResourcesItemList.downArrowImage(presentationData.theme), title: text, sectionId: self.section, editing: false, action: {
+            return ItemListPeerActionItem(presentationData: presentationData, icon: PresentationResourcesItemList.downArrowImage(presentationData.theme), title: text, sectionId: self.section, editing: false, action: {
                 arguments.expandSection(.include)
             })
         case let .excludeExpand(text):
-            return ItemListPeerActionItem(presentationData: presentationData, systemStyle: .glass, icon: PresentationResourcesItemList.downArrowImage(presentationData.theme), title: text, sectionId: self.section, editing: false, action: {
+            return ItemListPeerActionItem(presentationData: presentationData, icon: PresentationResourcesItemList.downArrowImage(presentationData.theme), title: text, sectionId: self.section, editing: false, action: {
                 arguments.expandSection(.exclude)
             })
         case let .tagColorHeader(name, color, isPremium):
@@ -510,7 +507,6 @@ private enum ChatListFilterPresetEntry: ItemListNodeEntry {
         case let .tagColor(colors, color, isPremium):
             return PeerNameColorItem(
                 theme: presentationData.theme,
-                systemStyle: .glass,
                 colors: colors,
                 mode: .folderTag,
                 displayEmptyColor: true,
@@ -530,11 +526,11 @@ private enum ChatListFilterPresetEntry: ItemListNodeEntry {
         case .inviteLinkHeader:
             return ItemListSectionHeaderItem(presentationData: presentationData, text: presentationData.strings.ChatListFilter_SectionShare, badge: nil, sectionId: self.section)
         case let .inviteLinkCreate(hasLinks):
-            return ItemListPeerActionItem(presentationData: presentationData, systemStyle: .glass, icon: PresentationResourcesItemList.linkIcon(presentationData.theme), title: hasLinks ? presentationData.strings.ChatListFilter_CreateLink : presentationData.strings.ChatListFilter_CreateLinkNew, sectionId: self.section, editing: false, action: {
+            return ItemListPeerActionItem(presentationData: presentationData, icon: PresentationResourcesItemList.linkIcon(presentationData.theme), title: hasLinks ? presentationData.strings.ChatListFilter_CreateLink : presentationData.strings.ChatListFilter_CreateLinkNew, sectionId: self.section, editing: false, action: {
                 arguments.createLink()
             })
         case let .inviteLink(_, link):
-            return ItemListFolderInviteLinkListItem(presentationData: presentationData, systemStyle: .glass, invite: link, share: false, sectionId: self.section, style: .blocks, tapAction: { invite in
+            return ItemListFolderInviteLinkListItem(presentationData: presentationData, invite: link, share: false, sectionId: self.section, style: .blocks, tapAction: { invite in
                 arguments.openLink(invite)
             }, removeAction: { invite in
                 arguments.removeLink(invite)
@@ -548,7 +544,6 @@ private enum ChatListFilterPresetEntry: ItemListNodeEntry {
 }
 
 private struct ChatListFilterPresetControllerState: Equatable {
-    var isExisting: Bool
     var name: ChatFolderTitle
     var changedName: Bool
     var nameInputMode: ListComposePollOptionComponent.InputMode = .keyboard
@@ -567,10 +562,6 @@ private struct ChatListFilterPresetControllerState: Equatable {
     var isComplete: Bool {
         if self.name.text.isEmpty {
             return false
-        }
-        
-        if self.isExisting {
-            return true
         }
         
         let defaultCategories: ChatListFilterPeerCategories = .all
@@ -1136,8 +1127,6 @@ private final class ChatListFilterPresetController: ItemListController {
             sendBotContextResultAsGif: { _, _ , _, _, _, _ in
                 return false
             },
-            editGif: { _, _ in
-            },
             updateChoosingSticker: { _ in
             },
             switchToTextInput: { [weak self] in
@@ -1270,7 +1259,6 @@ private final class ChatListFilterPresetController: ItemListController {
             let presentationInterfaceState = ChatPresentationInterfaceState(
                 chatWallpaper: .builtin(WallpaperSettings()),
                 theme: presentationData.theme,
-                preferredGlassType: .default,
                 strings: presentationData.strings,
                 dateTimeFormat: presentationData.dateTimeFormat,
                 nameDisplayOrder: presentationData.nameDisplayOrder,
@@ -1286,11 +1274,13 @@ private final class ChatListFilterPresetController: ItemListController {
                 pendingUnpinnedAllMessages: false,
                 activeGroupCallInfo: nil,
                 hasActiveGroupCall: false,
+                importState: nil,
                 threadData: nil,
                 isGeneralThreadClosed: nil,
                 replyMessage: nil,
                 accountPeerColor: nil,
-                businessIntro: nil
+                businessIntro: nil,
+                starGiftsAvailable: false
             )
             
             self.inputMediaNodeBackground.backgroundColor = presentationData.theme.rootController.navigationBar.opaqueBackgroundColor.cgColor
@@ -1390,7 +1380,7 @@ private final class ChatListFilterPresetController: ItemListController {
     }
 }
 
-public func chatListFilterPresetController(context: AccountContext, currentPreset initialPreset: ChatListFilter?, updated: @escaping ([ChatListFilter]) -> Void) -> ViewController {
+func chatListFilterPresetController(context: AccountContext, currentPreset initialPreset: ChatListFilter?, updated: @escaping ([ChatListFilter]) -> Void) -> ViewController {
     let initialName: ChatFolderTitle
     if let initialPreset {
         initialName = initialPreset.title
@@ -1398,7 +1388,6 @@ public func chatListFilterPresetController(context: AccountContext, currentPrese
         initialName = ChatFolderTitle(text: "", entities: [], enableAnimations: true)
     }
     var initialState = ChatListFilterPresetControllerState(
-        isExisting: initialPreset?.id != nil,
         name: initialName,
         changedName: initialPreset != nil,
         color: initialPreset?.data?.color,
@@ -1755,14 +1744,14 @@ public func chatListFilterPresetController(context: AccountContext, currentPrese
             if initialPreset == nil {
                 let presentationData = context.sharedContext.currentPresentationData.with { $0 }
                 let text = presentationData.strings.ChatListFilter_AlertCreateFolderBeforeSharingText
-                presentControllerImpl?(textAlertController(context: context, title: nil, text: text, actions: [TextAlertAction(type: .defaultAction, title: presentationData.strings.Common_OK, action: {})]), nil)
+                presentControllerImpl?(standardTextAlertController(theme: AlertControllerTheme(presentationData: presentationData), title: nil, text: text, actions: [TextAlertAction(type: .defaultAction, title: presentationData.strings.Common_OK, action: {})]), nil)
             } else {
                 let presentationData = context.sharedContext.currentPresentationData.with { $0 }
                 
                 let state = stateValue.with({ $0 })
                 if state.additionallyIncludePeers.isEmpty {
                     let text = presentationData.strings.ChatListFilter_ErrorShareInvalidFolder
-                    presentControllerImpl?(textAlertController(context: context, title: nil, text: text, actions: [TextAlertAction(type: .defaultAction, title: presentationData.strings.Common_OK, action: {})]), nil)
+                    presentControllerImpl?(standardTextAlertController(theme: AlertControllerTheme(presentationData: presentationData), title: nil, text: text, actions: [TextAlertAction(type: .defaultAction, title: presentationData.strings.Common_OK, action: {})]), nil)
                     
                     return
                 }
@@ -1787,7 +1776,7 @@ public func chatListFilterPresetController(context: AccountContext, currentPrese
                                 statusController?.dismiss()
                                 
                                 let presentationData = context.sharedContext.currentPresentationData.with { $0 }
-                                presentControllerImpl?(textAlertController(context: context, title: nil, text: unavailableText, actions: [TextAlertAction(type: .defaultAction, title: presentationData.strings.Common_OK, action: {})]), nil)
+                                presentControllerImpl?(standardTextAlertController(theme: AlertControllerTheme(presentationData: presentationData), title: nil, text: unavailableText, actions: [TextAlertAction(type: .defaultAction, title: presentationData.strings.Common_OK, action: {})]), nil)
                                 
                                 return
                             }
@@ -1930,7 +1919,7 @@ public func chatListFilterPresetController(context: AccountContext, currentPrese
                     })
                 })))
                 
-                let contextController = makeContextController(presentationData: presentationData, source: .extracted(InviteLinkContextExtractedContentSource(controller: controller, sourceNode: node, keepInPlace: false, blurBackground: true)), items: .single(ContextController.Items(content: .list(items))), gesture: gesture)
+                let contextController = ContextController(presentationData: presentationData, source: .extracted(InviteLinkContextExtractedContentSource(controller: controller, sourceNode: node, keepInPlace: false, blurBackground: true)), items: .single(ContextController.Items(content: .list(items))), gesture: gesture)
                 presentInGlobalOverlayImpl?(contextController)
             })
         },
@@ -1971,7 +1960,7 @@ public func chatListFilterPresetController(context: AccountContext, currentPrese
                 })
             })))
             
-            let contextController = makeContextController(presentationData: presentationData, source: .controller(ContextControllerContentSourceImpl(controller: chatController, sourceNode: node)), items: .single(ContextController.Items(content: .list(items))), gesture: gesture)
+            let contextController = ContextController(presentationData: presentationData, source: .controller(ContextControllerContentSourceImpl(controller: chatController, sourceNode: node)), items: .single(ContextController.Items(content: .list(items))), gesture: gesture)
             presentInGlobalOverlayImpl?(contextController)
         },
         updateTagColor: { color in
@@ -2362,7 +2351,7 @@ func openCreateChatListFolderLink(context: AccountContext, folderId: Int32, chec
                     case .someUserTooManyChannels:
                         text = presentationData.strings.ChatListFilter_CreateLinkErrorSomeoneHasChannelLimit
                     }
-                    presentController(textAlertController(context: context, title: nil, text: text, actions: [TextAlertAction(type: .defaultAction, title: presentationData.strings.Common_OK, action: {})]))
+                    presentController(standardTextAlertController(theme: AlertControllerTheme(presentationData: presentationData), title: nil, text: text, actions: [TextAlertAction(type: .defaultAction, title: presentationData.strings.Common_OK, action: {})]))
                 })
             }
         })

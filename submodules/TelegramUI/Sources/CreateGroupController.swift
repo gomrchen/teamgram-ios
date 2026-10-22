@@ -1,7 +1,6 @@
 import Foundation
 import UIKit
 import Display
-import SSignalKit
 import SwiftSignalKit
 import Postbox
 import TelegramCore
@@ -34,7 +33,6 @@ import TextFormat
 import AvatarEditorScreen
 import SendInviteLinkScreen
 import OldChannelsController
-import AVFoundation
 
 private struct CreateGroupArguments {
     let context: AccountContext
@@ -321,7 +319,7 @@ private enum CreateGroupEntry: ItemListNodeEntry {
         let arguments = arguments as! CreateGroupArguments
         switch self {
             case let .groupInfo(_, _, dateTimeFormat, peer, state, avatar):
-                return ItemListAvatarAndNameInfoItem(itemContext: .accountContext(arguments.context), presentationData: presentationData, systemStyle: .glass, dateTimeFormat: dateTimeFormat, mode: .editSettings, peer: peer.flatMap(EnginePeer.init), presence: nil, memberCount: nil, state: state, sectionId: ItemListSectionId(self.section), style: .blocks(withTopInset: false, withExtendedBottomInset: false), editingNameUpdated: { editingName in
+                return ItemListAvatarAndNameInfoItem(itemContext: .accountContext(arguments.context), presentationData: presentationData, dateTimeFormat: dateTimeFormat, mode: .editSettings, peer: peer.flatMap(EnginePeer.init), presence: nil, memberCount: nil, state: state, sectionId: ItemListSectionId(self.section), style: .blocks(withTopInset: false, withExtendedBottomInset: false), editingNameUpdated: { editingName in
                     arguments.updateEditingName(editingName)
                 }, editingNameCompleted: {
                     arguments.done()
@@ -329,13 +327,13 @@ private enum CreateGroupEntry: ItemListNodeEntry {
                     arguments.changeProfilePhoto()
                 }, updatingImage: avatar, tag: CreateGroupEntryTag.info)
             case let .setProfilePhoto(_, text):
-                return ItemListActionItem(presentationData: presentationData, systemStyle: .glass, title: text, kind: .generic, alignment: .natural, sectionId: ItemListSectionId(self.section), style: .blocks, action: {
+                return ItemListActionItem(presentationData: presentationData, title: text, kind: .generic, alignment: .natural, sectionId: ItemListSectionId(self.section), style: .blocks, action: {
                     arguments.changeProfilePhoto()
                 })
             case let .usernameHeader(_, title):
                 return ItemListSectionHeaderItem(presentationData: presentationData, text: title, sectionId: self.section)
             case let .username(theme, placeholder, text):
-                return ItemListSingleLineInputItem(presentationData: presentationData, systemStyle: .glass, title: NSAttributedString(string: "teamgram.me/", textColor: theme.list.itemPrimaryTextColor), text: text, placeholder: placeholder, type: .username, clearType: .always, tag: nil, sectionId: self.section, textUpdated: { updatedText in
+                return ItemListSingleLineInputItem(presentationData: presentationData, title: NSAttributedString(string: "teamgram.me/", textColor: theme.list.itemPrimaryTextColor), text: text, placeholder: placeholder, type: .username, clearType: .always, tag: nil, sectionId: self.section, textUpdated: { updatedText in
                     arguments.updatePublicLinkText(updatedText)
                 }, action: {
                 })
@@ -364,24 +362,24 @@ private enum CreateGroupEntry: ItemListNodeEntry {
             case let .usernameInfo(_, text):
                 return ItemListTextItem(presentationData: presentationData, text: .markdown(text), sectionId: self.section)
             case let .topics(_, text):
-                return ItemListSwitchItem(presentationData: presentationData, systemStyle: .glass, icon: UIImage(bundleImageName: "Settings/Menu/Topics")?.precomposed(), title: text, value: true, enabled: false, sectionId: self.section, style: .blocks, updated: { _ in })
+                return ItemListSwitchItem(presentationData: presentationData, icon: UIImage(bundleImageName: "Settings/Menu/Topics")?.precomposed(), title: text, value: true, enabled: false, sectionId: self.section, style: .blocks, updated: { _ in })
             case let .topicsInfo(_, text):
                 return ItemListTextItem(presentationData: presentationData, text: .plain(text), sectionId: self.section)
             case let .autoDelete(text, value):
-                return ItemListDisclosureItem(presentationData: presentationData, systemStyle: .glass, title: text, label: value, sectionId: self.section, style: .blocks, disclosureStyle: .optionArrows, action: {
+                return ItemListDisclosureItem(presentationData: presentationData, title: text, label: value, sectionId: self.section, style: .blocks, disclosureStyle: .optionArrows, action: {
                     arguments.updateAutoDelete()
                 }, tag: CreateGroupEntryTag.autoDelete)
             case let .autoDeleteInfo(text):
                 return ItemListTextItem(presentationData: presentationData, text: .markdown(text), sectionId: self.section)
             case let .member(_, _, _, dateTimeFormat, nameDisplayOrder, peer, presence):
-                return ItemListPeerItem(presentationData: presentationData, systemStyle: .glass, dateTimeFormat: dateTimeFormat, nameDisplayOrder: nameDisplayOrder, context: arguments.context, peer: EnginePeer(peer), presence: presence.flatMap(EnginePeer.Presence.init), text: .presence, label: .none, editing: ItemListPeerItemEditing(editable: false, editing: false, revealed: false), switchValue: nil, enabled: true, selectable: true, sectionId: self.section, action: nil, setPeerIdWithRevealedOptions: { _, _ in }, removePeer: { _ in })
+                return ItemListPeerItem(presentationData: presentationData, dateTimeFormat: dateTimeFormat, nameDisplayOrder: nameDisplayOrder, context: arguments.context, peer: EnginePeer(peer), presence: presence.flatMap(EnginePeer.Presence.init), text: .presence, label: .none, editing: ItemListPeerItemEditing(editable: false, editing: false, revealed: false), switchValue: nil, enabled: true, selectable: true, sectionId: self.section, action: nil, setPeerIdWithRevealedOptions: { _, _ in }, removePeer: { _ in })
             case let .locationHeader(_, title):
                 return ItemListSectionHeaderItem(presentationData: presentationData, text: title, sectionId: self.section)
             case let .location(theme, location):
                 let imageSignal = chatMapSnapshotImage(engine: arguments.context.engine, resource: MapSnapshotMediaResource(latitude: location.latitude, longitude: location.longitude, width: 90, height: 90))
-                return ItemListAddressItem(theme: theme, systemStyle: .glass, label: "", text: location.address.replacingOccurrences(of: ", ", with: "\n"), imageSignal: imageSignal, selected: nil, sectionId: self.section, style: .blocks, action: nil)
+                return ItemListAddressItem(theme: theme, label: "", text: location.address.replacingOccurrences(of: ", ", with: "\n"), imageSignal: imageSignal, selected: nil, sectionId: self.section, style: .blocks, action: nil)
             case let .changeLocation(_, text):
-                return ItemListActionItem(presentationData: presentationData, systemStyle: .glass, title: text, kind: .generic, alignment: .natural, sectionId: ItemListSectionId(self.section), style: .blocks, action: {
+                return ItemListActionItem(presentationData: presentationData, title: text, kind: .generic, alignment: .natural, sectionId: ItemListSectionId(self.section), style: .blocks, action: {
                     arguments.changeLocation()
                 })
             case let .locationInfo(_, text):
@@ -389,7 +387,7 @@ private enum CreateGroupEntry: ItemListNodeEntry {
             case let .venueHeader(_, title):
                 return ItemListSectionHeaderItem(presentationData: presentationData, text: title, sectionId: self.section)
             case let .venue(_, _, venue):
-                return ItemListVenueItem(presentationData: presentationData, systemStyle: .glass, engine: arguments.context.engine, venue: venue, sectionId: self.section, style: .blocks, action: {
+                return ItemListVenueItem(presentationData: presentationData, engine: arguments.context.engine, venue: venue, sectionId: self.section, style: .blocks, action: {
                     arguments.updateWithVenue(venue)
                 })
         }
@@ -677,7 +675,7 @@ public func createGroupControllerImpl(context: AccountContext, peerIds: [PeerId]
                     case .generic:
                         createSignal = context.engine.peers.createGroup(title: title, peerIds: peerIds, ttlPeriod: ttlPeriod)
                     case .supergroup:
-                        createSignal = context.engine.peers.createSupergroup(title: title, description: nil, ttlPeriod: ttlPeriod)
+                        createSignal = context.engine.peers.createSupergroup(title: title, description: nil)
                         |> map { peerId -> CreateGroupResult? in
                             return CreateGroupResult(peerId: peerId, result: TelegramInvitePeersResult(forbiddenPeers: []))
                         }
@@ -732,7 +730,7 @@ public func createGroupControllerImpl(context: AccountContext, peerIds: [PeerId]
                         }
                         
                         let createGroupSignal: (Bool) -> Signal<CreateGroupResult?, CreateGroupError> = { isForum in
-                            return context.engine.peers.createSupergroup(title: title, description: nil, isForum: isForum, ttlPeriod: ttlPeriod)
+                            return context.engine.peers.createSupergroup(title: title, description: nil, isForum: isForum)
                             |> map { peerId -> CreateGroupResult? in
                                 return CreateGroupResult(peerId: peerId, result: TelegramInvitePeersResult(forbiddenPeers: []))
                             }
@@ -769,7 +767,7 @@ public func createGroupControllerImpl(context: AccountContext, peerIds: [PeerId]
                         } else if isForum || group.userAdminRights != nil {
                             createSignal = createGroupSignal(isForum)
                         } else {
-                            createSignal = context.engine.peers.createGroup(title: title, peerIds: peerIds, ttlPeriod: ttlPeriod)
+                            createSignal = context.engine.peers.createGroup(title: title, peerIds: peerIds, ttlPeriod: nil)
                         }
 
                         if group.userAdminRights?.rights.contains(.canBeAnonymous) == true {
@@ -852,7 +850,7 @@ public func createGroupControllerImpl(context: AccountContext, peerIds: [PeerId]
                                         |> deliverOnMainQueue).start(next: { peer in
                                             if let peer, let exportedInvitation, let link = exportedInvitation.link {
                                                 
-                                                let inviteScreen = SendInviteLinkScreen(context: context, subject: .chat(peer: peer, link: link), peers: result.result.forbiddenPeers)
+                                                let inviteScreen = SendInviteLinkScreen(context: context, peer: peer, link: link, peers: result.result.forbiddenPeers)
                                                 controller?.push(inviteScreen)
                                             }
                                         })
@@ -1185,7 +1183,7 @@ public func createGroupControllerImpl(context: AccountContext, peerIds: [PeerId]
                 if currentValue == 0 {
                     return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Check"), color: theme.contextMenu.primaryColor)
                 } else {
-                    return UIImage()
+                    return nil
                 }
             }, action: { _, f in
                 applyValue(0)
@@ -1208,7 +1206,7 @@ public func createGroupControllerImpl(context: AccountContext, peerIds: [PeerId]
                     if currentValue == value {
                         return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Check"), color: theme.contextMenu.primaryColor)
                     } else {
-                        return UIImage()
+                        return nil
                     }
                 }, action: { _, f in
                     applyValue(value)
@@ -1232,7 +1230,7 @@ public func createGroupControllerImpl(context: AccountContext, peerIds: [PeerId]
                 let items: Signal<ContextController.Items, NoError> = .single(ContextController.Items(content: .list(subItems)))
                 let source: ContextContentSource = .reference(CreateGroupContextReferenceContentSource(sourceView: sourceNode.labelNode.view))
                 
-                let contextController = makeContextController(
+                let contextController = ContextController(
                     presentationData: presentationData,
                     source: source,
                     items: items,

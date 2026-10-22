@@ -51,9 +51,6 @@ final class NotificationContainerControllerNode: ASDisplayNode {
     }
     
     override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
-        if self.alpha == 0.0 {
-            return nil
-        }
         if let (_, blockingItemNode) = self.blockingItemAndNode {
             return blockingItemNode.hitTest(point, with: event)
         }
@@ -95,7 +92,10 @@ final class NotificationContainerControllerNode: ASDisplayNode {
             })
         }
         
-        let useCompactLayout = "".isEmpty
+        var useCompactLayout = false
+        if let validLayout = self.validLayout {
+            useCompactLayout = min(validLayout.size.width, validLayout.size.height) < 375.0
+        }
         
         let itemNode = item.node(compact: useCompactLayout)
         let containerNode = NotificationItemContainerNode(theme: self.presentationData.theme, contentNode: itemNode)
@@ -162,7 +162,10 @@ final class NotificationContainerControllerNode: ASDisplayNode {
             }
             self.topItemAndNode = nil
             
-            let useCompactLayout = "".isEmpty
+            var useCompactLayout = false
+            if let validLayout = self.validLayout {
+                useCompactLayout = min(validLayout.size.width, validLayout.size.height) < 375.0
+            }
             
             let itemNode = item.node(compact: useCompactLayout)
             let containerNode = NotificationItemContainerNode(theme: self.presentationData.theme, contentNode: itemNode)

@@ -180,7 +180,7 @@ class ThemeGridSearchColorsItemNode: ListViewItemNode {
         self.separatorNode = ASDisplayNode()
         self.separatorNode.isLayerBacked = true
         
-        super.init(layerBacked: false)
+        super.init(layerBacked: false, dynamicBounce: false)
         
         self.addSubnode(self.backgroundNode)
         self.addSubnode(self.separatorNode)

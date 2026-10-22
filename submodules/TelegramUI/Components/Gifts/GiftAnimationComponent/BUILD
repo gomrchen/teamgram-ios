@@ -28,7 +28,6 @@ swift_library(
         "//submodules/TelegramUI/Components/EmojiStatusComponent",
         "//submodules/AnimatedStickerNode",
         "//submodules/TelegramAnimatedStickerNode",
-        "//submodules/UIKitRuntimeUtils",
     ],
     visibility = [
         "//visibility:public",

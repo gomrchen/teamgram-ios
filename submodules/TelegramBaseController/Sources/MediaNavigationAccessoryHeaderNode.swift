@@ -571,7 +571,7 @@ public final class MediaNavigationAccessoryHeaderNode: ASDisplayNode, ASScrollVi
                 if isSelected && value == nil {
                     return generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Check"), color: theme.contextMenu.primaryColor)
                 } else {
-                    return UIImage()
+                    return nil
                 }
             }), action: { [weak self] _, f in
                 scheduleTooltip(nil)
@@ -596,7 +596,7 @@ public final class MediaNavigationAccessoryHeaderNode: ASDisplayNode, ASScrollVi
         let items = self.contextMenuSpeedItems(scheduleTooltip: { change in
             scheduledTooltip = change
         })
-        let contextController = makeContextController(presentationData: self.context.sharedContext.currentPresentationData.with { $0 }, source: .reference(HeaderContextReferenceContentSource(controller: controller, sourceNode: self.rateButton.referenceNode, shouldBeDismissed: self.dismissedPromise.get())), items: items, gesture: gesture)
+        let contextController = ContextController(presentationData: self.context.sharedContext.currentPresentationData.with { $0 }, source: .reference(HeaderContextReferenceContentSource(controller: controller, sourceNode: self.rateButton.referenceNode, shouldBeDismissed: self.dismissedPromise.get())), items: items, gesture: gesture)
         contextController.dismissed = { [weak self] in
             if let scheduledTooltip, let self, let rate = self.playbackBaseRate {
                 self.setRate?(rate, scheduledTooltip)

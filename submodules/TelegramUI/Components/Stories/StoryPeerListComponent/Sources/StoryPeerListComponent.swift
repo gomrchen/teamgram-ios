@@ -60,7 +60,6 @@ public final class StoryPeerListComponent: Component {
     public let contextPeerAction: (ContextExtractedContentContainingNode, ContextGesture, EnginePeer) -> Void
     public let openStatusSetup: (UIView) -> Void
     public let lockAction: () -> Void
-    public let composeAction: (CGFloat) -> Void
     
     public init(
         externalState: ExternalState,
@@ -82,8 +81,7 @@ public final class StoryPeerListComponent: Component {
         peerAction: @escaping (EnginePeer?) -> Void,
         contextPeerAction: @escaping (ContextExtractedContentContainingNode, ContextGesture, EnginePeer) -> Void,
         openStatusSetup: @escaping (UIView) -> Void,
-        lockAction: @escaping () -> Void,
-        composeAction: @escaping (CGFloat) -> Void
+        lockAction: @escaping () -> Void
     ) {
         self.externalState = externalState
         self.context = context
@@ -105,7 +103,6 @@ public final class StoryPeerListComponent: Component {
         self.contextPeerAction = contextPeerAction
         self.openStatusSetup = openStatusSetup
         self.lockAction = lockAction
-        self.composeAction = composeAction
     }
     
     public static func ==(lhs: StoryPeerListComponent, rhs: StoryPeerListComponent) -> Bool {
@@ -165,6 +162,7 @@ public final class StoryPeerListComponent: Component {
     
     private final class VisibleItem {
         let view = ComponentView<Empty>()
+        var hasBlur: Bool = false
         
         init() {
         }
@@ -362,8 +360,6 @@ public final class StoryPeerListComponent: Component {
         
         private var sharedBlurEffect: NSObject?
         
-        private var willComposeOnRelease = false
-        
         public override init(frame: CGRect) {
             self.collapsedButton = HighlightableButton()
             
@@ -533,18 +529,6 @@ public final class StoryPeerListComponent: Component {
             }
         }
         
-        public var isLiveStreaming: Bool {
-            guard let component = self.component else {
-                return false
-            }
-            for itemSet in self.sortedItems {
-                if itemSet.peer.id == component.context.account.peerId, itemSet.hasLiveItems {
-                    return true
-                }
-            }
-            return false
-        }
-        
         public func transitionViewForItem(peerId: EnginePeer.Id) -> (UIView, StoryContainerScreen.TransitionView)? {
             if self.collapsedButton.isUserInteractionEnabled {
                 return nil
@@ -577,69 +561,14 @@ public final class StoryPeerListComponent: Component {
         public func scrollViewDidScroll(_ scrollView: UIScrollView) {
             if !self.ignoreScrolling {
                 self.updateScrolling(transition: .immediate)
-                
-                let willComposeOnRelease = scrollView.contentOffset.x <= -70.0
-                if self.willComposeOnRelease != willComposeOnRelease {
-                    self.willComposeOnRelease = willComposeOnRelease
-                    
-                    if willComposeOnRelease {
-                        HapticFeedback().tap()
-                    } else {
-                        HapticFeedback().impact(.veryLight)
-                    }
-                }
-                
-                if scrollView.isScrollEnabled && scrollView.isTracking, scrollView.contentOffset.x <= -85.0 {
-                    scrollView.isScrollEnabled = false
-                    scrollView.panGestureRecognizer.isEnabled = false
-                    scrollView.panGestureRecognizer.isEnabled = true
-                    scrollView.contentOffset = CGPoint(x: -85.0, y: 0.0)
-                    
-                    self.willComposeOnRelease = false
-                    Queue.mainQueue().after(0.5) {
-                        scrollView.isScrollEnabled = true
-                        scrollView.contentOffset = .zero
-                    }
-                    if let component = self.component {
-                        HapticFeedback().tap()
-                        component.composeAction(abs(scrollView.contentOffset.x))
-                    }
-                }
             }
         }
                 
-        public func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
-            if !self.ignoreScrolling {
-                if scrollView.isScrollEnabled && scrollView.contentOffset.x <= -70.0 {
-                    scrollView.isScrollEnabled = false
-                    scrollView.panGestureRecognizer.isEnabled = false
-                    scrollView.panGestureRecognizer.isEnabled = true
-                    scrollView.contentOffset = CGPoint(x: max(-85.0, scrollView.contentOffset.x), y: 0.0)
-                    
-                    self.willComposeOnRelease = false
-                    Queue.mainQueue().after(0.5) {
-                        scrollView.isScrollEnabled = true
-                        scrollView.contentOffset = .zero
-                    }
-                    if let component = self.component {
-                        HapticFeedback().tap()
-                        component.composeAction(abs(scrollView.contentOffset.x))
-                    }
-                }
-            }
-        }
-        
-        public func openEmojiStatusSetup() {
-            guard let component = self.component, let titleIconView = self.titleIconView?.view else {
-                return
-            }
-            component.openStatusSetup(titleIconView)
-        }
-        
         private func updateScrolling(transition: ComponentTransition) {
             guard let component = self.component, let itemLayout = self.itemLayout else {
                 return
             }
+            
             let titleIconSpacing: CGFloat = 4.0
             let titleIndicatorSpacing: CGFloat = 8.0
             
@@ -768,7 +697,7 @@ public final class StoryPeerListComponent: Component {
             
             let collapsedItemWidth: CGFloat = 24.0
             let collapsedItemDistance: CGFloat = 14.0
-            let collapsedItemOffsetY: CGFloat = -66.0
+            let collapsedItemOffsetY: CGFloat = -54.0
             let titleContentSpacing: CGFloat = 8.0
             
             let collapsedItemCount: CGFloat = CGFloat(min(self.sortedItems.count - collapseStartIndex, 3))
@@ -1073,7 +1002,6 @@ public final class StoryPeerListComponent: Component {
                 }
                 
                 var hasUnseenCloseFriendsItems = itemSet.hasUnseenCloseFriends
-                let hasLiveItems = itemSet.hasLiveItems
                 
                 var hasItems = true
                 var itemRingAnimation: StoryPeerListItemComponent.RingAnimation?
@@ -1144,11 +1072,6 @@ public final class StoryPeerListComponent: Component {
                 totalCount = itemSet.storyCount
                 unseenCount = itemSet.unseenCount
                 
-                var composeContentOffset: CGFloat?
-                if peer.id == component.context.account.peerId && collapsedState.sideAlphaFraction == 1.0 && self.scrollView.contentOffset.x < 0.0 {
-                    composeContentOffset = self.scrollView.contentOffset.x * -1.0
-                }
-                
                 let _ = visibleItem.view.update(
                     transition: itemTransition,
                     component: AnyComponent(StoryPeerListItemComponent(
@@ -1159,7 +1082,6 @@ public final class StoryPeerListComponent: Component {
                         totalCount: totalCount,
                         unseenCount: unseenCount,
                         hasUnseenCloseFriendsItems: hasUnseenCloseFriendsItems,
-                        hasLiveItems: hasLiveItems,
                         hasItems: hasItems,
                         ringAnimation: itemRingAnimation,
                         scale: itemScale,
@@ -1168,7 +1090,6 @@ public final class StoryPeerListComponent: Component {
                         expandEffectFraction: collapsedState.expandEffectFraction,
                         leftNeighborDistance: leftNeighborDistance,
                         rightNeighborDistance: rightNeighborDistance,
-                        composeContentOffset: composeContentOffset,
                         action: component.peerAction,
                         contextGesture: component.contextPeerAction
                     )),
@@ -1299,7 +1220,6 @@ public final class StoryPeerListComponent: Component {
                         totalCount: 1,
                         unseenCount: itemSet.unseenCount != 0 ? 1 : 0,
                         hasUnseenCloseFriendsItems: hasUnseenCloseFriendsItems,
-                        hasLiveItems: itemSet.hasLiveItems,
                         hasItems: hasItems,
                         ringAnimation: itemRingAnimation,
                         scale: itemScale,
@@ -1308,7 +1228,6 @@ public final class StoryPeerListComponent: Component {
                         expandEffectFraction: collapsedState.expandEffectFraction,
                         leftNeighborDistance: leftNeighborDistance,
                         rightNeighborDistance: rightNeighborDistance,
-                        composeContentOffset: nil,
                         action: component.peerAction,
                         contextGesture: component.contextPeerAction
                     )),
@@ -1416,7 +1335,7 @@ public final class StoryPeerListComponent: Component {
             }
             
             if let titleIndicatorSize, let titleIndicatorView = self.titleIndicatorView?.view {
-                let titleIndicatorFrame = CGRect(origin: CGPoint(x: titleContentOffset - titleIndicatorSize.width - 9.0, y: collapsedItemOffsetY + 14.0 + floor((56.0 - titleIndicatorSize.height) * 0.5)), size: titleIndicatorSize)
+                let titleIndicatorFrame = CGRect(origin: CGPoint(x: titleContentOffset - titleIndicatorSize.width - 9.0, y: collapsedItemOffsetY + 2.0 + floor((56.0 - titleIndicatorSize.height) * 0.5)), size: titleIndicatorSize)
                 if titleIndicatorView.superview == nil {
                     self.addSubview(titleIndicatorView)
                 }
@@ -1434,7 +1353,7 @@ public final class StoryPeerListComponent: Component {
                 titleIndicatorView.alpha = indicatorAlpha
             }
             
-            let titleFrame = CGRect(origin: CGPoint(x: titleContentOffset + titleLockOffset, y: collapsedItemOffsetY + 14.0 + floor((56.0 - titleSize.height) * 0.5)), size: titleSize)
+            let titleFrame = CGRect(origin: CGPoint(x: titleContentOffset + titleLockOffset, y: collapsedItemOffsetY + 2.0 + floor((56.0 - titleSize.height) * 0.5)), size: titleSize)
             if let image = self.titleView.image {
                 self.titleView.center = CGPoint(x: titleFrame.minX, y: titleFrame.midY)
                 self.titleView.bounds = CGRect(origin: CGPoint(), size: image.size)
@@ -1501,7 +1420,7 @@ public final class StoryPeerListComponent: Component {
             if let titleIconSize, let titleIconView = self.titleIconView?.view {
                 titleContentOffset += titleIconSpacing
                 
-                let titleIconFrame = CGRect(origin: CGPoint(x: titleContentOffset - 3.0 + titleIconSpacing + (collapsedState.titleWidth - (titleIconSpacing + titleIconSize.width)) * (1.0 - collapsedState.activityFraction), y: collapsedItemOffsetY + 14.0 + floor((56.0 - titleIconSize.height) * 0.5)), size: titleIconSize)
+                let titleIconFrame = CGRect(origin: CGPoint(x: titleContentOffset - 3.0 + titleIconSpacing + (collapsedState.titleWidth - (titleIconSpacing + titleIconSize.width)) * (1.0 - collapsedState.activityFraction), y: collapsedItemOffsetY + 2.0 + floor((56.0 - titleIconSize.height) * 0.5)), size: titleIconSize)
                 
                 if titleIconView.superview == nil {
                     self.addSubview(titleIconView)
@@ -1736,7 +1655,7 @@ public final class StoryPeerListComponent: Component {
             
             let itemLayout = ItemLayout(
                 containerSize: availableSize,
-                containerInsets: UIEdgeInsets(top: 16.0, left: component.sideInset - 4.0, bottom: 0.0, right: component.sideInset - 4.0),
+                containerInsets: UIEdgeInsets(top: 4.0, left: component.sideInset - 4.0, bottom: 0.0, right: component.sideInset - 4.0),
                 itemSize: CGSize(width: 60.0, height: 77.0),
                 itemSpacing: 14.0,
                 itemCount: self.sortedItems.count

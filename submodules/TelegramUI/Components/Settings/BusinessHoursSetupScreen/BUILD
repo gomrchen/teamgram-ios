@@ -33,7 +33,6 @@ swift_library(
         "//submodules/LocationUI",
         "//submodules/AppBundle",
         "//submodules/TelegramStringFormatting",
-        "//submodules/TextFormat",
         "//submodules/UIKitRuntimeUtils",
         "//submodules/TelegramUI/Components/Settings/TimezoneSelectionScreen",
         "//submodules/TelegramUI/Components/TimeSelectionActionSheet",

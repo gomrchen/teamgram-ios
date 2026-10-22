@@ -63,17 +63,14 @@ func _internal_reportContent(account: Account, subject: ReportContentSubject, op
         }
         |> map { result -> ReportContentResult in
             switch result {
-            case let .reportResultChooseOption(reportResultChooseOptionData):
-                let (title, options) = (reportResultChooseOptionData.title, reportResultChooseOptionData.options)
+            case let .reportResultChooseOption(title, options):
                 return .options(title: title, options: options.map {
                     switch $0 {
-                    case let .messageReportOption(messageReportOptionData):
-                        let (text, option) = (messageReportOptionData.text, messageReportOptionData.option)
+                    case let .messageReportOption(text, option):
                         return ReportContentResult.Option(text: text, option: option.makeData())
                     }
                 })
-            case let .reportResultAddComment(reportResultAddCommentData):
-                let (flags, option) = (reportResultAddCommentData.flags, reportResultAddCommentData.option)
+            case let .reportResultAddComment(flags, option):
                 return .addComment(optional: (flags & (1 << 0)) != 0, option: option.makeData())
             case .reportResultReported:
                 return .reported

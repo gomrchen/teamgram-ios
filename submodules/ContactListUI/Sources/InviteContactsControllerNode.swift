@@ -508,7 +508,7 @@ final class InviteContactsControllerNode: ASDisplayNode {
             return
         }
         
-        self.searchDisplayController = SearchDisplayController(presentationData: self.presentationData, contentNode: ContactsSearchContainerNode(context: self.context, onlyWriteable: false, categories: [.deviceContacts], addContact: nil, openPeer: { [weak self] peer, _ in
+        self.searchDisplayController = SearchDisplayController(presentationData: self.presentationData, contentNode: ContactsSearchContainerNode(context: self.context, onlyWriteable: false, categories: [.deviceContacts], addContact: nil, openPeer: { [weak self] peer in
             if let strongSelf = self, case let .deviceContact(id, _) = peer {
                 strongSelf.selectionState = strongSelf.selectionState.withSelectedContactId(id)
                 strongSelf.requestDeactivateSearch?()
@@ -518,7 +518,7 @@ final class InviteContactsControllerNode: ASDisplayNode {
             if let requestDeactivateSearch = self?.requestDeactivateSearch {
                 requestDeactivateSearch()
             }
-        }, fieldStyle: placeholderNode.fieldStyle)
+        })
         
         self.searchDisplayController?.containerLayoutUpdated(containerLayout, navigationBarHeight: navigationBarHeight, transition: .immediate)
         self.searchDisplayController?.activate(insertSubnode: { [weak self, weak placeholderNode] subnode, isSearchBar in

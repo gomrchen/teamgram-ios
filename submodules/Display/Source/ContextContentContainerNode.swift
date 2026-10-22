@@ -1,5 +1,4 @@
 import Foundation
-import UIKit
 import AsyncDisplayKit
 
 public final class ContextContentContainerNode: ASDisplayNode {
@@ -16,7 +15,7 @@ public final class ContextContentContainerNode: ASDisplayNode {
         switch contentNode {
         case .reference:
             break
-        case .extracted, .extractedContainer:
+        case .extracted:
             break
         case let .controller(controller):
             transition.updatePosition(node: controller, position: CGPoint(x: scaledSize.width / 2.0, y: scaledSize.height / 2.0))

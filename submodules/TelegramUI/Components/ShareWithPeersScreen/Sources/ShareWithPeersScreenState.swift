@@ -44,7 +44,7 @@ public extension ShareWithPeersScreen {
     final class StateContext {
         public enum Subject: Equatable {
             case peers(peers: [EnginePeer], peerId: EnginePeer.Id?)
-            case stories(editing: Bool, count: Int32)
+            case stories(editing: Bool)
             case chats(blocked: Bool)
             case contacts(base: EngineStoryPrivacy.Base)
             case contactsSearch(query: String, onlyContacts: Bool)
@@ -55,7 +55,6 @@ public extension ShareWithPeersScreen {
         var stateValue: State?
         
         public let subject: Subject
-        public let liveStream: Bool
         public let editing: Bool
         public private(set) var initialPeerIds: Set<EnginePeer.Id> = Set()
         let blockedPeersContext: BlockedPeersContext?
@@ -75,7 +74,6 @@ public extension ShareWithPeersScreen {
         public init(
             context: AccountContext,
             subject: Subject = .chats(blocked: false),
-            liveStream: Bool = false,
             editing: Bool = false,
             initialSelectedPeers: [EngineStoryPrivacy.Base: [EnginePeer.Id]] = [:],
             initialPeerIds: Set<EnginePeer.Id> = Set(),
@@ -84,7 +82,6 @@ public extension ShareWithPeersScreen {
             blockedPeersContext: BlockedPeersContext? = nil
         ) {
             self.subject = subject
-            self.liveStream = liveStream
             self.editing = editing
             self.initialPeerIds = initialPeerIds
             self.blockedPeersContext = blockedPeersContext
@@ -101,13 +98,6 @@ public extension ShareWithPeersScreen {
              
             switch subject {
             case let .peers(peers, _):
-                let peers = peers.filter { peer in
-                    if liveStream, case let .channel(channel) = peer, case .group = channel.info {
-                        return false
-                    } else {
-                        return true
-                    }
-                }
                 self.stateDisposable = (.single(peers)
                 |> mapToSignal { peers -> Signal<([EnginePeer], [EnginePeer.Id: Optional<Int>]), NoError> in
                     return context.engine.data.subscribe(
@@ -731,7 +721,7 @@ final class PeersListStoredState: Codable {
     }
 }
 
-func peersListStoredState(engine: TelegramEngine, base: Stories.Item.Privacy.Base) -> Signal<[EnginePeer.Id], NoError> {
+private func peersListStoredState(engine: TelegramEngine, base: Stories.Item.Privacy.Base) -> Signal<[EnginePeer.Id], NoError> {
     let key = EngineDataBuffer(length: 4)
     key.setInt32(0, value: base.rawValue)
     

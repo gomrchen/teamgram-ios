@@ -253,10 +253,8 @@ public final class SecretMediaPreviewController: ViewController {
         }, editMedia: { _ in
         }, controller: { [weak self] in
             return self
-        }, currentItemNode: { [weak self] in
-            return self?.controllerNode.pager.centralItemNode()
         })
-        self.displayNode = SecretMediaPreviewControllerNode(context: self.context, controllerInteraction: controllerInteraction, titleView: nil)
+        self.displayNode = SecretMediaPreviewControllerNode(context: self.context, controllerInteraction: controllerInteraction)
         self.displayNodeDidLoad()
         
         self.controllerNode.statusPressed = { [weak self] _ in
@@ -538,7 +536,7 @@ public final class SecretMediaPreviewController: ViewController {
                             self.dismiss(forceAway: false)
                         }
                     }
-                }, sendSticker: nil, present: { _, _ in }) else {
+                }, present: { _, _ in }) else {
                     self._ready.set(.single(true))
                     return
                 }

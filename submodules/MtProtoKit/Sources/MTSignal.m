@@ -230,10 +230,10 @@
         terminated = _terminated;
     os_unfair_lock_unlock(&_lock);
     
-    if (terminated) {
+    if (terminated)
         [_subscriber putCompletion];
-        _subscriber = nil;
-    } else if (nextSignal != nil) {
+    else if (nextSignal != nil)
+    {
         __weak MTSignalQueueState *weakSelf = self;
         id<MTDisposable> disposable = [nextSignal startWithNext:^(id next)
         {
@@ -282,7 +282,6 @@
 {
     [_currentDisposable dispose];
     [_disposable dispose];
-    _subscriber = nil;
 }
 
 @end

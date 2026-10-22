@@ -6,7 +6,6 @@ import TelegramCore
 import Postbox
 import ImageTransparency
 import Photos
-import BackgroundTasks
 
 enum ExportWriterStatus {
     case unknown
@@ -265,11 +264,6 @@ public final class MediaEditorVideoExport {
         self.outputPath = outputPath
         self.textScale = textScale
         
-        Logger.shared.log("VideoExport", "Init")
-        Logger.shared.log("VideoExport", "Subject: \(subject)")
-        Logger.shared.log("VideoExport", "Output Path: \(outputPath)")
-        Logger.shared.log("VideoExport", "Configuration: \(configuration)")
-        
         if FileManager.default.fileExists(atPath: outputPath) {
             try? FileManager.default.removeItem(atPath: outputPath)
         }
@@ -279,26 +273,12 @@ public final class MediaEditorVideoExport {
             guard let self else {
                 return
             }
-            /*if case let .video(_, isStory) = subject, isStory {
-                if #available(iOS 26.0, *) {
-                    if BGTaskScheduler.supportedResources.contains(.gpu) {
-                        return
-                    }
-                }
-            }*/
             self.resume()
         })
         let _ = NotificationCenter.default.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: nil, using: { [weak self] _ in
             guard let self else {
                 return
             }
-            /*if case let .video(_, isStory) = subject, isStory {
-                if #available(iOS 26.0, *) {
-                    if BGTaskScheduler.supportedResources.contains(.gpu) {
-                        return
-                    }
-                }
-            }*/
             self.pause()
         })
     }
@@ -317,9 +297,6 @@ public final class MediaEditorVideoExport {
     }
     
     private func setup() {
-        Logger.shared.log("VideoExport", "Setting up")
-        
-        
         var mainAsset: AVAsset?
         
         var signals: [Signal<Input, NoError>] = []
@@ -423,11 +400,7 @@ public final class MediaEditorVideoExport {
                 duration = CMTime(seconds: 5.0, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
             }
         }
-        if self.configuration.values.videoBounce, case .video = self.subject {
-            self.durationValue = CMTimeAdd(duration, duration)
-        } else {
-            self.durationValue = duration
-        }
+        self.durationValue = duration
         
         let _ = (combineLatest(signals)
         |> deliverOn(self.queue)).start(next: { [weak self] additionalInputs in
@@ -516,49 +489,17 @@ public final class MediaEditorVideoExport {
                 self.mainVideoScale = scale
                 self.mainVideoOffset = offset
                 self.textureRotation = rotation
-                var mainTimeRange = CMTimeRange(start: .zero, duration: asset.duration)
-                if let timeRange = self.configuration.timeRange {
-                    mainTimeRange = timeRange
-                } else if isStory && asset.duration.seconds > 60.0 {
-                    mainTimeRange = CMTimeRange(start: .zero, duration: CMTime(seconds: 60.0, preferredTimescale: CMTimeScale(NSEC_PER_SEC)))
-                }
                 if let videoAssetTrack = asset.tracks(withMediaType: .video).first {
                     if let compositionTrack = composition?.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) {
                         mainVideoTrack = compositionTrack
                         compositionTrack.preferredTransform = videoAssetTrack.preferredTransform
-
-                        try? compositionTrack.insertTimeRange(mainTimeRange, of: videoAssetTrack, at: .zero)
-
-                        if self.configuration.values.videoBounce {
-                            let sourceFrameRate: Float
-                            if videoAssetTrack.nominalFrameRate > 0.0 {
-                                sourceFrameRate = videoAssetTrack.nominalFrameRate
-                            } else if self.configuration.frameRate > 0.0 {
-                                sourceFrameRate = self.configuration.frameRate
-                            } else {
-                                sourceFrameRate = 30.0
-                            }
-                            let roundedFrameRate = max(1, Int(round(sourceFrameRate)))
-                            let frameDuration = CMTime(value: 1, timescale: Int32(roundedFrameRate))
-
-                            var insertionTime = mainTimeRange.duration
-                            var cursor = CMTimeSubtract(CMTimeRangeGetEnd(mainTimeRange), frameDuration)
-                            while CMTimeCompare(cursor, mainTimeRange.start) >= 0 {
-                                let remaining = CMTimeSubtract(CMTimeRangeGetEnd(mainTimeRange), cursor)
-                                let segmentDuration = CMTimeCompare(frameDuration, remaining) <= 0 ? frameDuration : remaining
-                                if segmentDuration.seconds > 0.0 {
-                                    let segmentRange = CMTimeRange(start: cursor, duration: segmentDuration)
-                                    try? compositionTrack.insertTimeRange(segmentRange, of: videoAssetTrack, at: insertionTime)
-                                    insertionTime = CMTimeAdd(insertionTime, segmentDuration)
-                                }
-                                cursor = CMTimeSubtract(cursor, frameDuration)
-                            }
-                        }
+                        
+                        try? compositionTrack.insertTimeRange(CMTimeRange(start: .zero, duration: asset.duration), of: videoAssetTrack, at: .zero)
                     }
                 }
                 if let audioAssetTrack = asset.tracks(withMediaType: .audio).first, !self.configuration.values.videoIsMuted {
                     if let compositionTrack = composition?.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) {
-                        try? compositionTrack.insertTimeRange(mainTimeRange, of: audioAssetTrack, at: .zero)
+                        try? compositionTrack.insertTimeRange(CMTimeRange(start: .zero, duration: asset.duration), of: audioAssetTrack, at: .zero)
                         
                         if let volume = self.configuration.values.videoVolume, volume != 1.0 {
                             let trackParameters = AVMutableAudioMixInputParameters(track: compositionTrack)
@@ -568,7 +509,7 @@ public final class MediaEditorVideoExport {
                         }
                     }
                 }
-                if !self.configuration.values.videoBounce, let timeRange = self.configuration.timeRange {
+                if let timeRange = self.configuration.timeRange {
                     readerRange = timeRange
                 }
             }
@@ -1007,6 +948,11 @@ public final class MediaEditorVideoExport {
                         return false
                     }
                 }
+            } else {
+//                if !writer.appendVideoBuffer(sampleBuffer) {
+//                    writer.markVideoAsFinished()
+//                    return false
+//                }
             }
         }
         return true
@@ -1037,21 +983,17 @@ public final class MediaEditorVideoExport {
     }
     
     private func start() {
-        Logger.shared.log("VideoExport", "Start")
         guard self.internalStatus == .idle, let writer = self.writer else {
-            Logger.shared.log("VideoExport", "Failed with invalid state")
             self.statusValue = .failed(.invalid)
             return
         }
         
         guard writer.startWriting() else {
-            Logger.shared.log("VideoExport", "Failed on startWriting")
             self.statusValue = .failed(.writing(nil))
             return
         }
         
         if let reader = self.reader, !reader.startReading() {
-            Logger.shared.log("VideoExport", "Failed on startReading")
             self.statusValue = .failed(.reading(nil))
             return
         }
@@ -1125,7 +1067,6 @@ public final class MediaEditorVideoExport {
         }
         
         if cancelled {
-            Logger.shared.log("VideoExport", "Cancelled")
             try? FileManager.default.removeItem(at: outputUrl)
             self.internalStatus = .finished
             self.statusValue = .failed(.cancelled)
@@ -1167,7 +1108,6 @@ public final class MediaEditorVideoExport {
                             let exportDuration = end - self.startTimestamp
                             print("video processing took \(exportDuration)s")
                             if duration.seconds > 0 {
-                                Logger.shared.log("VideoExport", "Completed with path \(self.outputPath)")
                                 Logger.shared.log("VideoExport", "Video processing took \(exportDuration / duration.seconds)")
                             }
                         })

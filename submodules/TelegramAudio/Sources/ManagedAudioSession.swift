@@ -867,19 +867,11 @@ public final class ManagedAudioSessionImpl: NSObject, ManagedAudioSession {
                         options.insert(.allowBluetoothA2DP)
                     }
                 case .voiceCall, .videoCall:
-                    #if canImport(AlarmKit) //Xcode 26
-                    options.insert(.allowBluetoothHFP)
-                    #else
                     options.insert(.allowBluetooth)
-                    #endif
                     options.insert(.allowBluetoothA2DP)
                     options.insert(.mixWithOthers)
                 case let .record(_, video, mixWithOthers):
-                    #if canImport(AlarmKit) //Xcode 26
-                    options.insert(.allowBluetoothHFP)
-                    #else
                     options.insert(.allowBluetooth)
-                    #endif
                     if video {
                         options.insert(.allowBluetoothA2DP)
                     }

@@ -650,8 +650,7 @@ final class HashtagSearchControllerNode: ASDisplayNode, ASGestureRecognizerDeleg
                         }
                         return self.controller?.navigationController as? NavigationController
                     },
-                    listContext: storySearchContext,
-                    initialStoryFolderId: nil
+                    listContext: storySearchContext
                 )
                 self.storySearchPaneNode = storySearchPaneNode
                 if let storySearchView = self.storySearchComponentView?.view {

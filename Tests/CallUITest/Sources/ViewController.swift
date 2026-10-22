@@ -35,8 +35,7 @@ public final class ViewController: UIViewController {
         isRemoteAudioMuted: false,
         localVideo: nil,
         remoteVideo: nil,
-        isRemoteBatteryLow: false,
-        enableVideoSharpening: false
+        isRemoteBatteryLow: false
     )
     
     private var currentLayout: (size: CGSize, insets: UIEdgeInsets)?

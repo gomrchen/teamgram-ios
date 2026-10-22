@@ -266,7 +266,8 @@ final class MiniAppListScreenComponent: Component {
                     }
                 ))) : nil,
                 rightButtons: rightButtons,
-                backPressed: isModal ? nil : { [weak self] in
+                backTitle: isModal ? nil : strings.Common_Back,
+                backPressed: { [weak self] in
                     guard let self else {
                         return
                     }
@@ -285,15 +286,14 @@ final class MiniAppListScreenComponent: Component {
                     strings: strings,
                     statusBarHeight: statusBarHeight,
                     sideInset: insets.left,
-                    search: ChatListNavigationBar.Search(isEnabled: true),
-                    activeSearch: self.isSearchDisplayControllerActive ? ChatListNavigationBar.ActiveSearch(isExternal: false) : nil,
+                    isSearchActive: self.isSearchDisplayControllerActive,
+                    isSearchEnabled: true,
                     primaryContent: headerContent,
                     secondaryContent: nil,
                     secondaryTransition: 0.0,
                     storySubscriptions: nil,
                     storiesIncludeHidden: false,
                     uploadProgress: [:],
-                    headerPanels: nil,
                     tabsNode: nil,
                     tabsNodeIsSearch: false,
                     accessoryPanelContainer: nil,
@@ -460,7 +460,6 @@ final class MiniAppListScreenComponent: Component {
                     let searchBarTheme = SearchBarNodeTheme(theme: environment.theme, hasSeparator: false)
                     searchBarNode = SearchBarNode(
                         theme: searchBarTheme,
-                        presentationTheme: environment.theme,
                         strings: environment.strings,
                         fieldStyle: .modern,
                         displayBackground: false
@@ -511,8 +510,6 @@ final class MiniAppListScreenComponent: Component {
                             timingFunction = kCAMediaTimingFunctionSpring
                         case .custom:
                             timingFunction = kCAMediaTimingFunctionSpring
-                        case .bounce:
-                            timingFunction = kCAMediaTimingFunctionSpring
                         }
                         
                         searchBarNode.animateIn(from: placeholderNode, duration: duration, timingFunction: timingFunction)
@@ -533,7 +530,7 @@ final class MiniAppListScreenComponent: Component {
                 contentListNode = ContentListNode(parentView: self, context: component.context)
                 self.contentListNode = contentListNode
                 
-                contentListNode.visibleContentOffsetChanged = { [weak self] offset, _ in
+                contentListNode.visibleContentOffsetChanged = { [weak self] offset in
                     guard let self else {
                         return
                     }

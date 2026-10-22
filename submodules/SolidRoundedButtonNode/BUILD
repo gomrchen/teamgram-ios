@@ -16,7 +16,6 @@ swift_library(
         "//submodules/ShimmerEffect:ShimmerEffect",
         "//submodules/Components/HierarchyTrackingLayer:HierarchyTrackingLayer",
         "//submodules/ManagedAnimationNode:ManagedAnimationNode",
-        "//submodules/TelegramUI/Components/GlassBackgroundComponent",
     ],
     visibility = [
         "//visibility:public",

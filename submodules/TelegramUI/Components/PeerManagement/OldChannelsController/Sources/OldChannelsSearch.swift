@@ -15,8 +15,8 @@ import ChatListSearchItemHeader
 import ContactsPeerItem
 
 //Xcode 16
-#if SWIFT_PACKAGE
-extension NavigationBarSearchContentNode: ItemListControllerSearchNavigationContentNode {
+#if canImport(ContactProvider)
+extension NavigationBarSearchContentNode: @retroactive ItemListControllerSearchNavigationContentNode {
     public func activate() {
     }
     
@@ -27,7 +27,7 @@ extension NavigationBarSearchContentNode: ItemListControllerSearchNavigationCont
     }
 }
 #else
-extension NavigationBarSearchContentNode: @retroactive ItemListControllerSearchNavigationContentNode {
+extension NavigationBarSearchContentNode: ItemListControllerSearchNavigationContentNode {
     public func activate() {
     }
     
@@ -79,7 +79,7 @@ final class OldChannelsSearchItem: ItemListControllerSearch {
         }
     }
     
-    func titleContentNode(current: (NavigationBarContentNode & ItemListControllerSearchNavigationContentNode)?) -> (NavigationBarContentNode & ItemListControllerSearchNavigationContentNode)? {
+    func titleContentNode(current: (NavigationBarContentNode & ItemListControllerSearchNavigationContentNode)?) -> NavigationBarContentNode & ItemListControllerSearchNavigationContentNode {
         let updateActivated: (Bool) -> Void = self.updateActivated
         if let current = current as? NavigationBarSearchContentNode {
             current.updateThemeAndPlaceholder(theme: self.theme, placeholder: self.placeholder)
@@ -391,7 +391,7 @@ private final class OldChannelsSearchItemNode: ItemListControllerSearchNode {
         
         self.searchDisplayController = SearchDisplayController(presentationData: self.presentationData, contentNode: OldChannelsSearchContainerNode(context: self.context, peers: self.peers, selectedPeerIds: self.selectedPeerIds, togglePeer: self.togglePeer), cancel: { [weak self] in
             self?.cancel()
-        }, fieldStyle: placeholderNode.fieldStyle)
+        })
         
         self.searchDisplayController?.containerLayoutUpdated(containerLayout, navigationBarHeight: navigationBarHeight, transition: .immediate)
         self.searchDisplayController?.activate(insertSubnode: { [weak self, weak placeholderNode] subnode, isSearchBar in

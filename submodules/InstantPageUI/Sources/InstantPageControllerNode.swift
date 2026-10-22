@@ -628,7 +628,7 @@ final class InstantPageControllerNode: ASDisplayNode, ASScrollViewDelegate {
                         guard let strongSelf = self, let controller = strongSelf.controller else {
                             return
                         }
-                        let pinchController = makePinchController(sourceNode: sourceNode, getContentAreaInScreenSpace: {
+                        let pinchController = PinchController(sourceNode: sourceNode, getContentAreaInScreenSpace: {
                             guard let strongSelf = self else {
                                 return CGRect()
                             }
@@ -911,7 +911,7 @@ final class InstantPageControllerNode: ASDisplayNode, ASScrollViewDelegate {
             if let current = self.linkHighlightingNode {
                 linkHighlightingNode = current
             } else {
-                let highlightColor = self.theme?.linkHighlightColor ?? UIColor(rgb: 0x0088ff).withAlphaComponent(0.4)
+                let highlightColor = self.theme?.linkHighlightColor ?? UIColor(rgb: 0x007aff).withAlphaComponent(0.4)
                 linkHighlightingNode = LinkHighlightingNode(color: highlightColor)
                 linkHighlightingNode.isUserInteractionEnabled = false
                 self.linkHighlightingNode = linkHighlightingNode

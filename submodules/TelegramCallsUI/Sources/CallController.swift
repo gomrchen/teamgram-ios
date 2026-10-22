@@ -486,84 +486,45 @@ public final class CallController: ViewController {
         var disablePeerIds: [EnginePeer.Id] = []
         disablePeerIds.append(self.call.context.account.peerId)
         disablePeerIds.append(self.call.peerId)
-        let controller = CallController.openConferenceAddParticipant(context: self.call.context, disablePeerIds: disablePeerIds, shareLink: nil, completion: { [weak self] peers in
+        let controller = CallController.openConferenceAddParticipant(context: self.call.context, disablePeerIds: disablePeerIds, completion: { [weak self] peerIds in
             guard let self else {
                 return
             }
             
-            let _ = self.call.upgradeToConference(invitePeers: peers, completion: { _ in
+            let _ = self.call.upgradeToConference(invitePeerIds: peerIds, completion: { _ in
             })
         })
         self.push(controller)
     }
     
-    static func openConferenceAddParticipant(context: AccountContext, disablePeerIds: [EnginePeer.Id], shareLink: (() -> Void)?, completion: @escaping ([(id: EnginePeer.Id, isVideo: Bool)]) -> Void) -> ViewController {
-        let presentationData = context.sharedContext.currentPresentationData.with({ $0 }).withUpdated(theme: defaultDarkColorPresentationTheme)
-        
-        var options: [ContactListAdditionalOption] = []
-        var openShareLinkImpl: (() -> Void)?
-        if shareLink != nil {
-            options.append(ContactListAdditionalOption(title: presentationData.strings.Call_ShareLink, icon: .generic(UIImage(bundleImageName: "Contact List/LinkActionIcon")!), action: {
-                openShareLinkImpl?()
-            }, clearHighlightAutomatically: false))
-        }
-        
-        let controller = context.sharedContext.makeContactSelectionController(ContactSelectionControllerParams(
+    static func openConferenceAddParticipant(context: AccountContext, disablePeerIds: [EnginePeer.Id], completion: @escaping ([EnginePeer.Id]) -> Void) -> ViewController {
+        //TODO:localize
+        let presentationData = context.sharedContext.currentPresentationData.with({ $0 }).withUpdated(theme: defaultDarkPresentationTheme)
+        let controller = context.sharedContext.makeContactMultiselectionController(ContactMultiselectionControllerParams(
             context: context,
             updatedPresentationData: (initial: presentationData, signal: .single(presentationData)),
-            mode: .generic,
-            title: { strings in
-                return strings.Call_AddMemberTitle
-            },
-            options: .single(options),
-            displayCallIcons: true,
-            multipleSelection: .disabled,
-            confirmation: { peer in
-                switch peer {
-                case let .peer(peer, _, _):
-                    let peer = EnginePeer(peer)
-                    guard case let .user(user) = peer else {
-                        return .single(false)
-                    }
-                    if disablePeerIds.contains(user.id) {
-                        return .single(false)
-                    }
-                    if user.botInfo != nil {
-                        return .single(false)
-                    }
-                    return .single(true)
-                default:
-                    return .single(false)
-                }
-            },
+            title: "Invite Members",
+            mode: .peerSelection(searchChatList: true, searchGroups: false, searchChannels: false),
             isPeerEnabled: { peer in
-                switch peer {
-                case let .peer(peer, _, _):
-                    let peer = EnginePeer(peer)
-                    guard case let .user(user) = peer else {
-                        return false
-                    }
-                    if disablePeerIds.contains(user.id) {
-                        return false
-                    }
-                    if user.botInfo != nil {
-                        return false
-                    }
-                    return true
-                default:
+                guard case let .user(user) = peer else {
                     return false
                 }
+                if disablePeerIds.contains(user.id) {
+                    return false
+                }
+                if user.botInfo != nil {
+                    return false
+                }
+                return true
             }
         ))
-        
-        openShareLinkImpl = { [weak controller] in
-            controller?.dismiss()
-            shareLink?()
-        }
-        
         controller.navigationPresentation = .modal
         let _ = (controller.result |> take(1) |> deliverOnMainQueue).startStandalone(next: { [weak controller] result in
-            guard let result, let peer = result.0.first, case let .peer(peer, _, _) = peer else {
+            guard case let .result(peerIds, _) = result else {
+                controller?.dismiss()
+                return
+            }
+            if peerIds.isEmpty {
                 controller?.dismiss()
                 return
             }
@@ -572,15 +533,15 @@ public final class CallController: ViewController {
                 controller?.dismiss()
             }
             
-            var isVideo = false
-            switch result.1 {
-            case .videoCall:
-                isVideo = true
-            default:
-                break
+            let invitePeerIds = peerIds.compactMap { item -> EnginePeer.Id? in
+                if case let .peer(peerId) = item {
+                    return peerId
+                } else {
+                    return nil
+                }
             }
             
-            completion([(peer.id, isVideo)])
+            completion(invitePeerIds)
         })
         
         return controller

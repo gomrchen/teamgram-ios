@@ -112,13 +112,10 @@ public final class DrawingMessageRenderer {
             self.wallpaperColor = wallpaperColor
             
             self.messagesContainerNode = ASDisplayNode()
-            self.messagesContainerNode.displaysAsynchronously = false
             self.messagesContainerNode.clipsToBounds = true
             self.messagesContainerNode.transform = CATransform3DMakeScale(1.0, -1.0, 1.0)
                     
             super.init()
-            
-            self.displaysAsynchronously = false
             
             self.addSubnode(self.messagesContainerNode)
         }
@@ -233,7 +230,7 @@ public final class DrawingMessageRenderer {
             } else {
                 avatarHeaderItem = nil
             }
-            let items: [ListViewItem] = [self.context.sharedContext.makeChatMessagePreviewItem(context: self.context, messages: self.messages, theme: theme, strings: presentationData.strings, wallpaper: presentationData.theme.chat.defaultWallpaper, fontSize: presentationData.chatFontSize, chatBubbleCorners: chatBubbleCorners, dateTimeFormat: presentationData.dateTimeFormat, nameOrder: presentationData.nameDisplayOrder, forcedResourceStatus: nil, tapMessage: nil, clickThroughMessage: nil, backgroundNode: nil, availableReactions: nil, accountPeer: nil, isCentered: false, isPreview: true, isStandalone: false, rank: nil, rankRole: nil)]
+            let items: [ListViewItem] = [self.context.sharedContext.makeChatMessagePreviewItem(context: self.context, messages: self.messages, theme: theme, strings: presentationData.strings, wallpaper: presentationData.theme.chat.defaultWallpaper, fontSize: presentationData.chatFontSize, chatBubbleCorners: chatBubbleCorners, dateTimeFormat: presentationData.dateTimeFormat, nameOrder: presentationData.nameDisplayOrder, forcedResourceStatus: nil, tapMessage: nil, clickThroughMessage: nil, backgroundNode: nil, availableReactions: nil, accountPeer: nil, isCentered: false, isPreview: true, isStandalone: false)]
         
             let inset: CGFloat = 16.0
             var leftInset: CGFloat = 37.0
@@ -326,7 +323,7 @@ public final class DrawingMessageRenderer {
                 }
              
                 avatarHeaderNode.frame = CGRect(origin: CGPoint(x: 0.0, y: 3.0), size: CGSize(width: layout.size.width, height: avatarHeaderItem.height))
-                avatarHeaderNode.updateLayout(size: size, leftInset: layout.safeInsets.left, rightInset: layout.safeInsets.right, transition: .immediate)
+                avatarHeaderNode.updateLayout(size: size, leftInset: layout.safeInsets.left, rightInset: layout.safeInsets.right)
             }
             
             var finalWidth: CGFloat = width

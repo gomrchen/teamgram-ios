@@ -80,10 +80,6 @@ swift_library(
         "//submodules/TelegramUI/Components/PeerManagement/OwnershipTransferController",
         "//submodules/TelegramUI/Components/PeerManagement/OldChannelsController",
         "//submodules/TelegramUI/Components/PeerInfo/MessagePriceItem",
-        "//submodules/TelegramUI/Components/GlassBackgroundComponent",
-        "//submodules/ComponentFlow",
-        "//submodules/Components/ComponentDisplayAdapters",
-        "//submodules/CounterControllerTitleView",
     ],
     visibility = [
         "//visibility:public",
